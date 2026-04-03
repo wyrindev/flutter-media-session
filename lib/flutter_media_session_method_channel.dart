@@ -1,0 +1,43 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'src/models/media_metadata.dart';
+import 'src/models/playback_state.dart';
+import 'src/models/media_action.dart';
+import 'flutter_media_session_platform_interface.dart';
+
+/// An implementation of [FlutterMediaSessionPlatform] that uses method channels.
+class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
+  /// The method channel used to interact with the native platform.
+  @visibleForTesting
+  final methodChannel = const MethodChannel('flutter_media_session');
+
+  /// The event channel used to receive media actions from the native platform.
+  final eventChannel = const EventChannel('flutter_media_session_events');
+
+  @override
+  Future<void> activate() async {
+    await methodChannel.invokeMethod('activate');
+  }
+
+  @override
+  Future<void> deactivate() async {
+    await methodChannel.invokeMethod('deactivate');
+  }
+
+  @override
+  Future<void> updateMetadata(MediaMetadata metadata) async {
+    await methodChannel.invokeMethod('updateMetadata', metadata.toJson());
+  }
+
+  @override
+  Future<void> updatePlaybackState(PlaybackState state) async {
+    await methodChannel.invokeMethod('updatePlaybackState', state.toJson());
+  }
+
+  @override
+  Stream<MediaAction> get onMediaAction {
+    return eventChannel.receiveBroadcastStream().map((event) {
+      return MediaAction(event as String);
+    });
+  }
+}

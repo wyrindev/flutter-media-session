@@ -1,0 +1,12 @@
+* text=auto
+
+*.dart text eol=lf
+*.kt text eol=lf
+*.xml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.gradle text eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
