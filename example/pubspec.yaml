@@ -1,0 +1,27 @@
+name: flutter_media_session_example
+description: "Demonstrates how to use the flutter_media_session plugin."
+
+publish_to: 'none'
+
+environment:
+  sdk: ^3.3.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_media_session:
+    path: ../
+
+  cupertino_icons: ^1.0.8
+  audioplayers: ^6.6.0
+
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

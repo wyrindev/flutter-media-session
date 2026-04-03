@@ -1,0 +1,47 @@
+name: flutter_media_session
+description: "Sync media metadata and playback state with system controls on Android, Windows, and Web."
+version: 1.0.0
+homepage: https://github.com/wyrindev/flutter-media-session
+repository: https://github.com/wyrindev/flutter-media-session
+issue_tracker: https://github.com/wyrindev/flutter-media-session/issues
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.3.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+  flutter_web_plugins:
+    sdk: flutter
+  web: ">=0.5.1 <2.0.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: dev.wyrin.flutter_media_session
+        pluginClass: FlutterMediaSessionPlugin
+      windows:
+        pluginClass: FlutterMediaSessionPluginCApi
+      web:
+        pluginClass: FlutterMediaSessionWeb
+        fileName: flutter_media_session_web.dart
+
+topics:
+  - media
+  - audio
+  - playback
+  - media-session
+  - lockscreen
+
+platforms:
+  android:
+  windows:
+  web:

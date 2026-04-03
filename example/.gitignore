@@ -1,0 +1,73 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code related
+.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Android related
+/android/local.properties
+/android/flutter_media_session_example_android.iml
+/android/.gradle
+/android/captures/
+/android/gradle/
+/android/.cxx
+/android/.externalNativeBuild
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+
+# iOS related
+/ios/Runner/GeneratedPluginRegistrant.[mh]
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/DerivedData/
+/ios/.generated/
+/ios/.sentry-native/
+/ios/Pods/
+/ios/.symlinks/
+/ios/Config/Generated.xcconfig
+/ios/ServiceDefinitions.json
+/ios/Runner/project.xcworkspace
+
+# Windows related
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake
+/windows/CMakeCache.txt
+/windows/CMakeFiles/
+/windows/CMakeSettings.json
+/windows/cmake-build-*/
+/windows/x64/
+/windows/out/
+/windows/build/

@@ -1,0 +1,138 @@
+package dev.wyrin.flutter_media_session
+
+import android.content.Context
+import android.content.Intent
+import androidx.annotation.NonNull
+import androidx.media3.common.util.UnstableApi
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.EventChannel
+
+/**
+ * Flutter plugin for managing system media sessions on Android.
+ * Integrates with Media3 to provide system-level media controls, metadata, and playback state synchronization.
+ */
+@UnstableApi
+class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
+    private lateinit var channel : MethodChannel
+    private lateinit var eventChannel: EventChannel
+    private var eventSink: EventChannel.EventSink? = null
+    private lateinit var context: Context
+
+    private var pendingMetadata: Map<String, Any?>? = null
+    private var pendingPlaybackState: Map<String, Any?>? = null
+
+    companion object {
+        /**
+         * Singleton instance for access from the media service.
+         */
+        var instance: FlutterMediaSessionPlugin? = null
+            private set
+    }
+
+    override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        instance = this
+        context = flutterPluginBinding.applicationContext
+        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_media_session")
+        channel.setMethodCallHandler(this)
+
+        eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "flutter_media_session_events")
+        eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {
+                eventSink = sink
+            }
+            override fun onCancel(arguments: Any?) {
+                eventSink = null
+            }
+        })
+    }
+
+    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+        when (call.method) {
+            "activate" -> {
+                val intent = Intent(context, FlutterMediaSessionService::class.java)
+                context.startService(intent)
+                result.success(null)
+            }
+            "deactivate" -> {
+                val intent = Intent(context, FlutterMediaSessionService::class.java)
+                context.stopService(intent)
+                result.success(null)
+            }
+            "updateMetadata" -> {
+                val arguments = call.arguments as? Map<String, Any?>
+                if (FlutterMediaSessionService.instance != null) {
+                    val title = call.argument<String>("title")
+                    val artist = call.argument<String>("artist")
+                    val album = call.argument<String>("album")
+                    val artworkUri = call.argument<String>("artworkUri")
+                    val durationMs = (call.argument<Number>("durationMs"))?.toLong() ?: 0L
+                    FlutterMediaSessionService.instance?.updateMetadata(title, artist, album, artworkUri, durationMs)
+                } else {
+                    pendingMetadata = arguments
+                }
+                result.success(null)
+            }
+            "updatePlaybackState" -> {
+                val arguments = call.arguments as? Map<String, Any?>
+                if (FlutterMediaSessionService.instance != null) {
+                    val status = call.argument<String>("status") ?: "idle"
+                    val positionMs = (call.argument<Number>("positionMs"))?.toLong() ?: 0L
+                    val speed = (call.argument<Number>("speed"))?.toFloat() ?: 1.0f
+                    val bufferedPositionMs = (call.argument<Number>("bufferedPositionMs"))?.toLong() ?: 0L
+                    FlutterMediaSessionService.instance?.updatePlaybackState(status, positionMs, speed, bufferedPositionMs)
+                } else {
+                    pendingPlaybackState = arguments
+                }
+                result.success(null)
+            }
+            else -> result.notImplemented()
+        }
+    }
+
+    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+        eventChannel.setStreamHandler(null)
+        instance = null
+    }
+
+    /**
+     * Sends a media action event back to the Flutter side.
+     * @param action The name of the action (e.g., "play", "pause").
+     * @param args Optional arguments for the action (e.g., seek position).
+     */
+    fun sendAction(action: String, args: Any? = null) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            eventSink?.success(action)
+        }
+    }
+
+    /**
+     * Synchronizes metadata and playback state that were received before the service was fully initialized.
+     */
+    fun syncPendingData() {
+        val service = FlutterMediaSessionService.instance ?: return
+        
+        pendingMetadata?.let {
+            val title = it["title"] as? String
+            val artist = it["artist"] as? String
+            val album = it["album"] as? String
+            val artworkUri = it["artworkUri"] as? String
+            val durationMs = (it["durationMs"] as? Number)?.toLong() ?: 0L
+            service.updateMetadata(title, artist, album, artworkUri, durationMs)
+            pendingMetadata = null
+        }
+        
+        pendingPlaybackState?.let {
+            val status = it["status"] as? String ?: "idle"
+            val positionMs = (it["positionMs"] as? Number)?.toLong() ?: 0L
+            val speed = (it["speed"] as? Number)?.toFloat() ?: 1.0f
+            val bufferedPositionMs = (it["bufferedPositionMs"] as? Number)?.toLong() ?: 0L
+            service.updatePlaybackState(status, positionMs, speed, bufferedPositionMs)
+            pendingPlaybackState = null
+        }
+    }
+}
