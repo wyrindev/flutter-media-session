@@ -117,6 +117,35 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
     }
   }
 
+  /// Map from browser action names to MediaAction constants.
+  static const _webActionMap = {
+    'play': MediaAction.play,
+    'pause': MediaAction.pause,
+    'previoustrack': MediaAction.skipToPrevious,
+    'nexttrack': MediaAction.skipToNext,
+    'stop': MediaAction.stop,
+    'seekbackward': MediaAction.rewind,
+    'seekforward': MediaAction.fastForward,
+    'seekto': MediaAction.seekTo,
+  };
+
+  @override
+  Future<void> updateAvailableActions(Set<MediaAction>? actions) async {
+    try {
+      final session = web.window.navigator.mediaSession;
+      for (final entry in _webActionMap.entries) {
+        if (actions == null || actions.contains(entry.value)) {
+          _registerAction(session, entry.key, entry.value);
+        } else {
+          // Unregister by setting handler to null
+          try {
+            session.setActionHandler(entry.key, null);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Internal helper to register a media action handler with the browser's media session.
   void _registerAction(
       web.MediaSession session, String actionName, MediaAction actionToEmit) {

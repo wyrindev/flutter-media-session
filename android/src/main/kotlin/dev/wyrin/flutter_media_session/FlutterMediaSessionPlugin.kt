@@ -89,6 +89,12 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
                 }
                 result.success(null)
             }
+            "updateAvailableActions" -> {
+                @Suppress("UNCHECKED_CAST")
+                val actions = call.arguments as? List<String>
+                FlutterMediaSessionService.instance?.updateAvailableActions(actions)
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }

@@ -35,6 +35,14 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<void> updateAvailableActions(Set<MediaAction>? actions) async {
+    await methodChannel.invokeMethod(
+      'updateAvailableActions',
+      actions?.map((a) => a.name).toList(),
+    );
+  }
+
+  @override
   Stream<MediaAction> get onMediaAction {
     return eventChannel.receiveBroadcastStream().map((event) {
       if (event is Map) {
