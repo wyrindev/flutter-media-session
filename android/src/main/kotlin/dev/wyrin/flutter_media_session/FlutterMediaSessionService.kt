@@ -100,6 +100,14 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     /**
+     * Updates which media actions are available in the system controls.
+     * Pass null to enable all actions.
+     */
+    fun updateAvailableActions(actions: List<String>?) {
+        player.updateAvailableActions(actions)
+    }
+
+    /**
      * Callback handler for MediaSession events.
      */
     inner class CustomMediaSessionCallback : MediaSession.Callback {
@@ -121,6 +129,7 @@ class FlutterMediaSessionService : MediaSessionService() {
         private var speed: Float = 1.0f
         private var bufferedPositionMs: Long = 0
         private var durationMs: Long = C.TIME_UNSET
+        private var availableActions: List<String>? = null // null = all enabled
 
         /**
          * Updates the internal metadata state and triggers a state invalidation.
@@ -143,9 +152,17 @@ class FlutterMediaSessionService : MediaSessionService() {
          * Updates the internal playback state and triggers a state invalidation.
          * Also manages the registration of the ACTION_AUDIO_BECOMING_NOISY receiver.
          */
+        /**
+         * Updates which actions are available. Pass null to enable all.
+         */
+        fun updateAvailableActions(actions: List<String>?) {
+            this.availableActions = actions
+            invalidateState()
+        }
+
         fun updatePlaybackState(status: String, positionMs: Long, speed: Float, bufferedPositionMs: Long) {
             val isPlaying = status == "playing"
-            
+
             this.playbackStatus = status
             this.positionMs = positionMs
             this.speed = speed
@@ -171,12 +188,36 @@ class FlutterMediaSessionService : MediaSessionService() {
             }
             val playWhenReady = playbackStatus == "playing"
             
+            val commandsBuilder = Player.Commands.Builder()
+            val actions = availableActions
+            if (actions == null) {
+                commandsBuilder.addAllCommands()
+            } else {
+                // Always allow basic commands
+                commandsBuilder.add(Player.COMMAND_PLAY_PAUSE)
+                commandsBuilder.add(Player.COMMAND_STOP)
+                commandsBuilder.add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
+                commandsBuilder.add(Player.COMMAND_GET_METADATA)
+                commandsBuilder.add(Player.COMMAND_GET_TIMELINE)
+                if (actions.contains("seekTo")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                    commandsBuilder.add(Player.COMMAND_SEEK_BACK)
+                    commandsBuilder.add(Player.COMMAND_SEEK_FORWARD)
+                }
+                if (actions.contains("skipToNext")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_NEXT)
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                }
+                if (actions.contains("skipToPrevious")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                }
+                if (actions.contains("rewind")) commandsBuilder.add(Player.COMMAND_SEEK_BACK)
+                if (actions.contains("fastForward")) commandsBuilder.add(Player.COMMAND_SEEK_FORWARD)
+            }
+
             return State.Builder()
-                .setAvailableCommands(
-                    Player.Commands.Builder()
-                        .addAllCommands()
-                        .build()
-                )
+                .setAvailableCommands(commandsBuilder.build())
                 .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
                 .setPlaybackState(playerState)
                 .setCurrentMediaItemIndex(0)

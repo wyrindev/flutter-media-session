@@ -262,7 +262,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       else if (*status == "paused") smtcStatus = MediaPlaybackStatus::Paused;
                       else if (*status == "buffering") smtcStatus = MediaPlaybackStatus::Changing;
                       else if (*status == "idle" || *status == "ended" || *status == "error") smtcStatus = MediaPlaybackStatus::Stopped;
-                      
+
                       try {
                           smtc_.PlaybackStatus(smtcStatus);
                       } catch (winrt::hresult_error const& ex) {
@@ -270,6 +270,39 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       }
                   }
               }
+          }
+      }
+      result->Success();
+  } else if (method_name == "updateAvailableActions") {
+      if (smtc_) {
+          const auto* actions = std::get_if<flutter::EncodableList>(method_call.arguments());
+          if (actions) {
+              // Check which actions are in the list
+              bool hasPlay = false, hasPause = false, hasNext = false, hasPrevious = false;
+              for (const auto& action : *actions) {
+                  if (auto str = std::get_if<std::string>(&action)) {
+                      if (*str == "play") hasPlay = true;
+                      else if (*str == "pause") hasPause = true;
+                      else if (*str == "skipToNext") hasNext = true;
+                      else if (*str == "skipToPrevious") hasPrevious = true;
+                  }
+              }
+              try {
+                  smtc_.IsPlayEnabled(hasPlay);
+                  smtc_.IsPauseEnabled(hasPause);
+                  smtc_.IsNextEnabled(hasNext);
+                  smtc_.IsPreviousEnabled(hasPrevious);
+              } catch (winrt::hresult_error const& ex) {
+                  OutputDebugStringW((L"SMTC updateAvailableActions error: " + ex.message() + L"\n").c_str());
+              }
+          } else {
+              // null = enable all
+              try {
+                  smtc_.IsPlayEnabled(true);
+                  smtc_.IsPauseEnabled(true);
+                  smtc_.IsNextEnabled(true);
+                  smtc_.IsPreviousEnabled(true);
+              } catch (...) {}
           }
       }
       result->Success();

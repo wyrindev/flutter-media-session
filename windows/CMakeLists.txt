@@ -62,7 +62,7 @@ set(flutter_media_session_bundled_libraries
 
 # Only enable test builds when building the example (which sets this variable)
 # so that plugin clients aren't building the tests.
-if (FALSE AND ${include_${PROJECT_NAME}_tests})
+if(FALSE)
 set(TEST_RUNNER "${PROJECT_NAME}_test")
 enable_testing()
 
