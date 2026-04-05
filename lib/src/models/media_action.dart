@@ -3,8 +3,12 @@ class MediaAction {
   /// The unique name of the action.
   final String name;
 
-  /// Creates a new [MediaAction] instance with the given [name].
-  const MediaAction(this.name);
+  /// Optional seek position in milliseconds (only set for [seekTo] actions).
+  final Duration? seekPosition;
+
+  /// Creates a new [MediaAction] instance with the given [name] and optional
+  /// [seekPosition].
+  const MediaAction(this.name, {this.seekPosition});
 
   /// Action to resume playback.
   static const play = MediaAction('play');
@@ -22,6 +26,10 @@ class MediaAction {
   static const stop = MediaAction('stop');
 
   /// Action to seek to a specific position.
+  ///
+  /// When received from system controls, [seekPosition] contains the target
+  /// position. Use [MediaAction.seekTo] as a constant only for equality checks;
+  /// actual seek events will have a non-null [seekPosition].
   static const seekTo = MediaAction('seekTo');
 
   /// Action to rewind playback by a standard interval.
@@ -41,5 +49,6 @@ class MediaAction {
   int get hashCode => name.hashCode;
 
   @override
-  String toString() => name;
+  String toString() =>
+      seekPosition != null ? '$name(${seekPosition!.inMilliseconds}ms)' : name;
 }

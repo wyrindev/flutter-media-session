@@ -124,7 +124,19 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
       session.setActionHandler(
           actionName,
           ((JSAny? details) {
-            // Todo: For 'seekto', extract the seek position from details if needed.
+            if (actionName == 'seekto' && details != null) {
+              // Extract seekTime from the MediaSessionActionDetails object.
+              final map = (details as JSObject);
+              final seekTime = (map['seekTime'] as JSNumber?)?.toDartDouble;
+              if (seekTime != null) {
+                _actionController.add(MediaAction(
+                  'seekTo',
+                  seekPosition:
+                      Duration(milliseconds: (seekTime * 1000).round()),
+                ));
+                return;
+              }
+            }
             _actionController.add(actionToEmit);
           }).toJS);
     } catch (e) {
