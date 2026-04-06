@@ -24,6 +24,9 @@ class MockFlutterMediaSessionPlatform
       Future.value();
 
   @override
+  Future<bool> requestNotificationPermission() => Future.value(true);
+
+  @override
   Stream<MediaAction> get onMediaAction => const Stream.empty();
 }
 

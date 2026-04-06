@@ -43,6 +43,13 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<bool> requestNotificationPermission() async {
+    final result =
+        await methodChannel.invokeMethod<bool>('requestNotificationPermission');
+    return result ?? false;
+  }
+
+  @override
   Stream<MediaAction> get onMediaAction {
     return eventChannel.receiveBroadcastStream().map((event) {
       if (event is Map) {
