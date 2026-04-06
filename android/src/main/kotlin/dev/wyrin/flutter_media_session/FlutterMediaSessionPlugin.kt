@@ -36,6 +36,8 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
     private var pendingAvailableActions: List<String>? = null
 
     companion object {
+        private const val REQUEST_NOTIFICATION_PERMISSION = 1101
+        
         /**
          * Singleton instance for access from the media service.
          */
@@ -133,11 +135,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
         }
 
         pendingPermissionResult = result
-        activity?.requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1101)
+        activity?.requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), REQUEST_NOTIFICATION_PERMISSION)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray): Boolean {
-        if (requestCode == 1101) {
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             pendingPermissionResult?.success(granted)
             pendingPermissionResult = null
