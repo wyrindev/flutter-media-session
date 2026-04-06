@@ -3,6 +3,7 @@ package dev.wyrin.flutter_media_session
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.NonNull
+import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -54,7 +55,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
         when (call.method) {
             "activate" -> {
                 val intent = Intent(context, FlutterMediaSessionService::class.java)
-                context.startService(intent)
+                ContextCompat.startForegroundService(context, intent)
                 result.success(null)
             }
             "deactivate" -> {
