@@ -60,6 +60,7 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   String? _loadedUrl;
   Timer? _seekDebounce;
+  final List<StreamSubscription> _subscriptions = [];
 
   final List<Track> _playlist = List.generate(17, (index) {
     final id = index + 1;
@@ -81,7 +82,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   void _listenMediaSessionActions() {
-    _plugin.onMediaAction.listen((action) {
+    _subscriptions.add(_plugin.onMediaAction.listen((action) {
       switch (action) {
         case MediaAction.play:
           _play();
@@ -102,21 +103,25 @@ class _PlayerHomeState extends State<PlayerHome> {
               setState(() => _position = newPosition);
             }
             _updatePlayback();
-            
+
+            // Debouncing external seek commands to avoid flooding the audio player.
+            // 200ms provides a good balance between responsiveness and stability.
             _seekDebounce?.cancel();
-            _seekDebounce = Timer(const Duration(milliseconds: 300), () {
-              _audioPlayer.seek(newPosition).catchError((_) {});
+            _seekDebounce = Timer(const Duration(milliseconds: 200), () {
+              if (mounted) {
+                _audioPlayer.seek(newPosition).catchError((_) {});
+              }
             });
           }
           break;
         default:
           break;
       }
-    });
+    }));
   }
 
   void _listenAudioPlayerEvents() {
-    _audioPlayer.onDurationChanged.listen((Duration d) {
+    _subscriptions.add(_audioPlayer.onDurationChanged.listen((Duration d) {
       if (mounted) {
         setState(() {
           _currentDuration = d;
@@ -124,9 +129,9 @@ class _PlayerHomeState extends State<PlayerHome> {
         });
         _updateAll();
       }
-    });
+    }));
 
-    _audioPlayer.onPositionChanged.listen((p) {
+    _subscriptions.add(_audioPlayer.onPositionChanged.listen((p) {
       if (mounted) {
         setState(() {
           _position = p;
@@ -134,11 +139,11 @@ class _PlayerHomeState extends State<PlayerHome> {
         });
         _updatePlayback();
       }
-    });
+    }));
 
-    _audioPlayer.onPlayerComplete.listen((event) => _next());
+    _subscriptions.add(_audioPlayer.onPlayerComplete.listen((event) => _next()));
 
-    _audioPlayer.onPlayerStateChanged.listen((state) {
+    _subscriptions.add(_audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
         setState(() {
           if (state == PlayerState.playing) {
@@ -156,7 +161,7 @@ class _PlayerHomeState extends State<PlayerHome> {
         });
         _updatePlayback();
       }
-    });
+    }));
   }
 
   Future<void> _activate() async {
@@ -166,6 +171,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _deactivate() async {
+    _seekDebounce?.cancel();
     await _plugin.deactivate();
     await _audioPlayer.stop();
     setState(() {
@@ -200,6 +206,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _prev() async => _changeTrack(-1);
 
   void _changeTrack(int step) async {
+    _seekDebounce?.cancel();
     await _audioPlayer.stop().catchError((_) {});
     setState(() {
       _isSwitchingTrack = true;
@@ -263,6 +270,10 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   @override
   void dispose() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
     _seekDebounce?.cancel();
     _audioPlayer.dispose();
     super.dispose();
@@ -375,7 +386,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                             max: _currentDuration.inMilliseconds.toDouble() > 0
                                 ? _currentDuration.inMilliseconds.toDouble()
                                 : 1.0,
-                            onChanged: _hasError
+                            onChanged: (_hasError || _currentDuration <= Duration.zero)
                                 ? null
                                 : (v) {
                                     final newPosition = Duration(
@@ -383,7 +394,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                                     );
                                     setState(() => _position = newPosition);
                                   },
-                            onChangeEnd: _hasError
+                            onChangeEnd: (_hasError || _currentDuration <= Duration.zero)
                                 ? null
                                 : (v) {
                                     final newPosition = Duration(
