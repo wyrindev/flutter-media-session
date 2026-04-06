@@ -38,6 +38,7 @@ enum MediaActionId {
   Pause,
   SkipToNext,
   SkipToPrevious,
+  SeekTo,
 };
 
 // static
@@ -145,6 +146,14 @@ void FlutterMediaSessionPlugin::InitSmtc() {
                 PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)action_id, 0);
             }
         });
+
+        playback_position_change_requested_token_ = smtc_.PlaybackPositionChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, PlaybackPositionChangeRequestedEventArgs const& args) {
+            if (root_hwnd) {
+                // Pass position in milliseconds through lparam.
+                int64_t position_ms = args.RequestedPlaybackPosition().count() / 10000; // WinRT duration is in 100ns units
+                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::SeekTo, (LPARAM)position_ms);
+            }
+        });
         
     } catch (winrt::hresult_error const& ex) {
         OutputDebugStringW((L"InitSmtc HRESULT error: " + ex.message() + L"\n").c_str());
@@ -162,6 +171,7 @@ void FlutterMediaSessionPlugin::DisposeSmtc() {
     if (smtc_) {
         smtc_.IsEnabled(false);
         smtc_.ButtonPressed(button_pressed_token_);
+        smtc_.PlaybackPositionChangeRequested(playback_position_change_requested_token_);
         smtc_ = nullptr;
     }
 }
@@ -178,11 +188,19 @@ std::optional<LRESULT> FlutterMediaSessionPlugin::HandleWindowProc(HWND hwnd, UI
             case MediaActionId::Pause: actionStr = "pause"; break;
             case MediaActionId::SkipToNext: actionStr = "skipToNext"; break;
             case MediaActionId::SkipToPrevious: actionStr = "skipToPrevious"; break;
+            case MediaActionId::SeekTo: actionStr = "seekTo"; break;
             default: break;
         }
 
         if (!actionStr.empty() && event_sink_) {
-            event_sink_->Success(flutter::EncodableValue(actionStr));
+            if (id == MediaActionId::SeekTo) {
+                flutter::EncodableMap args;
+                args[flutter::EncodableValue("action")] = flutter::EncodableValue(actionStr);
+                args[flutter::EncodableValue("args")] = flutter::EncodableValue((int64_t)lparam);
+                event_sink_->Success(flutter::EncodableValue(args));
+            } else {
+                event_sink_->Success(flutter::EncodableValue(actionStr));
+            }
         }
         return 0; // Handled
     }

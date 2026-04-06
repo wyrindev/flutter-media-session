@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 
 void main() {
@@ -57,6 +58,9 @@ class _PlayerHomeState extends State<PlayerHome> {
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
 
+  String? _loadedUrl;
+  Timer? _seekDebounce;
+
   final List<Track> _playlist = List.generate(17, (index) {
     final id = index + 1;
     return Track(
@@ -90,6 +94,20 @@ class _PlayerHomeState extends State<PlayerHome> {
           break;
         case MediaAction.skipToPrevious:
           _prev();
+          break;
+        case MediaAction.seekTo:
+          if (action.seekPosition != null) {
+            final newPosition = action.seekPosition!;
+            if (mounted) {
+              setState(() => _position = newPosition);
+            }
+            _updatePlayback();
+            
+            _seekDebounce?.cancel();
+            _seekDebounce = Timer(const Duration(milliseconds: 300), () {
+              _audioPlayer.seek(newPosition).catchError((_) {});
+            });
+          }
           break;
         default:
           break;
@@ -165,12 +183,14 @@ class _PlayerHomeState extends State<PlayerHome> {
       if (_status != PlaybackStatus.playing) _isBuffering = true;
     });
     try {
-      if (_audioPlayer.source == null || _position == Duration.zero) {
+      if (_loadedUrl != current.url || _audioPlayer.source == null) {
+        _loadedUrl = current.url;
         await _audioPlayer.play(UrlSource(current.url));
       } else {
         await _audioPlayer.resume();
       }
     } catch (e) {
+      debugPrint("Play error: $e");
       _handleError();
     }
   }
@@ -180,7 +200,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _prev() async => _changeTrack(-1);
 
   void _changeTrack(int step) async {
-    await _audioPlayer.stop();
+    await _audioPlayer.stop().catchError((_) {});
     setState(() {
       _isSwitchingTrack = true;
       _currentIndex =
@@ -190,14 +210,18 @@ class _PlayerHomeState extends State<PlayerHome> {
       _isBuffering = true;
       _hasError = false;
       _status = PlaybackStatus.idle;
+      _loadedUrl = current.url;
     });
     _updateAll();
-    try {
-      await Future.delayed(const Duration(milliseconds: 50));
-      await _audioPlayer.play(UrlSource(current.url));
-    } catch (e) {
-      _handleError();
-    }
+    
+    Future.delayed(const Duration(milliseconds: 50), () async {
+      try {
+        await _audioPlayer.play(UrlSource(current.url));
+      } catch (e) {
+        debugPrint("Change track error: $e");
+        _handleError();
+      }
+    });
   }
 
   void _handleError() {
@@ -239,12 +263,13 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   @override
   void dispose() {
+    _seekDebounce?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
 
   String _format(Duration d) {
-    if (_isBuffering || d == Duration.zero) return "--:--";
+    if (_isBuffering || _isSwitchingTrack) return "--:--";
     String two(int n) => n.toString().padLeft(2, '0');
     return "${two(d.inMinutes)}:${two(d.inSeconds % 60)}";
   }
@@ -322,7 +347,10 @@ class _PlayerHomeState extends State<PlayerHome> {
                 // Playback Progress
                 SizedBox(
                   height: 20,
-                  child: (_isBuffering || _currentDuration <= Duration.zero)
+                  child: (_isBuffering ||
+                          _isSwitchingTrack ||
+                          (_status == PlaybackStatus.playing &&
+                              _currentDuration <= Duration.zero))
                       ? Center(
                           child: LinearProgressIndicator(
                             minHeight: 12.0,
@@ -344,7 +372,9 @@ class _PlayerHomeState extends State<PlayerHome> {
                                   _currentDuration.inMilliseconds.toDouble(),
                                 ),
                             min: 0.0,
-                            max: _currentDuration.inMilliseconds.toDouble(),
+                            max: _currentDuration.inMilliseconds.toDouble() > 0
+                                ? _currentDuration.inMilliseconds.toDouble()
+                                : 1.0,
                             onChanged: _hasError
                                 ? null
                                 : (v) {
@@ -352,7 +382,14 @@ class _PlayerHomeState extends State<PlayerHome> {
                                       milliseconds: v.toInt(),
                                     );
                                     setState(() => _position = newPosition);
-                                    _audioPlayer.seek(newPosition);
+                                  },
+                            onChangeEnd: _hasError
+                                ? null
+                                : (v) {
+                                    final newPosition = Duration(
+                                      milliseconds: v.toInt(),
+                                    );
+                                    _audioPlayer.seek(newPosition).catchError((_) {});
                                     _updatePlayback();
                                   },
                           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' as web;
@@ -124,7 +125,16 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
       session.setActionHandler(
           actionName,
           ((JSAny? details) {
-            // Todo: For 'seekto', extract the seek position from details if needed.
+            if (actionName == 'seekto' && details != null) {
+              final seekTime = (details as JSObject).getProperty<JSNumber?>('seekTime'.toJS)?.toDartDouble;
+              if (seekTime != null) {
+                _actionController.add(MediaAction(
+                  'seekTo',
+                  seekPosition: Duration(milliseconds: (seekTime * 1000).round()),
+                ));
+                return;
+              }
+            }
             _actionController.add(actionToEmit);
           }).toJS);
     } catch (e) {
