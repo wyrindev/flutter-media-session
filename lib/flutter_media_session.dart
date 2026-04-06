@@ -48,4 +48,22 @@ class FlutterMediaSession {
   Future<void> updatePlaybackState(PlaybackState state) {
     return FlutterMediaSessionPlatform.instance.updatePlaybackState(state);
   }
+
+  /// Updates which media actions are available in system controls.
+  ///
+  /// Actions not in [actions] will be disabled in the notification.
+  /// Pass null to enable all actions (the default).
+  ///
+  /// Example — disable skip buttons:
+  /// ```dart
+  /// await _mediaSession.updateAvailableActions({
+  ///   MediaAction.play,
+  ///   MediaAction.pause,
+  ///   MediaAction.seekTo,
+  ///   MediaAction.stop,
+  /// });
+  /// ```
+  Future<void> updateAvailableActions(Set<MediaAction>? actions) {
+    return FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
+  }
 }

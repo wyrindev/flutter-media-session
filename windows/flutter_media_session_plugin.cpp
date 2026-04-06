@@ -276,11 +276,13 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
               
               if (duration_ms_ > 0) {
                   winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
-                  timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
-                  timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
-                  timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                  timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                  timelineProperties.Position(winrt::Windows::Foundation::TimeSpan::zero());
+                  if (has_seek_to_) {
+                      timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
+                      timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
+                      timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                      timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                      timelineProperties.Position(winrt::Windows::Foundation::TimeSpan::zero());
+                  }
                   smtc_.UpdateTimelineProperties(timelineProperties);
               }
           } catch (winrt::hresult_error const& ex) {
@@ -321,17 +323,70 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   if (pos_ms >= 0 && duration_ms_ > 0) {
                       try {
                           winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
-                          timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
-                          timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
-                          timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000)); // 100ns units
-                          timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                          timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(pos_ms * 10000));
+                          if (has_seek_to_) {
+                              timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
+                              timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
+                              timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000)); // 100ns units
+                              timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                              timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(pos_ms * 10000));
+                          }
                           smtc_.UpdateTimelineProperties(timelineProperties);
                       } catch (winrt::hresult_error const& ex) {
                           OutputDebugStringW((L"SMTC TimelineProperties update error: " + ex.message() + L"\n").c_str());
                       }
                   }
               }
+          }
+      }
+      result->Success();
+  } else if (method_name == "updateAvailableActions") {
+      if (smtc_) {
+          const auto* actions = std::get_if<flutter::EncodableList>(method_call.arguments());
+          if (actions) {
+              // Check which actions are in the list
+              bool hasPlay = false, hasPause = false, hasNext = false, hasPrevious = false;
+              bool hasStop = false, hasFastForward = false, hasRewind = false;
+              has_seek_to_ = false;
+              for (const auto& action : *actions) {
+                  if (auto str = std::get_if<std::string>(&action)) {
+                      if (*str == "play") hasPlay = true;
+                      else if (*str == "pause") hasPause = true;
+                      else if (*str == "skipToNext") hasNext = true;
+                      else if (*str == "skipToPrevious") hasPrevious = true;
+                      else if (*str == "stop") hasStop = true;
+                      else if (*str == "fastForward") hasFastForward = true;
+                      else if (*str == "rewind") hasRewind = true;
+                      else if (*str == "seekTo") has_seek_to_ = true;
+                  }
+              }
+              try {
+                  smtc_.IsPlayEnabled(hasPlay);
+                  smtc_.IsPauseEnabled(hasPause);
+                  smtc_.IsNextEnabled(hasNext);
+                  smtc_.IsPreviousEnabled(hasPrevious);
+                  smtc_.IsStopEnabled(hasStop);
+                  smtc_.IsFastForwardEnabled(hasFastForward);
+                  smtc_.IsRewindEnabled(hasRewind);
+                  
+                  if (!has_seek_to_) {
+                      winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
+                      smtc_.UpdateTimelineProperties(timelineProperties);
+                  }
+              } catch (winrt::hresult_error const& ex) {
+                  OutputDebugStringW((L"SMTC updateAvailableActions error: " + ex.message() + L"\n").c_str());
+              }
+          } else {
+              // null = enable all
+              has_seek_to_ = true;
+              try {
+                  smtc_.IsPlayEnabled(true);
+                  smtc_.IsPauseEnabled(true);
+                  smtc_.IsNextEnabled(true);
+                  smtc_.IsPreviousEnabled(true);
+                  smtc_.IsStopEnabled(true);
+                  smtc_.IsFastForwardEnabled(true);
+                  smtc_.IsRewindEnabled(true);
+              } catch (...) {}
           }
       }
       result->Success();

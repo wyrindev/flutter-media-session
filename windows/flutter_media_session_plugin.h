@@ -89,6 +89,7 @@ private:
   void DisposeSmtc();
 
   int64_t duration_ms_ = 0;
+  bool has_seek_to_ = true;
 };
 
 } // namespace flutter_media_session

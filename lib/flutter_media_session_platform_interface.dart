@@ -48,6 +48,15 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
     throw UnimplementedError('updatePlaybackState() has not been implemented.');
   }
 
+  /// Updates the set of media actions available in system controls.
+  ///
+  /// Actions not in [actions] will be disabled (hidden or greyed out)
+  /// in the notification and lock screen. Pass null to enable all actions.
+  Future<void> updateAvailableActions(Set<MediaAction>? actions) {
+    throw UnimplementedError(
+        'updateAvailableActions() has not been implemented.');
+  }
+
   /// A stream of media actions emitted by the current platform.
   Stream<MediaAction> get onMediaAction {
     throw UnimplementedError('onMediaAction has not been implemented.');

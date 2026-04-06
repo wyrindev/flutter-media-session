@@ -100,6 +100,13 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     /**
+     * Updates the set of media actions available in the system controls.
+     */
+    fun updateAvailableActions(actions: List<String>?) {
+        player.updateAvailableActions(actions)
+    }
+
+    /**
      * Callback handler for MediaSession events.
      */
     inner class CustomMediaSessionCallback : MediaSession.Callback {
@@ -122,6 +129,7 @@ class FlutterMediaSessionService : MediaSessionService() {
         private var speed: Float = 1.0f
         private var bufferedPositionMs: Long = 0
         private var durationMs: Long = C.TIME_UNSET
+        private var availableActions: List<String>? = null
 
         /**
          * Updates the internal metadata state and triggers a state invalidation.
@@ -137,6 +145,14 @@ class FlutterMediaSessionService : MediaSessionService() {
                 .setArtworkUri(artworkUri?.let { android.net.Uri.parse(it) })
                 .build()
             this.durationMs = if (durationMs > 0) durationMs else C.TIME_UNSET
+            invalidateState()
+        }
+
+        /**
+         * Updates which actions are available in the system controls.
+         */
+        fun updateAvailableActions(actions: List<String>?) {
+            this.availableActions = actions
             invalidateState()
         }
 
@@ -172,13 +188,44 @@ class FlutterMediaSessionService : MediaSessionService() {
                 else -> Player.STATE_IDLE
             }
             val playWhenReady = playbackStatus == "playing"
+
+            val commandsBuilder = Player.Commands.Builder()
+            val actions = availableActions
+            if (actions == null) {
+                commandsBuilder.addAllCommands()
+            } else {
+                // Basic commands that don't belong to actions
+                commandsBuilder.add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
+                commandsBuilder.add(Player.COMMAND_GET_METADATA)
+                commandsBuilder.add(Player.COMMAND_GET_TIMELINE)
+                
+                if (actions.contains("play") || actions.contains("pause")) {
+                    commandsBuilder.add(Player.COMMAND_PLAY_PAUSE)
+                }
+                if (actions.contains("stop")) {
+                    commandsBuilder.add(Player.COMMAND_STOP)
+                }
+                if (actions.contains("seekTo")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                }
+                if (actions.contains("skipToNext")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_NEXT)
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                }
+                if (actions.contains("skipToPrevious")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                }
+                if (actions.contains("rewind")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_BACK)
+                }
+                if (actions.contains("fastForward")) {
+                    commandsBuilder.add(Player.COMMAND_SEEK_FORWARD)
+                }
+            }
             
             return State.Builder()
-                .setAvailableCommands(
-                    Player.Commands.Builder()
-                        .addAllCommands()
-                        .build()
-                )
+                .setAvailableCommands(commandsBuilder.build())
                 .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
                 .setPlaybackState(playerState)
                 .setCurrentMediaItemIndex(0)

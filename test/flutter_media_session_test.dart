@@ -20,6 +20,10 @@ class MockFlutterMediaSessionPlatform
   Future<void> updatePlaybackState(PlaybackState state) => Future.value();
 
   @override
+  Future<void> updateAvailableActions(Set<MediaAction>? actions) =>
+      Future.value();
+
+  @override
   Stream<MediaAction> get onMediaAction => const Stream.empty();
 }
 
