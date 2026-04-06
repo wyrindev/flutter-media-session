@@ -60,6 +60,7 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   String? _loadedUrl;
   Timer? _seekDebounce;
+  DateTime _lastSeekTime = DateTime.fromMillisecondsSinceEpoch(0);
   final List<StreamSubscription> _subscriptions = [];
 
   final List<Track> _playlist = List.generate(17, (index) {
@@ -100,7 +101,10 @@ class _PlayerHomeState extends State<PlayerHome> {
           if (action.seekPosition != null) {
             final newPosition = action.seekPosition!;
             if (mounted) {
-              setState(() => _position = newPosition);
+              setState(() {
+                _position = newPosition;
+                _lastSeekTime = DateTime.now();
+              });
             }
             _updatePlayback();
 
@@ -133,16 +137,21 @@ class _PlayerHomeState extends State<PlayerHome> {
 
     _subscriptions.add(_audioPlayer.onPositionChanged.listen((p) {
       if (mounted) {
+        // Ignore stale position updates for 500ms after a seek to prevent UI flickering
+        if (DateTime.now().difference(_lastSeekTime).inMilliseconds < 500) return;
+        
+        final wasBuffering = _isBuffering;
         setState(() {
           _position = p;
           if (!_isSwitchingTrack) _isBuffering = false;
         });
+        if (wasBuffering && !_isBuffering) _updatePlayback();
         // System Media Sessions (Android/Windows) extrapolate position automatically.
-        // Spamming updates overrides extrapolation and breaks external controllers (e.g., KDE Connect).
       }
     }));
 
-    _subscriptions.add(_audioPlayer.onPlayerComplete.listen((event) => _next()));
+    _subscriptions
+        .add(_audioPlayer.onPlayerComplete.listen((event) => _next()));
 
     _subscriptions.add(_audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
@@ -221,7 +230,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _loadedUrl = current.url;
     });
     _updateAll();
-    
+
     Future.delayed(const Duration(milliseconds: 50), () async {
       try {
         await _audioPlayer.play(UrlSource(current.url));
@@ -261,9 +270,16 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Future<void> _updatePlayback() async {
     if (!_active) return;
+    PlaybackStatus status = _status;
+    if (_isSwitchingTrack) {
+      status = PlaybackStatus.idle;
+    } else if (_isBuffering) {
+      status = PlaybackStatus.buffering;
+    }
+
     await _plugin.updatePlaybackState(
       PlaybackState(
-        status: _isSwitchingTrack ? PlaybackStatus.idle : _status,
+        status: status,
         position: _position,
       ),
     );
@@ -387,23 +403,31 @@ class _PlayerHomeState extends State<PlayerHome> {
                             max: _currentDuration.inMilliseconds.toDouble() > 0
                                 ? _currentDuration.inMilliseconds.toDouble()
                                 : 1.0,
-                            onChanged: (_hasError || _currentDuration <= Duration.zero)
-                                ? null
-                                : (v) {
-                                    final newPosition = Duration(
-                                      milliseconds: v.toInt(),
-                                    );
-                                    setState(() => _position = newPosition);
-                                  },
-                            onChangeEnd: (_hasError || _currentDuration <= Duration.zero)
-                                ? null
-                                : (v) {
-                                    final newPosition = Duration(
-                                      milliseconds: v.toInt(),
-                                    );
-                                    _audioPlayer.seek(newPosition).catchError((_) {});
-                                    _updatePlayback();
-                                  },
+                            onChanged:
+                                (_hasError || _currentDuration <= Duration.zero)
+                                    ? null
+                                    : (v) {
+                                        final newPosition = Duration(
+                                          milliseconds: v.toInt(),
+                                        );
+                                        setState(() => _position = newPosition);
+                                      },
+                            onChangeEnd:
+                                (_hasError || _currentDuration <= Duration.zero)
+                                    ? null
+                                    : (v) {
+                                        final newPosition = Duration(
+                                          milliseconds: v.toInt(),
+                                        );
+                                        setState(() {
+                                          _position = newPosition;
+                                          _lastSeekTime = DateTime.now();
+                                        });
+                                        _audioPlayer
+                                            .seek(newPosition)
+                                            .catchError((_) {});
+                                        _updatePlayback();
+                                      },
                           ),
                         ),
                 ),

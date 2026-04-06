@@ -117,7 +117,8 @@ class FlutterMediaSessionService : MediaSessionService() {
     inner class ForwardingPlayer : androidx.media3.common.SimpleBasePlayer(mainLooper) {
         private var currentMetadata: MediaMetadata = MediaMetadata.EMPTY
         private var playbackStatus: String = "idle"
-        private var positionMs: Long = 0
+        private var lastPositionMs: Long = 0
+        private var lastPositionUpdateTimeMs: Long = android.os.SystemClock.elapsedRealtime()
         private var speed: Float = 1.0f
         private var bufferedPositionMs: Long = 0
         private var durationMs: Long = C.TIME_UNSET
@@ -147,7 +148,8 @@ class FlutterMediaSessionService : MediaSessionService() {
             val isPlaying = status == "playing"
             
             this.playbackStatus = status
-            this.positionMs = positionMs
+            this.lastPositionMs = positionMs
+            this.lastPositionUpdateTimeMs = android.os.SystemClock.elapsedRealtime()
             this.speed = speed
             this.bufferedPositionMs = bufferedPositionMs
             invalidateState()
@@ -181,12 +183,21 @@ class FlutterMediaSessionService : MediaSessionService() {
                 .setPlaybackState(playerState)
                 .setCurrentMediaItemIndex(0)
                 .setPlaylist(listOf(
-                    MediaItemData.Builder(0)
+                    MediaItemData.Builder("channel_0")
+                        .setMediaItem(MediaItem.Builder().setMediaId("channel_0").setMediaMetadata(currentMetadata).build())
                         .setMediaMetadata(currentMetadata)
                         .setDurationUs(if (durationMs != C.TIME_UNSET) durationMs * 1000 else C.TIME_UNSET)
                         .build()
                 ))
-                .setContentPositionMs { positionMs }
+                .setContentPositionMs {
+                    val position = if (playbackStatus == "playing") {
+                        val elapsed = android.os.SystemClock.elapsedRealtime() - lastPositionUpdateTimeMs
+                        lastPositionMs + (elapsed * speed).toLong()
+                    } else {
+                        lastPositionMs
+                    }
+                    if (durationMs != C.TIME_UNSET && position > durationMs) durationMs else position
+                }
                 .setContentBufferedPositionMs { bufferedPositionMs }
                 .setPlaybackParameters(PlaybackParameters(speed))
                 .build()
@@ -206,6 +217,10 @@ class FlutterMediaSessionService : MediaSessionService() {
                     FlutterMediaSessionPlugin.instance?.sendAction("skipToPrevious")
                 }
                 else -> {
+                    // Update internal state immediately for better responsiveness
+                    this.lastPositionMs = positionMs
+                    this.lastPositionUpdateTimeMs = android.os.SystemClock.elapsedRealtime()
+                    invalidateState()
                     FlutterMediaSessionPlugin.instance?.sendAction("seekTo", positionMs)
                 }
             }
