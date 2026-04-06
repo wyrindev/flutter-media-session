@@ -102,15 +102,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
     /**
      * Sends a media action event back to the Flutter side.
      * @param action The name of the action (e.g., "play", "pause").
-     * @param args Optional arguments for the action (e.g., seek position in ms).
+     * @param args Optional arguments for the action (e.g., seek position).
      */
     fun sendAction(action: String, args: Any? = null) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
-            if (args != null) {
-                eventSink?.success(mapOf("action" to action, "args" to args))
-            } else {
-                eventSink?.success(action)
-            }
+            eventSink?.success(action)
         }
     }
 
