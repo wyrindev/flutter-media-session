@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 
 void main() {
@@ -57,6 +58,11 @@ class _PlayerHomeState extends State<PlayerHome> {
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
 
+  String? _loadedUrl;
+  Timer? _seekDebounce;
+  DateTime _lastSeekTime = DateTime.fromMillisecondsSinceEpoch(0);
+  final List<StreamSubscription> _subscriptions = [];
+
   final List<Track> _playlist = List.generate(17, (index) {
     final id = index + 1;
     return Track(
@@ -77,7 +83,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   void _listenMediaSessionActions() {
-    _plugin.onMediaAction.listen((action) {
+    _subscriptions.add(_plugin.onMediaAction.listen((action) {
       switch (action) {
         case MediaAction.play:
           _play();
@@ -91,14 +97,35 @@ class _PlayerHomeState extends State<PlayerHome> {
         case MediaAction.skipToPrevious:
           _prev();
           break;
+        case MediaAction.seekTo:
+          if (action.seekPosition != null) {
+            final newPosition = action.seekPosition!;
+            if (mounted) {
+              setState(() {
+                _position = newPosition;
+                _lastSeekTime = DateTime.now();
+              });
+            }
+            _updatePlayback();
+
+            // Debouncing external seek commands to avoid flooding the audio player.
+            // 200ms provides a good balance between responsiveness and stability.
+            _seekDebounce?.cancel();
+            _seekDebounce = Timer(const Duration(milliseconds: 200), () {
+              if (mounted) {
+                _audioPlayer.seek(newPosition).catchError((_) {});
+              }
+            });
+          }
+          break;
         default:
           break;
       }
-    });
+    }));
   }
 
   void _listenAudioPlayerEvents() {
-    _audioPlayer.onDurationChanged.listen((Duration d) {
+    _subscriptions.add(_audioPlayer.onDurationChanged.listen((Duration d) {
       if (mounted) {
         setState(() {
           _currentDuration = d;
@@ -106,21 +133,27 @@ class _PlayerHomeState extends State<PlayerHome> {
         });
         _updateAll();
       }
-    });
+    }));
 
-    _audioPlayer.onPositionChanged.listen((p) {
+    _subscriptions.add(_audioPlayer.onPositionChanged.listen((p) {
       if (mounted) {
+        // Ignore stale position updates for 500ms after a seek to prevent UI flickering
+        if (DateTime.now().difference(_lastSeekTime).inMilliseconds < 500) return;
+        
+        final wasBuffering = _isBuffering;
         setState(() {
           _position = p;
           if (!_isSwitchingTrack) _isBuffering = false;
         });
-        _updatePlayback();
+        if (wasBuffering && !_isBuffering) _updatePlayback();
+        // System Media Sessions (Android/Windows) extrapolate position automatically.
       }
-    });
+    }));
 
-    _audioPlayer.onPlayerComplete.listen((event) => _next());
+    _subscriptions
+        .add(_audioPlayer.onPlayerComplete.listen((event) => _next()));
 
-    _audioPlayer.onPlayerStateChanged.listen((state) {
+    _subscriptions.add(_audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
         setState(() {
           if (state == PlayerState.playing) {
@@ -138,7 +171,7 @@ class _PlayerHomeState extends State<PlayerHome> {
         });
         _updatePlayback();
       }
-    });
+    }));
   }
 
   Future<void> _activate() async {
@@ -148,6 +181,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _deactivate() async {
+    _seekDebounce?.cancel();
     await _plugin.deactivate();
     await _audioPlayer.stop();
     setState(() {
@@ -165,12 +199,14 @@ class _PlayerHomeState extends State<PlayerHome> {
       if (_status != PlaybackStatus.playing) _isBuffering = true;
     });
     try {
-      if (_audioPlayer.source == null || _position == Duration.zero) {
+      if (_loadedUrl != current.url || _audioPlayer.source == null) {
+        _loadedUrl = current.url;
         await _audioPlayer.play(UrlSource(current.url));
       } else {
         await _audioPlayer.resume();
       }
     } catch (e) {
+      debugPrint("Play error: $e");
       _handleError();
     }
   }
@@ -180,7 +216,8 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _prev() async => _changeTrack(-1);
 
   void _changeTrack(int step) async {
-    await _audioPlayer.stop();
+    _seekDebounce?.cancel();
+    await _audioPlayer.stop().catchError((_) {});
     setState(() {
       _isSwitchingTrack = true;
       _currentIndex =
@@ -190,14 +227,18 @@ class _PlayerHomeState extends State<PlayerHome> {
       _isBuffering = true;
       _hasError = false;
       _status = PlaybackStatus.idle;
+      _loadedUrl = current.url;
     });
     _updateAll();
-    try {
-      await Future.delayed(const Duration(milliseconds: 50));
-      await _audioPlayer.play(UrlSource(current.url));
-    } catch (e) {
-      _handleError();
-    }
+
+    Future.delayed(const Duration(milliseconds: 50), () async {
+      try {
+        await _audioPlayer.play(UrlSource(current.url));
+      } catch (e) {
+        debugPrint("Change track error: $e");
+        _handleError();
+      }
+    });
   }
 
   void _handleError() {
@@ -229,9 +270,16 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Future<void> _updatePlayback() async {
     if (!_active) return;
+    PlaybackStatus status = _status;
+    if (_isSwitchingTrack) {
+      status = PlaybackStatus.idle;
+    } else if (_isBuffering) {
+      status = PlaybackStatus.buffering;
+    }
+
     await _plugin.updatePlaybackState(
       PlaybackState(
-        status: _isSwitchingTrack ? PlaybackStatus.idle : _status,
+        status: status,
         position: _position,
       ),
     );
@@ -239,12 +287,17 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   @override
   void dispose() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+    _seekDebounce?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
 
   String _format(Duration d) {
-    if (_isBuffering || d == Duration.zero) return "--:--";
+    if (_isBuffering || _isSwitchingTrack) return "--:--";
     String two(int n) => n.toString().padLeft(2, '0');
     return "${two(d.inMinutes)}:${two(d.inSeconds % 60)}";
   }
@@ -322,7 +375,10 @@ class _PlayerHomeState extends State<PlayerHome> {
                 // Playback Progress
                 SizedBox(
                   height: 20,
-                  child: (_isBuffering || _currentDuration <= Duration.zero)
+                  child: (_isBuffering ||
+                          _isSwitchingTrack ||
+                          (_status == PlaybackStatus.playing &&
+                              _currentDuration <= Duration.zero))
                       ? Center(
                           child: LinearProgressIndicator(
                             minHeight: 12.0,
@@ -344,17 +400,34 @@ class _PlayerHomeState extends State<PlayerHome> {
                                   _currentDuration.inMilliseconds.toDouble(),
                                 ),
                             min: 0.0,
-                            max: _currentDuration.inMilliseconds.toDouble(),
-                            onChanged: _hasError
-                                ? null
-                                : (v) {
-                                    final newPosition = Duration(
-                                      milliseconds: v.toInt(),
-                                    );
-                                    setState(() => _position = newPosition);
-                                    _audioPlayer.seek(newPosition);
-                                    _updatePlayback();
-                                  },
+                            max: _currentDuration.inMilliseconds.toDouble() > 0
+                                ? _currentDuration.inMilliseconds.toDouble()
+                                : 1.0,
+                            onChanged:
+                                (_hasError || _currentDuration <= Duration.zero)
+                                    ? null
+                                    : (v) {
+                                        final newPosition = Duration(
+                                          milliseconds: v.toInt(),
+                                        );
+                                        setState(() => _position = newPosition);
+                                      },
+                            onChangeEnd:
+                                (_hasError || _currentDuration <= Duration.zero)
+                                    ? null
+                                    : (v) {
+                                        final newPosition = Duration(
+                                          milliseconds: v.toInt(),
+                                        );
+                                        setState(() {
+                                          _position = newPosition;
+                                          _lastSeekTime = DateTime.now();
+                                        });
+                                        _audioPlayer
+                                            .seek(newPosition)
+                                            .catchError((_) {});
+                                        _updatePlayback();
+                                      },
                           ),
                         ),
                 ),

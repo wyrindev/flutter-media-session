@@ -37,6 +37,17 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   @override
   Stream<MediaAction> get onMediaAction {
     return eventChannel.receiveBroadcastStream().map((event) {
+      if (event is Map) {
+        final action = event['action'] as String;
+        final args = event['args'];
+        if (action == 'seekTo' && args is num) {
+          return MediaAction(
+            action,
+            seekPosition: Duration(milliseconds: args.toInt()),
+          );
+        }
+        return MediaAction(action);
+      }
       return MediaAction(event as String);
     });
   }

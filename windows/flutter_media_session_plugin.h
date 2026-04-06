@@ -64,6 +64,7 @@ private:
   // WinRT System Media Transport Controls (SMTC) objects and tokens.
   winrt::Windows::Media::SystemMediaTransportControls smtc_{nullptr};
   winrt::event_token button_pressed_token_;
+  winrt::event_token playback_position_change_requested_token_;
   winrt::event_token status_changed_token_;
 
   /**
@@ -86,6 +87,8 @@ private:
    * Disables and releases the System Media Transport Controls.
    */
   void DisposeSmtc();
+
+  int64_t duration_ms_ = 0;
 };
 
 } // namespace flutter_media_session

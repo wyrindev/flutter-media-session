@@ -106,7 +106,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
      */
     fun sendAction(action: String, args: Any? = null) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
-            eventSink?.success(action)
+            if (args != null) {
+                eventSink?.success(mapOf("action" to action, "args" to args))
+            } else {
+                eventSink?.success(action)
+            }
         }
     }
 
