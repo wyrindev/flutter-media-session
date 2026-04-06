@@ -57,6 +57,14 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'updateAvailableActions() has not been implemented.');
   }
 
+  /// Requests the POST_NOTIFICATIONS permission on Android (33+).
+  ///
+  /// Returns true if granted or if not needed (e.g., older Android version).
+  Future<bool> requestNotificationPermission() {
+    throw UnimplementedError(
+        'requestNotificationPermission() has not been implemented.');
+  }
+
   /// A stream of media actions emitted by the current platform.
   Stream<MediaAction> get onMediaAction {
     throw UnimplementedError('onMediaAction has not been implemented.');

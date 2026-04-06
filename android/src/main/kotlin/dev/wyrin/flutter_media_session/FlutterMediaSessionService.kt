@@ -50,7 +50,6 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     override fun onCreate() {
-        super.onCreate()
         instance = this
         player = ForwardingPlayer()
         
@@ -58,11 +57,20 @@ class FlutterMediaSessionService : MediaSessionService() {
         val intent = packageManager.getLaunchIntentForPackage(packageName)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
+        // Build the session BEFORE super.onCreate() — Media3 may query
+        // onGetSession() during initialization.
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .setCallback(CustomMediaSessionCallback())
             .build()
             
+        super.onCreate()
+
+        // Register the session with the service so Media3's
+        // MediaNotificationManager creates its internal MediaController
+        // and starts the notification pipeline.
+        addSession(mediaSession!!)
+
         // Sync any data that was sent to the plugin before the service was ready
         FlutterMediaSessionPlugin.instance?.syncPendingData()
     }
@@ -123,7 +131,7 @@ class FlutterMediaSessionService : MediaSessionService() {
      */
     inner class ForwardingPlayer : androidx.media3.common.SimpleBasePlayer(mainLooper) {
         private var currentMetadata: MediaMetadata = MediaMetadata.EMPTY
-        private var playbackStatus: String = "idle"
+        private var playbackStatus: String = "buffering"
         private var lastPositionMs: Long = 0
         private var lastPositionUpdateTimeMs: Long = android.os.SystemClock.elapsedRealtime()
         private var speed: Float = 1.0f

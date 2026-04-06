@@ -66,4 +66,11 @@ class FlutterMediaSession {
   Future<void> updateAvailableActions(Set<MediaAction>? actions) {
     return FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
   }
+
+  /// Requests the POST_NOTIFICATIONS permission on Android (33+).
+  ///
+  /// Returns true if granted or if not needed (e.g., older Android version).
+  Future<bool> requestNotificationPermission() {
+    return FlutterMediaSessionPlatform.instance.requestNotificationPermission();
+  }
 }

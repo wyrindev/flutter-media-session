@@ -3,6 +3,7 @@ package dev.wyrin.flutter_media_session
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.NonNull
+import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -10,23 +11,33 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.EventChannel
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.PluginRegistry
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 
 /**
  * Flutter plugin for managing system media sessions on Android.
  * Integrates with Media3 to provide system-level media controls, metadata, and playback state synchronization.
  */
 @UnstableApi
-class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
+class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.RequestPermissionsResultListener {
     private lateinit var channel : MethodChannel
     private lateinit var eventChannel: EventChannel
     private var eventSink: EventChannel.EventSink? = null
     private lateinit var context: Context
+    private var activity: Activity? = null
+    private var pendingPermissionResult: Result? = null
 
     private var pendingMetadata: Map<String, Any?>? = null
     private var pendingPlaybackState: Map<String, Any?>? = null
     private var pendingAvailableActions: List<String>? = null
 
     companion object {
+        private const val REQUEST_NOTIFICATION_PERMISSION = 1101
+        
         /**
          * Singleton instance for access from the media service.
          */
@@ -55,7 +66,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
         when (call.method) {
             "activate" -> {
                 val intent = Intent(context, FlutterMediaSessionService::class.java)
-                context.startService(intent)
+                ContextCompat.startForegroundService(context, intent)
                 result.success(null)
             }
             "deactivate" -> {
@@ -100,8 +111,59 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
                 }
                 result.success(null)
             }
+            "requestNotificationPermission" -> {
+                requestNotificationPermission(result)
+            }
             else -> result.notImplemented()
         }
+    }
+
+    private fun requestNotificationPermission(result: Result) {
+        if (Build.VERSION.SDK_INT < 33) {
+            result.success(true)
+            return
+        }
+
+        if (ContextCompat.checkSelfPermission(context, "android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED) {
+            result.success(true)
+            return
+        }
+
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "Activity is not available", null)
+            return
+        }
+
+        pendingPermissionResult = result
+        activity?.requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), REQUEST_NOTIFICATION_PERMISSION)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray): Boolean {
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            pendingPermissionResult?.success(granted)
+            pendingPermissionResult = null
+            return true
+        }
+        return false
+    }
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
     }
 
     override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {

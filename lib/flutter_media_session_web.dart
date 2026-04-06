@@ -147,6 +147,11 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
     } catch (_) {}
   }
 
+  @override
+  Future<bool> requestNotificationPermission() async {
+    return true;
+  }
+
   /// Internal helper to register a media action handler with the browser's media session.
   void _registerAction(
       web.MediaSession session, String actionName, MediaAction actionToEmit) {

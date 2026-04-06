@@ -176,6 +176,12 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _activate() async {
+    final granted = await _plugin.requestNotificationPermission();
+    if (!granted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notification permission is required for media controls')),
+      );
+    }
     await _plugin.activate();
     setState(() => _active = true);
     await _updateAvailableActions();
