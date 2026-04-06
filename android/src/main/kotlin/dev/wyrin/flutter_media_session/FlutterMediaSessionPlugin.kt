@@ -24,6 +24,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
 
     private var pendingMetadata: Map<String, Any?>? = null
     private var pendingPlaybackState: Map<String, Any?>? = null
+    private var pendingAvailableActions: List<String>? = null
 
     companion object {
         /**
@@ -89,6 +90,16 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
                 }
                 result.success(null)
             }
+            "updateAvailableActions" -> {
+                @Suppress("UNCHECKED_CAST")
+                val actions = call.arguments as? List<String>
+                if (FlutterMediaSessionService.instance != null) {
+                    FlutterMediaSessionService.instance?.updateAvailableActions(actions)
+                } else {
+                    pendingAvailableActions = actions
+                }
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -137,6 +148,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler {
             val bufferedPositionMs = (it["bufferedPositionMs"] as? Number)?.toLong() ?: 0L
             service.updatePlaybackState(status, positionMs, speed, bufferedPositionMs)
             pendingPlaybackState = null
+        }
+
+        pendingAvailableActions?.let {
+            service.updateAvailableActions(it)
+            pendingAvailableActions = null
         }
     }
 }

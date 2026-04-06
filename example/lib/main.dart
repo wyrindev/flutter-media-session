@@ -57,6 +57,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   int _currentIndex = 0;
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
+  Set<MediaAction>? _availableActions;
 
   String? _loadedUrl;
   Timer? _seekDebounce;
@@ -177,7 +178,13 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _activate() async {
     await _plugin.activate();
     setState(() => _active = true);
+    await _updateAvailableActions();
     await _updateAll();
+  }
+
+  Future<void> _updateAvailableActions() async {
+    if (!_active) return;
+    await _plugin.updateAvailableActions(_availableActions);
   }
 
   Future<void> _deactivate() async {
@@ -194,6 +201,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _play() async {
+    if (_availableActions != null && !_availableActions!.contains(MediaAction.play)) return;
     setState(() {
       _hasError = false;
       if (_status != PlaybackStatus.playing) _isBuffering = true;
@@ -206,14 +214,31 @@ class _PlayerHomeState extends State<PlayerHome> {
         await _audioPlayer.resume();
       }
     } catch (e) {
+      if (e.toString().contains('AbortError') || e.toString().contains('interrupted')) {
+        // A known race condition in browsers when pause is called right after play
+        return;
+      }
       debugPrint("Play error: $e");
       _handleError();
     }
   }
 
-  Future<void> _pause() async => await _audioPlayer.pause();
-  Future<void> _next() async => _changeTrack(1);
-  Future<void> _prev() async => _changeTrack(-1);
+  Future<void> _pause() async {
+    if (_availableActions != null && !_availableActions!.contains(MediaAction.pause)) return;
+    try {
+      await _audioPlayer.pause();
+    } catch (_) {}
+  }
+  
+  Future<void> _next() async {
+    if (_availableActions != null && !_availableActions!.contains(MediaAction.skipToNext)) return;
+    _changeTrack(1);
+  }
+  
+  Future<void> _prev() async {
+    if (_availableActions != null && !_availableActions!.contains(MediaAction.skipToPrevious)) return;
+    _changeTrack(-1);
+  }
 
   void _changeTrack(int step) async {
     _seekDebounce?.cancel();
@@ -235,6 +260,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       try {
         await _audioPlayer.play(UrlSource(current.url));
       } catch (e) {
+        if (e.toString().contains('AbortError') || e.toString().contains('interrupted')) return;
         debugPrint("Change track error: $e");
         _handleError();
       }
@@ -404,7 +430,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 ? _currentDuration.inMilliseconds.toDouble()
                                 : 1.0,
                             onChanged:
-                                (_hasError || _currentDuration <= Duration.zero)
+                                (_hasError || _currentDuration <= Duration.zero || (_availableActions != null && !_availableActions!.contains(MediaAction.seekTo)))
                                     ? null
                                     : (v) {
                                         final newPosition = Duration(
@@ -413,7 +439,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                                         setState(() => _position = newPosition);
                                       },
                             onChangeEnd:
-                                (_hasError || _currentDuration <= Duration.zero)
+                                (_hasError || _currentDuration <= Duration.zero || (_availableActions != null && !_availableActions!.contains(MediaAction.seekTo)))
                                     ? null
                                     : (v) {
                                         final newPosition = Duration(
@@ -454,16 +480,18 @@ class _PlayerHomeState extends State<PlayerHome> {
                   children: [
                     IconButton.filledTonal(
                       iconSize: 32,
-                      onPressed: _prev,
+                      onPressed: (_availableActions != null && !_availableActions!.contains(MediaAction.skipToPrevious)) ? null : _prev,
                       icon: const Icon(Icons.skip_previous),
                     ),
                     IconButton.filled(
                       iconSize: 56,
-                      onPressed: _hasError
-                          ? _play
-                          : (_status == PlaybackStatus.playing
-                              ? _pause
-                              : _play),
+                      onPressed: (_availableActions != null && !_availableActions!.contains(_status == PlaybackStatus.playing ? MediaAction.pause : MediaAction.play))
+                          ? null
+                          : (_hasError
+                              ? _play
+                              : (_status == PlaybackStatus.playing
+                                  ? _pause
+                                  : _play)),
                       icon: Icon(
                         _status == PlaybackStatus.playing
                             ? Icons.pause
@@ -472,7 +500,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                     ),
                     IconButton.filledTonal(
                       iconSize: 32,
-                      onPressed: _next,
+                      onPressed: (_availableActions != null && !_availableActions!.contains(MediaAction.skipToNext)) ? null : _next,
                       icon: const Icon(Icons.skip_next),
                     ),
                   ],
@@ -499,11 +527,93 @@ class _PlayerHomeState extends State<PlayerHome> {
                     },
                   ),
                 ),
+                const SizedBox(height: 32),
+                if (_active) ...[
+                  Text(
+                    "System Control Actions",
+                    style: textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilterChip(
+                        label: const Text("All"),
+                        selected: _availableActions == null,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _availableActions = null);
+                            _updateAvailableActions();
+                          }
+                        },
+                      ),
+                      for (final action in [
+                        MediaAction.play,
+                        MediaAction.pause,
+                        MediaAction.skipToNext,
+                        MediaAction.skipToPrevious,
+                        MediaAction.seekTo,
+                        MediaAction.stop,
+                        MediaAction.rewind,
+                        MediaAction.fastForward,
+                      ])
+                        _singleActionChip(action),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Selected: ${_availableActions == null ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
+                    style: textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _singleActionChip(MediaAction action) {
+    final isSelected =
+        _availableActions == null || _availableActions!.contains(action);
+
+    return FilterChip(
+      label: Text(action.name),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (_availableActions == null) {
+            if (!selected) {
+              _availableActions = {
+                MediaAction.play,
+                MediaAction.pause,
+                MediaAction.skipToNext,
+                MediaAction.skipToPrevious,
+                MediaAction.seekTo,
+                MediaAction.stop,
+                MediaAction.rewind,
+                MediaAction.fastForward,
+              }..remove(action);
+            }
+          } else {
+            if (selected) {
+              _availableActions!.add(action);
+              if (_availableActions!.length == 8) {
+                // If all 8 standard actions are selected, revert to null (All)
+                _availableActions = null;
+              }
+            } else {
+              _availableActions!.remove(action);
+            }
+          }
+        });
+        _updateAvailableActions();
+      },
     );
   }
 }
