@@ -1,5 +1,8 @@
 # flutter_media_session
 
+> [!IMPORTANT]  
+> **Experimental API**: This plugin is currently experimental. The API is subject to change without notice in future versions.
+
 A powerful Flutter plugin for integrating your app with system-level media controls (lock screen, notification, media center) across Android, Windows, and Web.
 
 This plugin allows your app to display media metadata (title, artist, artwork) in the system's media center and respond to system actions like Play, Pause, Skip, and Seek.
