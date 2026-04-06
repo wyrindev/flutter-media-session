@@ -87,6 +87,8 @@ private:
    * Disables and releases the System Media Transport Controls.
    */
   void DisposeSmtc();
+
+  int64_t duration_ms_ = 0;
 };
 
 } // namespace flutter_media_session

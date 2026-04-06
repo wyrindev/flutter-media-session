@@ -137,7 +137,8 @@ class _PlayerHomeState extends State<PlayerHome> {
           _position = p;
           if (!_isSwitchingTrack) _isBuffering = false;
         });
-        _updatePlayback();
+        // System Media Sessions (Android/Windows) extrapolate position automatically.
+        // Spamming updates overrides extrapolation and breaks external controllers (e.g., KDE Connect).
       }
     }));
 

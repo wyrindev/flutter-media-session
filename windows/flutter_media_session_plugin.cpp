@@ -174,6 +174,7 @@ void FlutterMediaSessionPlugin::DisposeSmtc() {
         smtc_.PlaybackPositionChangeRequested(playback_position_change_requested_token_);
         smtc_ = nullptr;
     }
+    duration_ms_ = 0;
 }
 
 /**
@@ -260,9 +261,28 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       }
                   }
               }
+              
+              auto itDuration = args->find(flutter::EncodableValue("durationMs"));
+              if (itDuration != args->end() && !itDuration->second.IsNull()) {
+                  if (auto duration64 = std::get_if<int64_t>(&itDuration->second)) {
+                      duration_ms_ = *duration64;
+                  } else if (auto duration32 = std::get_if<int32_t>(&itDuration->second)) {
+                      duration_ms_ = *duration32;
+                  }
+              }
           }
           try {
               updater.Update();
+              
+              if (duration_ms_ > 0) {
+                  winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
+                  timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
+                  timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
+                  timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                  timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                  timelineProperties.Position(winrt::Windows::Foundation::TimeSpan::zero());
+                  smtc_.UpdateTimelineProperties(timelineProperties);
+              }
           } catch (winrt::hresult_error const& ex) {
               OutputDebugStringW((L"SMTC Metadata Update error: " + ex.message() + L"\n").c_str());
           }
@@ -285,6 +305,30 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                           smtc_.PlaybackStatus(smtcStatus);
                       } catch (winrt::hresult_error const& ex) {
                           OutputDebugStringW((L"SMTC PlaybackStatus update error: " + ex.message() + L"\n").c_str());
+                      }
+                  }
+              }
+
+              auto itPosition = args->find(flutter::EncodableValue("positionMs"));
+              if (itPosition != args->end() && !itPosition->second.IsNull()) {
+                  int64_t pos_ms = -1;
+                  if (auto position64 = std::get_if<int64_t>(&itPosition->second)) {
+                      pos_ms = *position64;
+                  } else if (auto position32 = std::get_if<int32_t>(&itPosition->second)) {
+                      pos_ms = *position32;
+                  }
+                  
+                  if (pos_ms >= 0 && duration_ms_ > 0) {
+                      try {
+                          winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
+                          timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
+                          timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
+                          timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000)); // 100ns units
+                          timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                          timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(pos_ms * 10000));
+                          smtc_.UpdateTimelineProperties(timelineProperties);
+                      } catch (winrt::hresult_error const& ex) {
+                          OutputDebugStringW((L"SMTC TimelineProperties update error: " + ex.message() + L"\n").c_str());
                       }
                   }
               }
