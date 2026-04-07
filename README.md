@@ -49,71 +49,9 @@ No specific configuration is required. The plugin uses winrt on Windows and stan
 
 ## Usage
 
-### 1. Initialize the Plugin
+For detailed instructions and examples on how to initialize the plugin, manage media metadata, respond to system media events, and customize available media controls layout dynamically, please refer to our full breakdown:
 
-Create an instance of `FlutterMediaSession` and activate it.
-
-```dart
-final _mediaSession = FlutterMediaSession();
-
-// Activate to start the media session
-await _mediaSession.activate();
-```
-
-### 2. Handle Media Actions
-
-Listen to the `onMediaAction` stream to respond to user interactions from system controls.
-
-```dart
-_mediaSession.onMediaAction.listen((action) {
-  if (action == MediaAction.play) {
-    // Resume your player
-  } else if (action == MediaAction.pause) {
-    // Pause your player
-  } else if (action == MediaAction.skipToNext) {
-    // Move to the next track
-  }
-  // Handle other actions like skipToPrevious, stop, seekTo, etc.
-});
-```
-
-### 3. Update Metadata
-
-Whenever a new track starts or metadata changes, update the system controls.
-
-```dart
-await _mediaSession.updateMetadata(
-  MediaMetadata(
-    title: 'Song Title',
-    artist: 'Artist Name',
-    album: 'Album Title',
-    artworkUri: 'https://example.com/artwork.png',
-    duration: Duration(minutes: 3, seconds: 45),
-  ),
-);
-```
-
-### 4. Update Playback State
-
-Keep the system synchronized with your player's current status and position.
-
-```dart
-await _mediaSession.updatePlaybackState(
-  PlaybackState(
-    status: PlaybackStatus.playing, // or paused, buffering, idle, etc.
-    position: Duration(seconds: 42),
-    speed: 1.0,
-  ),
-);
-```
-
-### 5. Deactivate
-
-When your app no longer needs the media session (e.g., app closing or music stopped), deactivate it.
-
-```dart
-await _mediaSession.deactivate();
-```
+**[Detailed Usage Guide](docs/usage.md)**
 
 ## License
 
