@@ -51,7 +51,7 @@ No specific configuration is required. The plugin uses winrt on Windows and stan
 
 For detailed instructions and examples on how to initialize the plugin, manage media metadata, respond to system media events, and customize available media controls layout dynamically, please refer to our full breakdown:
 
-**[Detailed Usage Guide](docs/usage.md)**
+**[Detailed Usage Guide](doc/usage.md)**
 
 ## License
 
