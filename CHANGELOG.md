@@ -1,13 +1,10 @@
-## 2.0.0-pre.2
+## 2.0.0
 
-* Fixed incorrect `usage.md` link in README (`docs/usage.md` → `doc/usage.md`)
-
-## 2.0.0-pre.1
-
-* **Breaking Feature**: Added `updateAvailableActions` API to dynamically toggle system media controls (Play, Pause, Skip, Seek, etc.).
+* Added `updateAvailableActions` API to dynamically toggle system media controls (Play, Pause, Skip, Seek, etc.).
 * Improved Web Media Session playback buffering and synchronized seeking logic.
 * Fixed Android and Windows media progress bar synchronization, with advanced position extrapolation.
 * Enhanced debounced seeking strategy across all platforms.
+* Improved documentation and fixed cross-platform link consistency.
 
 ## 1.0.0
 
