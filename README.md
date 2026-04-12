@@ -1,6 +1,6 @@
 # flutter_media_session
 
-A powerful Flutter plugin for integrating your app with system-level media controls (lock screen, notification, media center) across Android, Windows, and Web.
+A powerful Flutter plugin for integrating your app with system-level media controls (lock screen, notification, media center) across Android, iOS, macOS, Windows, and Web.
 
 This plugin allows your app to display media metadata (title, artist, artwork) in the system's media center and respond to system actions like Play, Pause, Skip, and Seek.
 
@@ -9,6 +9,8 @@ This plugin allows your app to display media metadata (title, artist, artwork) i
 | Platform | Support | Underlying API |
 | :--- | :--- | :--- |
 | **Android** | ✅ | [Media3 MediaSessionService](https://developer.android.com/media/media3/session/control-playback) |
+| **iOS** | ✅ | [MPNowPlayingInfoCenter](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter) / [MPRemoteCommandCenter](https://developer.apple.com/documentation/mediaplayer/mpremotecommandcenter) |
+| **macOS** | ✅ | [MPNowPlayingInfoCenter](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter) / [MPRemoteCommandCenter](https://developer.apple.com/documentation/mediaplayer/mpremotecommandcenter) |
 | **Windows** | ✅ | [SystemMediaTransportControls (SMTC)](https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/system-media-transport-controls) |
 | **Web** | ✅ | [Media Session API](https://developer.mozilla.org/en-US/docs/Web/API/Media_Session_API) |
 
@@ -39,6 +41,23 @@ dependencies:
     ```
 
 2.  **Service Declaration**: The plugin handles the service declaration internally via its manifest merger.
+
+### iOS
+
+1. **Background Audio**: Add the `audio` background mode to your `Info.plist`:
+    ```xml
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
+    ```
+    This allows the Now Playing controls to work when the app is backgrounded.
+
+2. **Audio Session**: Call `requestNotificationPermission()` before activating the session. On iOS, this configures the `AVAudioSession` with the `.playback` category.
+
+### macOS
+
+No specific configuration is required. The plugin uses `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter` directly.
 
 ### Windows & Web
 
