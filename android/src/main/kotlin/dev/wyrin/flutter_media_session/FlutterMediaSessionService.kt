@@ -150,6 +150,9 @@ class FlutterMediaSessionService : MediaSessionService() {
         if (!enabled) {
             abandonAudioFocus()
             resumeOnFocusGain = false
+        } else if (player.playbackStatus == "playing") {
+            // If enabled while already playing, request focus immediately.
+            requestAudioFocus()
         }
     }
 
@@ -298,7 +301,10 @@ class FlutterMediaSessionService : MediaSessionService() {
             if (FlutterMediaSessionPlugin.instance?.handlesInterruptions == true) {
                 if (isPlaying) {
                     requestAudioFocus()
-                } else if (status != "buffering") {
+                } else if (status != "buffering" && !resumeOnFocusGain) {
+                    // Only abandon focus if we're not waiting to resume from a transient loss.
+                    // Abandoning focus removes the app from the focus stack, which would
+                    // prevent us from ever receiving AUDIOFOCUS_GAIN back.
                     abandonAudioFocus()
                 }
             }
