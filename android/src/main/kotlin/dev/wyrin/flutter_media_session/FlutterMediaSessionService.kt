@@ -150,7 +150,7 @@ class FlutterMediaSessionService : MediaSessionService() {
         if (!enabled) {
             abandonAudioFocus()
             resumeOnFocusGain = false
-        } else if (player.playbackStatus == "playing") {
+        } else if (player.isCurrentlyPlaying()) {
             // If enabled while already playing, request focus immediately.
             requestAudioFocus()
         }
@@ -240,6 +240,11 @@ class FlutterMediaSessionService : MediaSessionService() {
     inner class ForwardingPlayer : androidx.media3.common.SimpleBasePlayer(mainLooper) {
         private var currentMetadata: MediaMetadata = MediaMetadata.EMPTY
         private var playbackStatus: String = "buffering"
+
+        /** Outer-class accessor — `playbackStatus` is private to this inner
+         *  class so [FlutterMediaSessionService.onHandlesInterruptionsChanged]
+         *  cannot read the field directly. */
+        fun isCurrentlyPlaying(): Boolean = playbackStatus == "playing"
         private var lastPositionMs: Long = 0
         private var lastPositionUpdateTimeMs: Long = android.os.SystemClock.elapsedRealtime()
         private var speed: Float = 1.0f
