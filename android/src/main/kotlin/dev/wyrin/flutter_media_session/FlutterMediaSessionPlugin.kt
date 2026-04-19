@@ -34,6 +34,15 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
     private var pendingMetadata: Map<String, Any?>? = null
     private var pendingPlaybackState: Map<String, Any?>? = null
     private var pendingAvailableActions: List<String>? = null
+    /**
+     * When true, the service requests audio focus while playing and forwards
+     * focus events as media actions. Mirrors the user-facing
+     * `setHandlesInterruptions` API; defaults to false so we don't fight other
+     * audio plugins (audioplayers, just_audio) that already manage focus.
+     * Persisted across service restarts so the setting survives deactivate.
+     */
+    var handlesInterruptions: Boolean = false
+        private set
 
     companion object {
         private const val REQUEST_NOTIFICATION_PERMISSION = 1101
@@ -113,6 +122,12 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             }
             "requestNotificationPermission" -> {
                 requestNotificationPermission(result)
+            }
+            "setHandlesInterruptions" -> {
+                val enabled = call.arguments as? Boolean ?: false
+                handlesInterruptions = enabled
+                FlutterMediaSessionService.instance?.onHandlesInterruptionsChanged(enabled)
+                result.success(null)
             }
             else -> result.notImplemented()
         }

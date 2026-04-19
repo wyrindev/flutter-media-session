@@ -73,4 +73,21 @@ class FlutterMediaSession {
   Future<bool> requestNotificationPermission() {
     return FlutterMediaSessionPlatform.instance.requestNotificationPermission();
   }
+
+  /// Opts the plugin into handling system audio interruptions
+  /// (calls, navigation prompts, other apps grabbing audio).
+  ///
+  /// When enabled, the plugin requests audio focus on Android while
+  /// playback is `playing` and forwards focus events through
+  /// [onMediaAction] — `pause` on focus loss, `play` when transient
+  /// focus returns. Defaults to `false`.
+  ///
+  /// Leave this off if your audio player already manages focus
+  /// (e.g. `audioplayers`, `just_audio`), otherwise both will fight
+  /// for it and silently pause each other. Turn it on for players
+  /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
+  Future<void> setHandlesInterruptions(bool enabled) {
+    return FlutterMediaSessionPlatform.instance
+        .setHandlesInterruptions(enabled);
+  }
 }

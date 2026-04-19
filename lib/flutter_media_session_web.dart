@@ -152,6 +152,12 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
     return true;
   }
 
+  @override
+  Future<void> setHandlesInterruptions(bool enabled) async {
+    // No-op on web: browsers don't expose audio-focus-style interruption
+    // events, and the page is typically the only audio source.
+  }
+
   /// Internal helper to register a media action handler with the browser's media session.
   void _registerAction(
       web.MediaSession session, String actionName, MediaAction actionToEmit) {

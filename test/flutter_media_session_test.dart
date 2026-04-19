@@ -27,6 +27,9 @@ class MockFlutterMediaSessionPlatform
   Future<bool> requestNotificationPermission() => Future.value(true);
 
   @override
+  Future<void> setHandlesInterruptions(bool enabled) => Future.value();
+
+  @override
   Stream<MediaAction> get onMediaAction => const Stream.empty();
 }
 
