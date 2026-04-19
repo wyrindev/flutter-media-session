@@ -1,7 +1,11 @@
 package dev.wyrin.flutter_media_session
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -36,17 +40,101 @@ class FlutterMediaSessionService : MediaSessionService() {
 
     private var isReceiverRegistered = false
 
+    private val audioManager: AudioManager by lazy {
+        getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var hasAudioFocus = false
+    /**
+     * Set when we lose focus transiently (e.g. an incoming call) while playing,
+     * so we can ask the Flutter side to resume once focus returns. Permanent
+     * losses do not set this — the user gave focus to another app on purpose.
+     */
+    private var resumeOnFocusGain = false
+
     /**
      * BroadcastReceiver to handle ACTION_AUDIO_BECOMING_NOISY, which typically happens
      * when headphones are unplugged. It notifies the Flutter side to pause playback.
      */
     private val noisyReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
-            if (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY == intent.action) {
+            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == intent.action) {
                 // Notify Flutter side to pause playback
                 FlutterMediaSessionPlugin.instance?.sendAction("pause")
             }
         }
+    }
+
+    /**
+     * Listens for audio focus changes (e.g. phone calls, navigation prompts).
+     * Permanent and transient losses both ask Flutter to pause; transient losses
+     * additionally trigger a resume when focus returns. Duckable losses are left
+     * to the system to handle by lowering the volume automatically.
+     */
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                hasAudioFocus = false
+                resumeOnFocusGain = false
+                FlutterMediaSessionPlugin.instance?.sendAction("pause")
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                resumeOnFocusGain = hasAudioFocus
+                hasAudioFocus = false
+                FlutterMediaSessionPlugin.instance?.sendAction("pause")
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // No-op: the system ducks playback volume automatically because
+                // willPauseWhenDucked is false on the focus request.
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                hasAudioFocus = true
+                if (resumeOnFocusGain) {
+                    resumeOnFocusGain = false
+                    FlutterMediaSessionPlugin.instance?.sendAction("play")
+                }
+            }
+        }
+    }
+
+    private fun requestAudioFocus() {
+        if (hasAudioFocus) return
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .setWillPauseWhenDucked(false)
+                .build()
+                .also { audioFocusRequest = it }
+            audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                audioFocusListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
+        if (granted) {
+            hasAudioFocus = true
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        if (!hasAudioFocus && audioFocusRequest == null) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusListener)
+        }
+        hasAudioFocus = false
+        resumeOnFocusGain = false
     }
 
     override fun onCreate() {
@@ -85,6 +173,7 @@ class FlutterMediaSessionService : MediaSessionService() {
             unregisterReceiver(noisyReceiver)
             isReceiverRegistered = false
         }
+        abandonAudioFocus()
         mediaSession?.run {
             player.release()
             release()
@@ -180,11 +269,19 @@ class FlutterMediaSessionService : MediaSessionService() {
 
             // Manage AudioBecomingNoisy receiver based on playback state
             if (isPlaying && !isReceiverRegistered) {
-                registerReceiver(noisyReceiver, android.content.IntentFilter(android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+                registerReceiver(noisyReceiver, android.content.IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
                 isReceiverRegistered = true
             } else if (!isPlaying && isReceiverRegistered) {
                 unregisterReceiver(noisyReceiver)
                 isReceiverRegistered = false
+            }
+
+            // Manage audio focus alongside the noisy receiver. Hold focus while
+            // playing so the system routes call/navigation interruptions to us.
+            if (isPlaying) {
+                requestAudioFocus()
+            } else if (status != "buffering") {
+                abandonAudioFocus()
             }
         }
 
