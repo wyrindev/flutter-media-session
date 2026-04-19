@@ -65,6 +65,23 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'requestNotificationPermission() has not been implemented.');
   }
 
+  /// Opts the plugin into handling system audio interruptions
+  /// (calls, navigation prompts, other apps grabbing audio).
+  ///
+  /// When enabled, the plugin requests audio focus on Android while
+  /// playback is `playing`, and forwards focus events to your app via
+  /// the existing [onMediaAction] stream — `pause` on a loss, `play`
+  /// when transient focus returns. Defaults to `false`.
+  ///
+  /// Leave this off if your audio player already manages focus
+  /// (e.g. `audioplayers`, `just_audio`), otherwise both will fight
+  /// for it and silently pause each other. Turn it on for players
+  /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
+  Future<void> setHandlesInterruptions(bool enabled) {
+    throw UnimplementedError(
+        'setHandlesInterruptions() has not been implemented.');
+  }
+
   /// A stream of media actions emitted by the current platform.
   Stream<MediaAction> get onMediaAction {
     throw UnimplementedError('onMediaAction has not been implemented.');

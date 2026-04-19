@@ -390,6 +390,9 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
           }
       }
       result->Success();
+  } else if (method_name == "setHandlesInterruptions") {
+      // No-op on Windows: SMTC manages session focus implicitly.
+      result->Success();
   } else {
       result->NotImplemented();
   }

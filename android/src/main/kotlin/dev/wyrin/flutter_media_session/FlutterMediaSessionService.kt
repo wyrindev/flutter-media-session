@@ -134,7 +134,23 @@ class FlutterMediaSessionService : MediaSessionService() {
             audioManager.abandonAudioFocus(audioFocusListener)
         }
         hasAudioFocus = false
-        resumeOnFocusGain = false
+        // Note: do NOT reset resumeOnFocusGain here. abandonAudioFocus() runs
+        // after we've already sent "pause" to Flutter on a transient loss,
+        // and the next "paused" status update from Flutter will trip this.
+        // We need the flag preserved so AUDIOFOCUS_GAIN can resume.
+    }
+
+    /**
+     * Called by the plugin when the user toggles `setHandlesInterruptions`.
+     * If turning off, drops any focus we currently hold so other audio
+     * plugins (audioplayers, just_audio) can take it back without
+     * fighting us.
+     */
+    fun onHandlesInterruptionsChanged(enabled: Boolean) {
+        if (!enabled) {
+            abandonAudioFocus()
+            resumeOnFocusGain = false
+        }
     }
 
     override fun onCreate() {
@@ -276,12 +292,15 @@ class FlutterMediaSessionService : MediaSessionService() {
                 isReceiverRegistered = false
             }
 
-            // Manage audio focus alongside the noisy receiver. Hold focus while
-            // playing so the system routes call/navigation interruptions to us.
-            if (isPlaying) {
-                requestAudioFocus()
-            } else if (status != "buffering") {
-                abandonAudioFocus()
+            // Manage audio focus alongside the noisy receiver, but only if the
+            // user opted in. By default we stay out of the focus race so apps
+            // that already manage focus (audioplayers, just_audio) keep working.
+            if (FlutterMediaSessionPlugin.instance?.handlesInterruptions == true) {
+                if (isPlaying) {
+                    requestAudioFocus()
+                } else if (status != "buffering") {
+                    abandonAudioFocus()
+                }
             }
         }
 
