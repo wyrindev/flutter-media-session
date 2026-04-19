@@ -1,3 +1,10 @@
+## 2.0.1-pre.1
+
+* **Windows Improvements**: Resolved the "Unknown Application" issue in system media controls and lock screen.
+* Added `setWindowsAppUserModelId` API to explicitly set the AppUserModelID on Windows.
+* Added a comprehensive [Windows Setup Guide](doc/windows_setup.md) for proper application identification.
+* Updated the example app to demonstrate correct Windows initialization.
+
 ## 2.0.0
 
 * Added `updateAvailableActions` API to dynamically toggle system media controls (Play, Pause, Skip, Seek, etc.).

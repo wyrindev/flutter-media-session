@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isWindows) {
+    // This call is safely ignored by the plugin if the app is running as an MSIX package.
+    // For portable apps or debug mode, it sets the AUMID and creates a Start Menu shortcut.
+    await FlutterMediaSession().setWindowsAppUserModelId(
+      'dev.wyrin.flutter_media_session_example',
+      displayName: 'Flutter Media Session Example',
+    );
+  }
   runApp(const MyApp());
 }
 
