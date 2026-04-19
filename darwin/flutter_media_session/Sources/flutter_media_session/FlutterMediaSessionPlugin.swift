@@ -1,10 +1,7 @@
 #if os(iOS)
 import Flutter
-import UIKit
-import AVFoundation
 #elseif os(macOS)
 import FlutterMacOS
-import AppKit
 #endif
 
 public class FlutterMediaSessionPlugin: NSObject, FlutterPlugin {
@@ -81,7 +78,12 @@ public class FlutterMediaSessionPlugin: NSObject, FlutterPlugin {
 
         case "requestNotificationPermission":
             #if os(iOS)
-            let success = configureAudioSession()
+            if manager == nil {
+                manager = MediaSessionManager(eventSink: { [weak self] event in
+                    self?.eventSink?(event)
+                })
+            }
+            let success = manager?.configureAudioSession() ?? false
             result(success)
             #else
             result(true)
@@ -91,19 +93,6 @@ public class FlutterMediaSessionPlugin: NSObject, FlutterPlugin {
             result(FlutterMethodNotImplemented)
         }
     }
-
-    #if os(iOS)
-    private func configureAudioSession() -> Bool {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default)
-            try session.setActive(true)
-            return true
-        } catch {
-            return false
-        }
-    }
-    #endif
 }
 
 // MARK: - FlutterStreamHandler

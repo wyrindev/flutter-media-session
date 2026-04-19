@@ -6,18 +6,23 @@ import UIKit
 import AppKit
 #endif
 
-class MediaSessionManager {
+class MediaSessionManager: NSObject {
     private let sendEvent: (Any) -> Void
     private var commandTargets: [Any] = []
     private var durationMs: Int64?
 
     init(eventSink: @escaping (Any) -> Void) {
         self.sendEvent = eventSink
+        super.init()
     }
 
     // MARK: - Activate / Deactivate
 
     func activate() {
+        #if os(iOS)
+        configureAudioSession()
+        #endif
+
         let center = MPRemoteCommandCenter.shared()
 
         registerCommand(center.playCommand, action: "play")
@@ -33,6 +38,20 @@ class MediaSessionManager {
         registerRouteChangeObserver()
         #endif
     }
+
+    #if os(iOS)
+    @discardableResult
+    func configureAudioSession() -> Bool {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default)
+            try session.setActive(true)
+            return true
+        } catch {
+            return false
+        }
+    }
+    #endif
 
     func deactivate() {
         let center = MPRemoteCommandCenter.shared()
@@ -66,6 +85,7 @@ class MediaSessionManager {
         info[MPMediaItemPropertyTitle] = title
         info[MPMediaItemPropertyArtist] = artist
         info[MPMediaItemPropertyAlbumTitle] = album
+        info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
 
         if let durationMs = durationMs, durationMs > 0 {
             info[MPMediaItemPropertyPlaybackDuration] = Double(durationMs) / 1000.0
@@ -81,6 +101,14 @@ class MediaSessionManager {
     // MARK: - Playback State
 
     func updatePlaybackState(status: String, positionMs: Int64, speed: Double) {
+        #if os(iOS)
+        if status == "playing" {
+            // Re-assert the audio session: it may be deactivated between
+            // activate() and first playback by other plugins or the system.
+            try? AVAudioSession.sharedInstance().setActive(true)
+        }
+        #endif
+
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
 
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000.0
