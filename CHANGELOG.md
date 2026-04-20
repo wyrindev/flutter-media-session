@@ -1,9 +1,13 @@
-## 2.0.1-pre.1
+## 2.1.0-pre.1
 
-* **Windows Improvements**: Resolved the "Unknown Application" issue in system media controls and lock screen.
-* Added `setWindowsAppUserModelId` API to explicitly set the AppUserModelID on Windows.
-* Added a comprehensive [Windows Setup Guide](doc/windows_setup.md) for proper application identification.
-* Updated the example app to demonstrate correct Windows initialization.
+* **Android Custom Media Actions**: Added support for adding custom buttons (like "Like", "Shuffle") to the system notification and lock screen controls via Media3.
+* **Audio Focus Management**: Added `setHandlesInterruptions(bool)` to opt-in to automatic audio focus handling on Android.
+* **iOS & macOS Support**: Added full support for Darwin platforms using `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter`.
+* **Windows Improvements**: Resolved the "Unknown Application" issue in system media controls and lock screen using dynamic AUMID registration.
+* Extended `MediaAction` to support custom labels and Android drawable resources.
+* Improved Android `MediaSessionService` to dynamically update custom layout commands.
+* Fixed a `Slider` rendering assertion failure in the example application when durations were zero or negative.
+* Updated documentation and example app to demonstrate new platform features.
 
 ## 2.0.0
 

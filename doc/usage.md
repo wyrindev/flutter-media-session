@@ -67,6 +67,34 @@ await _mediaSession.updateAvailableActions({
 await _mediaSession.updateAvailableActions(null);
 ```
 
+### Android Custom Media Actions (New in v2.1.0)
+
+On Android, you can add completely custom buttons to the notification (e.g., "Like", "Shuffle"). You need to provide the name of a drawable resource (XML or PNG) that exists in your Android project's `res/drawable` folder.
+
+```dart
+final likeAction = MediaAction.custom(
+  name: 'like',
+  customLabel: 'Like',
+  customIconResource: 'ic_thumb_up', // Must exist in android/app/src/main/res/drawable/
+);
+
+// Add it to your available actions
+await _mediaSession.updateAvailableActions({
+  MediaAction.play,
+  MediaAction.pause,
+  likeAction,
+});
+
+// Listen for the custom action
+_mediaSession.onMediaAction.listen((action) {
+  if (action.name == 'like') {
+    // Handle the custom action
+  }
+});
+```
+
+> **Note:** Custom actions are currently only supported on Android. On other platforms, custom actions passed to `updateAvailableActions` will be gracefully ignored.
+
 ## 4. Update Metadata
 
 Whenever a new track starts or metadata changes, update the system controls.

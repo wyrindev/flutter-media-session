@@ -36,10 +36,23 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
 
   @override
   Future<void> updateAvailableActions(Set<MediaAction>? actions) async {
-    await methodChannel.invokeMethod(
-      'updateAvailableActions',
-      actions?.map((a) => a.name).toList(),
-    );
+    List<dynamic>? mappedActions;
+    if (actions != null) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        mappedActions = actions.map((a) {
+          if (a.customLabel != null || a.customIconResource != null) {
+            return a.toJson();
+          }
+          return a.name;
+        }).toList();
+      } else {
+        mappedActions = actions
+            .where((a) => a.customLabel == null && a.customIconResource == null)
+            .map((a) => a.name)
+            .toList();
+      }
+    }
+    await methodChannel.invokeMethod('updateAvailableActions', mappedActions);
   }
 
   @override
@@ -75,7 +88,10 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
             seekPosition: Duration(milliseconds: args.toInt()),
           );
         }
-        return MediaAction(action);
+        return MediaAction(
+          action,
+          customExtras: args is Map ? Map<String, dynamic>.from(args) : null,
+        );
       }
       return MediaAction(event as String);
     });
