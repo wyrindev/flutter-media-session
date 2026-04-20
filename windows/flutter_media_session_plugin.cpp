@@ -10,6 +10,7 @@
 #include <propkey.h>
 #include <shlwapi.h>
 #include <appmodel.h>
+#include <algorithm>
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -393,9 +394,8 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
       result->Success(flutter::EncodableValue(true));
   } else if (method_name == "setWindowsAppUserModelId") {
       UINT32 length = 0;
-      LONG rc = GetCurrentPackageFullName(&length, NULL);
-      if (rc != APPMODEL_ERROR_NO_PACKAGE) {
-          // Running inside MSIX/AppX. Windows manages AUMID and shortcuts automatically.
+      if (GetCurrentPackageFullName(&length, NULL) != APPMODEL_ERROR_NO_PACKAGE) {
+          // Successfully retrieved package name, indicating MSIX
           result->Success();
           return;
       }
@@ -425,55 +425,72 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
           std::wstring wId = winrt::to_hstring(id_str).c_str();
           HRESULT hr = SetCurrentProcessExplicitAppUserModelID(wId.c_str());
 
+          bool shortcutCreationFailed = false;
           if (!display_name.empty()) {
-              wchar_t exePath[MAX_PATH];
-              GetModuleFileNameW(NULL, exePath, MAX_PATH);
+              try {
+                  wchar_t exePath[MAX_PATH];
+                  GetModuleFileNameW(NULL, exePath, MAX_PATH);
 
-              PWSTR startMenuPath = NULL;
-              if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPath))) {
-                  std::wstring wName = winrt::to_hstring(display_name).c_str();
-                  std::wstring shortcutPath = std::wstring(startMenuPath) + L"\\" + wName + L".lnk";
-                  CoTaskMemFree(startMenuPath);
+                  PWSTR startMenuPath = NULL;
+                  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPath))) {
+                      std::wstring wName = winrt::to_hstring(display_name).c_str();
+                      // Remove path separators and control characters
+                      wName.erase(std::remove_if(wName.begin(), wName.end(), 
+                          [](wchar_t c) { return c == L'\\' || c == L'/' || c == L'*' || c == L'?' 
+                                                 || c == L'"' || c == L'<' || c == L'>' || c == L'|'; }), 
+                          wName.end());
+                      std::wstring shortcutPath = std::wstring(startMenuPath) + L"\\" + wName + L".lnk";
+                      CoTaskMemFree(startMenuPath);
 
-                  IShellLinkW* shellLink = NULL;
-                  if (SUCCEEDED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shellLink)))) {
-                      shellLink->SetPath(exePath);
-                      shellLink->SetWorkingDirectory(L"");
-                      
-                      if (!icon_path.empty()) {
-                          std::wstring wIcon = winrt::to_hstring(icon_path).c_str();
-                          shellLink->SetIconLocation(wIcon.c_str(), 0);
-                      }
-
-                      IPropertyStore* propertyStore = NULL;
-                      if (SUCCEEDED(shellLink->QueryInterface(IID_PPV_ARGS(&propertyStore)))) {
-                          PROPVARIANT appIdPropVar;
-                          PropVariantInit(&appIdPropVar);
-                          appIdPropVar.vt = VT_LPWSTR;
-                          SHStrDupW(wId.c_str(), &appIdPropVar.pwszVal);
+                      winrt::com_ptr<IShellLinkW> shellLink;
+                      if (SUCCEEDED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, __uuidof(IShellLinkW), shellLink.put_void()))) {
+                          shellLink->SetPath(exePath);
+                          shellLink->SetWorkingDirectory(L"");
                           
-                          propertyStore->SetValue(PKEY_AppUserModel_ID, appIdPropVar);
-                          propertyStore->Commit();
-                          
-                          PropVariantClear(&appIdPropVar);
-                          propertyStore->Release();
-                      }
+                          if (!icon_path.empty()) {
+                              std::wstring wIcon = winrt::to_hstring(icon_path).c_str();
+                              if (PathFileExistsW(wIcon.c_str())) {
+                                  shellLink->SetIconLocation(wIcon.c_str(), 0);
+                              }
+                          }
 
-                      IPersistFile* persistFile = NULL;
-                      if (SUCCEEDED(shellLink->QueryInterface(IID_PPV_ARGS(&persistFile)))) {
-                          persistFile->Save(shortcutPath.c_str(), TRUE);
-                          persistFile->Release();
-                          
-                          // Notify shell to pick it up immediately
-                          SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, shortcutPath.c_str(), NULL);
+                          winrt::com_ptr<IPropertyStore> propertyStore;
+                          if (SUCCEEDED(shellLink->QueryInterface(__uuidof(IPropertyStore), propertyStore.put_void()))) {
+                              PROPVARIANT appIdPropVar;
+                              PropVariantInit(&appIdPropVar);
+                              appIdPropVar.vt = VT_LPWSTR;
+                              SHStrDupW(wId.c_str(), &appIdPropVar.pwszVal);
+                              
+                              propertyStore->SetValue(PKEY_AppUserModel_ID, appIdPropVar);
+                              propertyStore->Commit();
+                              
+                              PropVariantClear(&appIdPropVar);
+                          }
+
+                          winrt::com_ptr<IPersistFile> persistFile;
+                          if (SUCCEEDED(shellLink->QueryInterface(__uuidof(IPersistFile), persistFile.put_void()))) {
+                              persistFile->Save(shortcutPath.c_str(), TRUE);
+                              
+                              // Notify shell to pick it up immediately
+                              SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, shortcutPath.c_str(), NULL);
+                          }
+                      } else {
+                          shortcutCreationFailed = true;
                       }
-                      shellLink->Release();
+                  } else {
+                      shortcutCreationFailed = true;
                   }
+              } catch (...) {
+                  shortcutCreationFailed = true;
               }
           }
 
           if (SUCCEEDED(hr)) {
-              result->Success();
+              if (shortcutCreationFailed) {
+                  result->Error("SHORTCUT_ERROR", "Failed to create Start Menu shortcut");
+              } else {
+                  result->Success();
+              }
           } else {
               result->Error("AUMID_ERROR", "Failed to set AppUserModelID");
           }
