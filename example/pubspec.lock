@@ -209,7 +209,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "2.0.1-pre.1"
+    version: "2.1.0-pre.1"
   flutter_test:
     dependency: "direct dev"
     description: flutter

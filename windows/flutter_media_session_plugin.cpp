@@ -487,10 +487,9 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
 
           if (SUCCEEDED(hr)) {
               if (shortcutCreationFailed) {
-                  result->Error("SHORTCUT_ERROR", "Failed to create Start Menu shortcut");
-              } else {
-                  result->Success();
+                  OutputDebugStringA("Failed to create Start Menu shortcut for AUMID.\n");
               }
+              result->Success();
           } else {
               result->Error("AUMID_ERROR", "Failed to set AppUserModelID");
           }
