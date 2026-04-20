@@ -59,6 +59,11 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<void> setHandlesInterruptions(bool enabled) async {
+    await methodChannel.invokeMethod('setHandlesInterruptions', enabled);
+  }
+
+  @override
   Stream<MediaAction> get onMediaAction {
     return eventChannel.receiveBroadcastStream().map((event) {
       if (event is Map) {

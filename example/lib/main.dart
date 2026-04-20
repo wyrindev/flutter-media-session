@@ -62,6 +62,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   bool _active = false;
   PlaybackStatus _status = PlaybackStatus.idle;
   bool _isBuffering = false;
+  bool _handlesInterruptions = false;
   bool _hasError = false;
   bool _isSwitchingTrack = false;
   int _currentIndex = 0;
@@ -213,6 +214,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _isBuffering = false;
       _position = Duration.zero;
       _isSwitchingTrack = false;
+      _handlesInterruptions = false; // Reset on deactivate
     });
   }
 
@@ -580,17 +582,30 @@ class _PlayerHomeState extends State<PlayerHome> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    "Selected: ${_availableActions == null ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
-                    style: textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
+                    Text(
+                      "Selected: ${_availableActions == null ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
+                      style: textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text("Handle Audio Focus"),
+                      subtitle: const Text(
+                          "Opt-in to Android audio focus management (pauses for calls/other apps)"),
+                      value: _handlesInterruptions,
+                      onChanged: (val) {
+                        setState(() => _handlesInterruptions = val);
+                        _plugin.setHandlesInterruptions(val);
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
-      ),
     );
   }
 

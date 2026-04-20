@@ -497,6 +497,9 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
       } else {
           result->Error("INVALID_ARGUMENT", "AppUserModelID must be a string or map with 'id'");
       }
+  } else if (method_name == "setHandlesInterruptions") {
+      // No-op on Windows: SMTC manages session focus implicitly.
+      result->Success();
   } else {
       result->NotImplemented();
   }
