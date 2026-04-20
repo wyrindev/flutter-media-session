@@ -1,24 +1,24 @@
 #include "flutter_media_session_plugin.h"
 
-#include <windows.h>
 #include <VersionHelpers.h>
-
-#include <flutter/method_channel.h>
-#include <flutter/event_channel.h>
-#include <flutter/event_stream_handler_functions.h>
-#include <flutter/plugin_registrar_windows.h>
-#include <flutter/standard_method_codec.h>
-
 #include <memory>
 #include <string>
-#include <systemmediatransportcontrolsinterop.h>
+
+#include <shobjidl.h>
+#include <shlobj.h>
+#include <knownfolders.h>
+#include <propkey.h>
+#include <shlwapi.h>
+#include <appmodel.h>
+#include <algorithm>
+
+#pragma comment(lib, "shlwapi.lib")
 
 #include <winrt/Windows.Storage.Streams.h>
 
 using namespace winrt::Windows::Media;
 using namespace winrt::Windows::Media::Playback;
 using namespace winrt::Windows::Media::Core;
-using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Storage::Streams;
 
 namespace flutter_media_session {
@@ -390,6 +390,112 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
           }
       }
       result->Success();
+  } else if (method_name == "requestNotificationPermission") {
+      result->Success(flutter::EncodableValue(true));
+  } else if (method_name == "setWindowsAppUserModelId") {
+      UINT32 length = 0;
+      if (GetCurrentPackageFullName(&length, NULL) != APPMODEL_ERROR_NO_PACKAGE) {
+          // Successfully retrieved package name, indicating MSIX
+          result->Success();
+          return;
+      }
+
+      std::string id_str = "";
+      std::string display_name = "";
+      std::string icon_path = "";
+
+      if (auto* id_ptr = std::get_if<std::string>(method_call.arguments())) {
+          id_str = *id_ptr;
+      } else if (auto* map_ptr = std::get_if<flutter::EncodableMap>(method_call.arguments())) {
+          auto itId = map_ptr->find(flutter::EncodableValue("id"));
+          if (itId != map_ptr->end() && !itId->second.IsNull()) {
+              if (auto* str = std::get_if<std::string>(&itId->second)) id_str = *str;
+          }
+          auto itName = map_ptr->find(flutter::EncodableValue("displayName"));
+          if (itName != map_ptr->end() && !itName->second.IsNull()) {
+              if (auto* str = std::get_if<std::string>(&itName->second)) display_name = *str;
+          }
+          auto itIcon = map_ptr->find(flutter::EncodableValue("iconPath"));
+          if (itIcon != map_ptr->end() && !itIcon->second.IsNull()) {
+              if (auto* str = std::get_if<std::string>(&itIcon->second)) icon_path = *str;
+          }
+      }
+
+      if (!id_str.empty()) {
+          std::wstring wId = winrt::to_hstring(id_str).c_str();
+          HRESULT hr = SetCurrentProcessExplicitAppUserModelID(wId.c_str());
+
+          bool shortcutCreationFailed = false;
+          if (!display_name.empty()) {
+              try {
+                  wchar_t exePath[MAX_PATH];
+                  GetModuleFileNameW(NULL, exePath, MAX_PATH);
+
+                  PWSTR startMenuPath = NULL;
+                  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPath))) {
+                      std::wstring wName = winrt::to_hstring(display_name).c_str();
+                      // Remove path separators and control characters
+                      wName.erase(std::remove_if(wName.begin(), wName.end(), 
+                          [](wchar_t c) { return c == L'\\' || c == L'/' || c == L'*' || c == L'?' 
+                                                 || c == L'"' || c == L'<' || c == L'>' || c == L'|'; }), 
+                          wName.end());
+                      std::wstring shortcutPath = std::wstring(startMenuPath) + L"\\" + wName + L".lnk";
+                      CoTaskMemFree(startMenuPath);
+
+                      winrt::com_ptr<IShellLinkW> shellLink;
+                      if (SUCCEEDED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, __uuidof(IShellLinkW), shellLink.put_void()))) {
+                          shellLink->SetPath(exePath);
+                          shellLink->SetWorkingDirectory(L"");
+                          
+                          if (!icon_path.empty()) {
+                              std::wstring wIcon = winrt::to_hstring(icon_path).c_str();
+                              if (PathFileExistsW(wIcon.c_str())) {
+                                  shellLink->SetIconLocation(wIcon.c_str(), 0);
+                              }
+                          }
+
+                          winrt::com_ptr<IPropertyStore> propertyStore;
+                          if (SUCCEEDED(shellLink->QueryInterface(__uuidof(IPropertyStore), propertyStore.put_void()))) {
+                              PROPVARIANT appIdPropVar;
+                              PropVariantInit(&appIdPropVar);
+                              appIdPropVar.vt = VT_LPWSTR;
+                              SHStrDupW(wId.c_str(), &appIdPropVar.pwszVal);
+                              
+                              propertyStore->SetValue(PKEY_AppUserModel_ID, appIdPropVar);
+                              propertyStore->Commit();
+                              
+                              PropVariantClear(&appIdPropVar);
+                          }
+
+                          winrt::com_ptr<IPersistFile> persistFile;
+                          if (SUCCEEDED(shellLink->QueryInterface(__uuidof(IPersistFile), persistFile.put_void()))) {
+                              persistFile->Save(shortcutPath.c_str(), TRUE);
+                              
+                              // Notify shell to pick it up immediately
+                              SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, shortcutPath.c_str(), NULL);
+                          }
+                      } else {
+                          shortcutCreationFailed = true;
+                      }
+                  } else {
+                      shortcutCreationFailed = true;
+                  }
+              } catch (...) {
+                  shortcutCreationFailed = true;
+              }
+          }
+
+          if (SUCCEEDED(hr)) {
+              if (shortcutCreationFailed) {
+                  OutputDebugStringA("Failed to create Start Menu shortcut for AUMID.\n");
+              }
+              result->Success();
+          } else {
+              result->Error("AUMID_ERROR", "Failed to set AppUserModelID");
+          }
+      } else {
+          result->Error("INVALID_ARGUMENT", "AppUserModelID must be a string or map with 'id'");
+      }
   } else if (method_name == "setHandlesInterruptions") {
       // No-op on Windows: SMTC manages session focus implicitly.
       result->Success();

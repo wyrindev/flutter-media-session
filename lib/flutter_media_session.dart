@@ -74,6 +74,23 @@ class FlutterMediaSession {
     return FlutterMediaSessionPlatform.instance.requestNotificationPermission();
   }
 
+  /// Sets the AppUserModelID for the current process on Windows.
+  ///
+  /// This is used by Windows to identify the application in the system media center.
+  /// If not set, the application might show up as "Unknown Application".
+  ///
+  /// Provide [displayName] (and optionally [iconPath]) to dynamically create a
+  /// Start Menu shortcut. This is highly recommended for unpackaged/portable apps.
+  /// If your app is packaged via MSIX or uses an installer to create shortcuts,
+  /// you should **omit** [displayName] to avoid creating duplicate shortcuts.
+  ///
+  /// This method is only effective on Windows.
+  Future<void> setWindowsAppUserModelId(String id,
+      {String? displayName, String? iconPath}) {
+    return FlutterMediaSessionPlatform.instance.setWindowsAppUserModelId(id,
+        displayName: displayName, iconPath: iconPath);
+  }
+
   /// Opts the plugin into handling system audio interruptions
   /// (calls, navigation prompts, other apps grabbing audio).
   ///

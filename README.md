@@ -61,7 +61,13 @@ No specific configuration is required. The plugin uses `MPNowPlayingInfoCenter` 
 
 ### Windows & Web
 
-No specific configuration is required. The plugin uses winrt on Windows and standard JS interop on Web.
+For proper application identification (avoiding "Unknown Application" in the system media center), please refer to the:
+
+**[Windows Setup Guide](doc/windows_setup.md)**
+
+### Web
+
+No specific configuration is required. The plugin uses standard JS interop on Web.
 
 ## Usage
 
