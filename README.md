@@ -59,7 +59,7 @@ dependencies:
 
 No specific configuration is required. The plugin uses `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter` directly.
 
-### Windows & Web
+### Windows
 
 For proper application identification (avoiding "Unknown Application" in the system media center), please refer to the:
 
