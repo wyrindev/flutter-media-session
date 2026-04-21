@@ -257,11 +257,12 @@ class _PlayerHomeState extends State<PlayerHome> {
     });
   }
 
+  bool _isActionAvailable(MediaAction action) {
+    return _availableActions == null || _availableActions!.contains(action);
+  }
+
   Future<void> _play() async {
-    if (_availableActions != null &&
-        !_availableActions!.contains(MediaAction.play)) {
-      return;
-    }
+    if (!_isActionAvailable(MediaAction.play)) return;
     setState(() {
       _hasError = false;
       if (_status != PlaybackStatus.playing) _isBuffering = true;
@@ -285,28 +286,19 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _pause() async {
-    if (_availableActions != null &&
-        !_availableActions!.contains(MediaAction.pause)) {
-      return;
-    }
+    if (!_isActionAvailable(MediaAction.pause)) return;
     try {
       await _audioPlayer.pause();
     } catch (_) {}
   }
 
   Future<void> _next() async {
-    if (_availableActions != null &&
-        !_availableActions!.contains(MediaAction.skipToNext)) {
-      return;
-    }
+    if (!_isActionAvailable(MediaAction.skipToNext)) return;
     _changeTrack(1);
   }
 
   Future<void> _prev() async {
-    if (_availableActions != null &&
-        !_availableActions!.contains(MediaAction.skipToPrevious)) {
-      return;
-    }
+    if (!_isActionAvailable(MediaAction.skipToPrevious)) return;
     _changeTrack(-1);
   }
 

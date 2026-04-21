@@ -272,13 +272,17 @@ class FlutterMediaSessionService : MediaSessionService() {
 
                     val iconResId = resources.getIdentifier(customIconResource, "drawable", packageName)
                     if (iconResId != 0) {
-                        val sessionCommand = androidx.media3.session.SessionCommand(name, extrasBundle)
-                        val button = androidx.media3.session.CommandButton.Builder()
-                            .setSessionCommand(sessionCommand)
-                            .setIconResId(iconResId)
-                            .setDisplayName(customLabel)
-                            .build()
-                        newCustomLayout.add(button)
+                        try {
+                            val sessionCommand = androidx.media3.session.SessionCommand(name, extrasBundle)
+                            val button = androidx.media3.session.CommandButton.Builder()
+                                .setSessionCommand(sessionCommand)
+                                .setIconResId(iconResId)
+                                .setDisplayName(customLabel)
+                                .build()
+                            newCustomLayout.add(button)
+                        } catch (e: Exception) {
+                            android.util.Log.e("FlutterMediaSession", "Failed to create custom action '$name'", e)
+                        }
                     } else {
                         android.util.Log.w("FlutterMediaSession", "Custom action icon resource '$customIconResource' not found for action '$name'. Action will be ignored.")
                     }
