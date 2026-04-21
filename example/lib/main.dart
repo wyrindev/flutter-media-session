@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 import 'dart:async';
 import 'dart:io';
@@ -107,7 +108,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       MediaAction.stop,
       MediaAction.rewind,
       MediaAction.fastForward,
-      _customLikeAction,
+      if (!kIsWeb && Platform.isAndroid) _customLikeAction,
     };
     _listenMediaSessionActions();
     _listenAudioPlayerEvents();
@@ -641,7 +642,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 MediaAction.stop,
                                 MediaAction.rewind,
                                 MediaAction.fastForward,
-                                _customLikeAction,
+                                if (!kIsWeb && Platform.isAndroid) _customLikeAction,
                               };
                             });
                             _updateAvailableActions();
@@ -657,14 +658,14 @@ class _PlayerHomeState extends State<PlayerHome> {
                         MediaAction.stop,
                         MediaAction.rewind,
                         MediaAction.fastForward,
-                        _customLikeAction,
+                        if (!kIsWeb && Platform.isAndroid) _customLikeAction,
                       ])
                         _singleActionChip(action),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "Selected: ${_availableActions?.length == 9 ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
+                    "Selected: ${_availableActions?.length == (!kIsWeb && Platform.isAndroid ? 9 : 8) ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
                     style: textTheme.bodySmall,
                     textAlign: TextAlign.center,
                   ),
