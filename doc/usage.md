@@ -125,7 +125,21 @@ await _mediaSession.updatePlaybackState(
 );
 ```
 
-## 6. Deactivate
+## 6. Audio Focus Management (New in v2.1.0)
+
+On Android, you can opt-in to automatic audio focus management. When enabled, the plugin will:
+1. Request audio focus when playback starts.
+2. Automatically pause playback (via `onMediaAction`) when another app takes focus (e.g., an incoming call).
+3. Automatically resume playback when the interruption ends (if the interruption was transient).
+
+```dart
+// Enable automatic focus management
+await _mediaSession.setHandlesInterruptions(true);
+```
+
+> **Important:** If your underlying audio player already handles audio focus (like `audioplayers` or `just_audio`), you should keep this **disabled** (the default) to avoid conflicts. Enable it only for players that don't manage focus themselves (like `fvp` or `video_player`).
+
+## 7. Deactivate
 
 When your app no longer needs the media session (e.g., the app is closing or the music is completely stopped and dismissed), deactivate it to release resources cleanly.
 

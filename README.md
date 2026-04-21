@@ -19,6 +19,9 @@ This plugin allows your app to display media metadata (title, artist, artwork) i
 - 🎵 **Metadata Synchronization**: Display title, artist, album, and artwork in the lock screen or system media center.
 - ⏯️ **Playback State Control**: Sync playing/paused status and current playback position.
 - 📡 **Native Media Actions**: Receive events from system controls (Play, Pause, Skip, Seek, etc.) and handle them in your Dart code.
+- 🎨 **Custom Actions (Android)**: Add completely custom buttons (like "Like", "Shuffle") with custom icons and labels to the notification.
+- 🔈 **Audio Focus (Android)**: Optional automatic handling of audio interruptions (calls, navigation prompts).
+- 🪟 **Windows Identity**: Dynamic AUMID and Start Menu shortcut registration to avoid "Unknown Application" label.
 - 🎧 **Android Background Support**: Automatically handles foreground service requirements for media playback on Android.
 
 ## Installation

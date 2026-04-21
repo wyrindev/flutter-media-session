@@ -1,12 +1,18 @@
 ## 2.1.0-pre.1
 
 * **Android Custom Media Actions**: Added support for adding custom buttons (like "Like", "Shuffle") to the system notification and lock screen controls via Media3.
-* **Audio Focus Management**: Added `setHandlesInterruptions(bool)` to opt-in to automatic audio focus handling on Android.
+    * Extended `MediaAction` to support custom labels and Android drawable resources.
+    * Improved Android `MediaSessionService` to dynamically update custom layout commands.
+    * **Security**: Implemented robust input validation and size-limited caching for custom action parameters and controller commands.
+* **Audio Focus Management**: Added `setHandlesInterruptions(bool)` to opt-in to automatic audio focus handling on Android. This allows the plugin to automatically pause/resume playback during calls or other audio interruptions.
 * **iOS & macOS Support**: Added full support for Darwin platforms using `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter`.
-* **Windows Improvements**: Resolved the "Unknown Application" issue in system media controls and lock screen using dynamic AUMID registration.
-* Extended `MediaAction` to support custom labels and Android drawable resources.
-* Improved Android `MediaSessionService` to dynamically update custom layout commands.
-* Fixed a `Slider` rendering assertion failure in the example application when durations were zero or negative.
+* **Windows Improvements**: 
+    * Resolved the "Unknown Application" issue in system media controls using dynamic AppUserModelID (AUMID) registration and Start Menu shortcut creation.
+    * Improved COM lifecycle management and path traversal security in Windows implementation.
+* **Fixes & Improvements**:
+    * **Android**: Exposed playback state via accessor for better integration with custom services (PR #16).
+    * **Example**: Fixed a `Slider` rendering assertion failure when durations were zero or negative.
+    * **Web**: Improved `updateAvailableActions` parity.
 * Updated documentation and example app to demonstrate new platform features.
 
 ## 2.0.0
