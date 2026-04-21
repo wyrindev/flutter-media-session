@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 import 'dart:async';
 import 'dart:io';
@@ -68,6 +69,14 @@ class _PlayerHomeState extends State<PlayerHome> {
   int _currentIndex = 0;
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
+  bool _isLiked = false;
+
+  MediaAction get _customLikeAction => MediaAction.custom(
+        name: 'like',
+        customLabel: 'Like',
+        customIconResource: _isLiked ? 'ic_thumb_up' : 'ic_thumb_up_outline',
+      );
+
   Set<MediaAction>? _availableActions;
 
   String? _loadedUrl;
@@ -90,6 +99,17 @@ class _PlayerHomeState extends State<PlayerHome> {
   @override
   void initState() {
     super.initState();
+    _availableActions = {
+      MediaAction.play,
+      MediaAction.pause,
+      MediaAction.skipToNext,
+      MediaAction.skipToPrevious,
+      MediaAction.seekTo,
+      MediaAction.stop,
+      MediaAction.rewind,
+      MediaAction.fastForward,
+      if (!kIsWeb && Platform.isAndroid) _customLikeAction,
+    };
     _listenMediaSessionActions();
     _listenAudioPlayerEvents();
   }
@@ -130,6 +150,22 @@ class _PlayerHomeState extends State<PlayerHome> {
             });
           }
           break;
+        case final a when a.name == 'like':
+          if (mounted) {
+            setState(() {
+              _isLiked = !_isLiked;
+              if (_availableActions != null) {
+                _availableActions!
+                    .removeWhere((action) => action.name == 'like');
+                _availableActions!.add(_customLikeAction);
+              }
+            });
+            _updateAvailableActions();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_isLiked ? 'Liked!' : 'Unliked!')),
+            );
+          }
+          break;
         default:
           break;
       }
@@ -150,8 +186,10 @@ class _PlayerHomeState extends State<PlayerHome> {
     _subscriptions.add(_audioPlayer.onPositionChanged.listen((p) {
       if (mounted) {
         // Ignore stale position updates for 500ms after a seek to prevent UI flickering
-        if (DateTime.now().difference(_lastSeekTime).inMilliseconds < 500) return;
-        
+        if (DateTime.now().difference(_lastSeekTime).inMilliseconds < 500) {
+          return;
+        }
+
         final wasBuffering = _isBuffering;
         setState(() {
           _position = p;
@@ -190,7 +228,9 @@ class _PlayerHomeState extends State<PlayerHome> {
     final granted = await _plugin.requestNotificationPermission();
     if (!granted && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification permission is required for media controls')),
+        const SnackBar(
+            content:
+                Text('Notification permission is required for media controls')),
       );
     }
     await _plugin.activate();
@@ -218,8 +258,12 @@ class _PlayerHomeState extends State<PlayerHome> {
     });
   }
 
+  bool _isActionAvailable(MediaAction action) {
+    return _availableActions == null || _availableActions!.contains(action);
+  }
+
   Future<void> _play() async {
-    if (_availableActions != null && !_availableActions!.contains(MediaAction.play)) return;
+    if (!_isActionAvailable(MediaAction.play)) return;
     setState(() {
       _hasError = false;
       if (_status != PlaybackStatus.playing) _isBuffering = true;
@@ -232,7 +276,8 @@ class _PlayerHomeState extends State<PlayerHome> {
         await _audioPlayer.resume();
       }
     } catch (e) {
-      if (e.toString().contains('AbortError') || e.toString().contains('interrupted')) {
+      if (e.toString().contains('AbortError') ||
+          e.toString().contains('interrupted')) {
         // A known race condition in browsers when pause is called right after play
         return;
       }
@@ -242,19 +287,19 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _pause() async {
-    if (_availableActions != null && !_availableActions!.contains(MediaAction.pause)) return;
+    if (!_isActionAvailable(MediaAction.pause)) return;
     try {
       await _audioPlayer.pause();
     } catch (_) {}
   }
-  
+
   Future<void> _next() async {
-    if (_availableActions != null && !_availableActions!.contains(MediaAction.skipToNext)) return;
+    if (!_isActionAvailable(MediaAction.skipToNext)) return;
     _changeTrack(1);
   }
-  
+
   Future<void> _prev() async {
-    if (_availableActions != null && !_availableActions!.contains(MediaAction.skipToPrevious)) return;
+    if (!_isActionAvailable(MediaAction.skipToPrevious)) return;
     _changeTrack(-1);
   }
 
@@ -278,7 +323,10 @@ class _PlayerHomeState extends State<PlayerHome> {
       try {
         await _audioPlayer.play(UrlSource(current.url));
       } catch (e) {
-        if (e.toString().contains('AbortError') || e.toString().contains('interrupted')) return;
+        if (e.toString().contains('AbortError') ||
+            e.toString().contains('interrupted')) {
+          return;
+        }
         debugPrint("Change track error: $e");
         _handleError();
       }
@@ -441,37 +489,46 @@ class _PlayerHomeState extends State<PlayerHome> {
                           child: Slider(
                             value: _position.inMilliseconds.toDouble().clamp(
                                   0.0,
-                                  _currentDuration.inMilliseconds.toDouble(),
+                                  _currentDuration.inMilliseconds.toDouble() > 0
+                                      ? _currentDuration.inMilliseconds
+                                          .toDouble()
+                                      : 1.0,
                                 ),
                             min: 0.0,
                             max: _currentDuration.inMilliseconds.toDouble() > 0
                                 ? _currentDuration.inMilliseconds.toDouble()
                                 : 1.0,
-                            onChanged:
-                                (_hasError || _currentDuration <= Duration.zero || (_availableActions != null && !_availableActions!.contains(MediaAction.seekTo)))
-                                    ? null
-                                    : (v) {
-                                        final newPosition = Duration(
-                                          milliseconds: v.toInt(),
-                                        );
-                                        setState(() => _position = newPosition);
-                                      },
-                            onChangeEnd:
-                                (_hasError || _currentDuration <= Duration.zero || (_availableActions != null && !_availableActions!.contains(MediaAction.seekTo)))
-                                    ? null
-                                    : (v) {
-                                        final newPosition = Duration(
-                                          milliseconds: v.toInt(),
-                                        );
-                                        setState(() {
-                                          _position = newPosition;
-                                          _lastSeekTime = DateTime.now();
-                                        });
-                                        _audioPlayer
-                                            .seek(newPosition)
-                                            .catchError((_) {});
-                                        _updatePlayback();
-                                      },
+                            onChanged: (_hasError ||
+                                    _currentDuration <= Duration.zero ||
+                                    (_availableActions != null &&
+                                        !_availableActions!
+                                            .contains(MediaAction.seekTo)))
+                                ? null
+                                : (v) {
+                                    final newPosition = Duration(
+                                      milliseconds: v.toInt(),
+                                    );
+                                    setState(() => _position = newPosition);
+                                  },
+                            onChangeEnd: (_hasError ||
+                                    _currentDuration <= Duration.zero ||
+                                    (_availableActions != null &&
+                                        !_availableActions!
+                                            .contains(MediaAction.seekTo)))
+                                ? null
+                                : (v) {
+                                    final newPosition = Duration(
+                                      milliseconds: v.toInt(),
+                                    );
+                                    setState(() {
+                                      _position = newPosition;
+                                      _lastSeekTime = DateTime.now();
+                                    });
+                                    _audioPlayer
+                                        .seek(newPosition)
+                                        .catchError((_) {});
+                                    _updatePlayback();
+                                  },
                           ),
                         ),
                 ),
@@ -498,12 +555,20 @@ class _PlayerHomeState extends State<PlayerHome> {
                   children: [
                     IconButton.filledTonal(
                       iconSize: 32,
-                      onPressed: (_availableActions != null && !_availableActions!.contains(MediaAction.skipToPrevious)) ? null : _prev,
+                      onPressed: (_availableActions != null &&
+                              !_availableActions!
+                                  .contains(MediaAction.skipToPrevious))
+                          ? null
+                          : _prev,
                       icon: const Icon(Icons.skip_previous),
                     ),
                     IconButton.filled(
                       iconSize: 56,
-                      onPressed: (_availableActions != null && !_availableActions!.contains(_status == PlaybackStatus.playing ? MediaAction.pause : MediaAction.play))
+                      onPressed: (_availableActions != null &&
+                              !_availableActions!.contains(
+                                  _status == PlaybackStatus.playing
+                                      ? MediaAction.pause
+                                      : MediaAction.play))
                           ? null
                           : (_hasError
                               ? _play
@@ -518,7 +583,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                     ),
                     IconButton.filledTonal(
                       iconSize: 32,
-                      onPressed: (_availableActions != null && !_availableActions!.contains(MediaAction.skipToNext)) ? null : _next,
+                      onPressed: (_availableActions != null &&
+                              !_availableActions!
+                                  .contains(MediaAction.skipToNext))
+                          ? null
+                          : _next,
                       icon: const Icon(Icons.skip_next),
                     ),
                   ],
@@ -560,10 +629,22 @@ class _PlayerHomeState extends State<PlayerHome> {
                     children: [
                       FilterChip(
                         label: const Text("All"),
-                        selected: _availableActions == null,
+                        selected: _availableActions?.length == 9,
                         onSelected: (selected) {
                           if (selected) {
-                            setState(() => _availableActions = null);
+                            setState(() {
+                              _availableActions = {
+                                MediaAction.play,
+                                MediaAction.pause,
+                                MediaAction.skipToNext,
+                                MediaAction.skipToPrevious,
+                                MediaAction.seekTo,
+                                MediaAction.stop,
+                                MediaAction.rewind,
+                                MediaAction.fastForward,
+                                if (!kIsWeb && Platform.isAndroid) _customLikeAction,
+                              };
+                            });
                             _updateAvailableActions();
                           }
                         },
@@ -577,70 +658,56 @@ class _PlayerHomeState extends State<PlayerHome> {
                         MediaAction.stop,
                         MediaAction.rewind,
                         MediaAction.fastForward,
+                        if (!kIsWeb && Platform.isAndroid) _customLikeAction,
                       ])
                         _singleActionChip(action),
                     ],
                   ),
                   const SizedBox(height: 16),
-                    Text(
-                      "Selected: ${_availableActions == null ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
-                      style: textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      title: const Text("Handle Audio Focus"),
-                      subtitle: const Text(
-                          "Opt-in to Android audio focus management (pauses for calls/other apps)"),
-                      value: _handlesInterruptions,
-                      onChanged: (val) {
-                        setState(() => _handlesInterruptions = val);
-                        _plugin.setHandlesInterruptions(val);
-                      },
-                    ),
-                  ],
+                  Text(
+                    "Selected: ${_availableActions?.length == (!kIsWeb && Platform.isAndroid ? 9 : 8) ? 'All' : _availableActions!.map((a) => a.name).join(', ')}",
+                    style: textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    title: const Text("Handle Audio Focus"),
+                    subtitle: const Text(
+                        "Opt-in to Android audio focus management (pauses for calls/other apps)"),
+                    value: _handlesInterruptions,
+                    onChanged: (val) {
+                      setState(() => _handlesInterruptions = val);
+                      _plugin.setHandlesInterruptions(val);
+                    },
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
+      ),
     );
   }
 
   Widget _singleActionChip(MediaAction action) {
+    // Check by name instead of exact reference to handle dynamic custom actions
     final isSelected =
-        _availableActions == null || _availableActions!.contains(action);
+        _availableActions?.any((a) => a.name == action.name) ?? false;
 
     return FilterChip(
       label: Text(action.name),
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          if (_availableActions == null) {
-            if (!selected) {
-              _availableActions = {
-                MediaAction.play,
-                MediaAction.pause,
-                MediaAction.skipToNext,
-                MediaAction.skipToPrevious,
-                MediaAction.seekTo,
-                MediaAction.stop,
-                MediaAction.rewind,
-                MediaAction.fastForward,
-              }..remove(action);
-            }
+          _availableActions ??= {};
+          if (selected) {
+            // For 'like', always add the dynamically evaluated getter
+            _availableActions!
+                .add(action.name == 'like' ? _customLikeAction : action);
           } else {
-            if (selected) {
-              _availableActions!.add(action);
-              if (_availableActions!.length == 8) {
-                // If all 8 standard actions are selected, revert to null (All)
-                _availableActions = null;
-              }
-            } else {
-              _availableActions!.remove(action);
-            }
+            _availableActions!.removeWhere((a) => a.name == action.name);
           }
         });
         _updateAvailableActions();

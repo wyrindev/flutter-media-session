@@ -166,11 +166,14 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
           actionName,
           ((JSAny? details) {
             if (actionName == 'seekto' && details != null) {
-              final seekTime = (details as JSObject).getProperty<JSNumber?>('seekTime'.toJS)?.toDartDouble;
+              final seekTime = (details as JSObject)
+                  .getProperty<JSNumber?>('seekTime'.toJS)
+                  ?.toDartDouble;
               if (seekTime != null) {
                 _actionController.add(MediaAction(
                   'seekTo',
-                  seekPosition: Duration(milliseconds: (seekTime * 1000).round()),
+                  seekPosition:
+                      Duration(milliseconds: (seekTime * 1000).round()),
                 ));
                 return;
               }

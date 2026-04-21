@@ -33,7 +33,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
 
     private var pendingMetadata: Map<String, Any?>? = null
     private var pendingPlaybackState: Map<String, Any?>? = null
-    private var pendingAvailableActions: List<String>? = null
+    private var pendingAvailableActions: List<Any>? = null
     /**
      * When true, the service requests audio focus while playing and forwards
      * focus events as media actions. Mirrors the user-facing
@@ -112,7 +112,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             }
             "updateAvailableActions" -> {
                 @Suppress("UNCHECKED_CAST")
-                val actions = call.arguments as? List<String>
+                val actions = call.arguments as? List<Any>
                 if (FlutterMediaSessionService.instance != null) {
                     FlutterMediaSessionService.instance?.updateAvailableActions(actions)
                 } else {

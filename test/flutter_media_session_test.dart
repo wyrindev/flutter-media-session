@@ -33,7 +33,9 @@ class MockFlutterMediaSessionPlatform
   Stream<MediaAction> get onMediaAction => const Stream.empty();
 
   @override
-  Future<void> setWindowsAppUserModelId(String id, {String? displayName, String? iconPath}) => Future.value();
+  Future<void> setWindowsAppUserModelId(String id,
+          {String? displayName, String? iconPath}) =>
+      Future.value();
 }
 
 void main() {

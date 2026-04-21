@@ -40,6 +40,13 @@ class FlutterMediaSessionService : MediaSessionService() {
 
     private var isReceiverRegistered = false
 
+    private var customLayout: List<androidx.media3.session.CommandButton> = emptyList()
+    private val baseControllerCommands = object : LinkedHashMap<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>() {
+        override fun removeEldestEntry(eldest: Map.Entry<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>?): Boolean {
+            return size > 100
+        }
+    }
+
     private val audioManager: AudioManager by lazy {
         getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
@@ -218,8 +225,88 @@ class FlutterMediaSessionService : MediaSessionService() {
     /**
      * Updates the set of media actions available in the system controls.
      */
-    fun updateAvailableActions(actions: List<String>?) {
-        player.updateAvailableActions(actions)
+    fun updateAvailableActions(actions: List<Any>?) {
+        val newCustomLayout = mutableListOf<androidx.media3.session.CommandButton>()
+        val standardActions = mutableListOf<String>()
+
+        if (actions != null) {
+            for (action in actions) {
+                if (action is String) {
+                    standardActions.add(action)
+                } else if (action is Map<*, *>) {
+                    val name = (action["name"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    val customLabel = (action["customLabel"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    val customIconResource = (action["customIconResource"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    
+                    if (!customIconResource.matches(Regex("^[a-z0-9_]+$"))) {
+                        android.util.Log.w("FlutterMediaSession", "Invalid resource name format: $customIconResource")
+                        continue
+                    }
+
+                    @Suppress("UNCHECKED_CAST")
+                    val customExtras = action["customExtras"] as? Map<String, Any>
+
+                    val extrasBundle = Bundle()
+                    
+                    if (customExtras != null && customExtras.size > 50) {
+                        android.util.Log.w("FlutterMediaSession", "customExtras exceeds size limit")
+                        continue
+                    }
+
+                    customExtras?.forEach { (key, value) ->
+                        if (!key.matches(Regex("^[a-zA-Z0-9_]+$"))) {
+                            android.util.Log.w("FlutterMediaSession", "Invalid extra key format: $key")
+                            return@forEach
+                        }
+                        when (value) {
+                            is String -> {
+                                if (value.length > 1000) return@forEach
+                                extrasBundle.putString(key, value)
+                            }
+                            is Int -> extrasBundle.putInt(key, value)
+                            is Boolean -> extrasBundle.putBoolean(key, value)
+                            is Double -> extrasBundle.putDouble(key, value)
+                            is Float -> extrasBundle.putFloat(key, value)
+                        }
+                    }
+
+                    val iconResId = resources.getIdentifier(customIconResource, "drawable", packageName)
+                    if (iconResId != 0) {
+                        try {
+                            val sessionCommand = androidx.media3.session.SessionCommand(name, extrasBundle)
+                            val button = androidx.media3.session.CommandButton.Builder()
+                                .setSessionCommand(sessionCommand)
+                                .setIconResId(iconResId)
+                                .setDisplayName(customLabel)
+                                .build()
+                            newCustomLayout.add(button)
+                        } catch (e: Exception) {
+                            android.util.Log.e("FlutterMediaSession", "Failed to create custom action '$name'", e)
+                        }
+                    } else {
+                        android.util.Log.w("FlutterMediaSession", "Custom action icon resource '$customIconResource' not found for action '$name'. Action will be ignored.")
+                    }
+                }
+            }
+        }
+
+        customLayout = newCustomLayout
+        player.updateAvailableActions(if (actions == null) null else standardActions)
+        
+        // Notify all connected controllers about the new custom layout
+        mediaSession?.let { session ->
+            for (controller in session.connectedControllers) {
+                val baseCommands = baseControllerCommands[controller]
+                if (baseCommands != null) {
+                    val sessionCommandsBuilder = baseCommands.first.buildUpon()
+                    for (button in customLayout) {
+                        button.sessionCommand?.let { sessionCommandsBuilder.add(it) }
+                    }
+                    session.setAvailableCommands(controller, sessionCommandsBuilder.build(), baseCommands.second)
+                }
+                session.setCustomLayout(controller, customLayout)
+            }
+        }
     }
 
     /**
@@ -230,7 +317,53 @@ class FlutterMediaSessionService : MediaSessionService() {
             session: MediaSession,
             controller: MediaSession.ControllerInfo
         ): MediaSession.ConnectionResult {
-            return super.onConnect(session, controller)
+            val connectionResult = super.onConnect(session, controller)
+            
+            // Store the default commands for this controller so we can append custom commands to them later dynamically
+            baseControllerCommands[controller] = Pair(connectionResult.availableSessionCommands, connectionResult.availablePlayerCommands)
+            
+            val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
+            
+            for (button in customLayout) {
+                button.sessionCommand?.let { availableSessionCommands.add(it) }
+            }
+            
+            return MediaSession.ConnectionResult.accept(
+                availableSessionCommands.build(),
+                connectionResult.availablePlayerCommands
+            )
+        }
+
+        override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
+            baseControllerCommands.remove(controller)
+            super.onDisconnected(session, controller)
+        }
+
+        override fun onPostConnect(session: MediaSession, controller: MediaSession.ControllerInfo) {
+            session.setCustomLayout(controller, customLayout)
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: androidx.media3.session.SessionCommand,
+            args: Bundle
+        ): ListenableFuture<androidx.media3.session.SessionResult> {
+            val actionName = customCommand.customAction
+            if (actionName.isNotEmpty()) {
+                val extrasMap = mutableMapOf<String, Any>()
+                for (key in customCommand.customExtras.keySet()) {
+                    customCommand.customExtras.get(key)?.let { extrasMap[key] = it }
+                }
+                
+                if (extrasMap.isEmpty()) {
+                    FlutterMediaSessionPlugin.instance?.sendAction(actionName)
+                } else {
+                    FlutterMediaSessionPlugin.instance?.sendAction(actionName, extrasMap)
+                }
+                return Futures.immediateFuture(androidx.media3.session.SessionResult(androidx.media3.session.SessionResult.RESULT_SUCCESS))
+            }
+            return super.onCustomCommand(session, controller, customCommand, args)
         }
     }
 

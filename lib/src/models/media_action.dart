@@ -6,9 +6,53 @@ class MediaAction {
   /// Optional seek position in milliseconds (only set for [seekTo] actions).
   final Duration? seekPosition;
 
+  /// The Android resource name for the icon (e.g., 'ic_favorite_border').
+  ///
+  /// This is only used for custom actions.
+  final String? customIconResource;
+
+  /// The label to display for this custom action.
+  final String? customLabel;
+
+  /// Optional bundle of extra data to pass with the custom action.
+  final Map<String, dynamic>? customExtras;
+
   /// Creates a new [MediaAction] instance with the given [name] and optional
   /// [seekPosition].
-  const MediaAction(this.name, {this.seekPosition});
+  const MediaAction(
+    this.name, {
+    this.seekPosition,
+    this.customIconResource,
+    this.customLabel,
+    this.customExtras,
+  });
+
+  /// Creates a custom media action for Android.
+  ///
+  /// Custom actions must have a [name], a [customLabel], and a [customIconResource].
+  factory MediaAction.custom({
+    required String name,
+    required String customLabel,
+    required String customIconResource,
+    Map<String, dynamic>? customExtras,
+  }) {
+    return MediaAction(
+      name,
+      customLabel: customLabel,
+      customIconResource: customIconResource,
+      customExtras: customExtras,
+    );
+  }
+
+  /// Converts this action to a JSON map.
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      if (customIconResource != null) 'customIconResource': customIconResource,
+      if (customLabel != null) 'customLabel': customLabel,
+      if (customExtras != null) 'customExtras': customExtras,
+    };
+  }
 
   /// Action to resume playback.
   static const play = MediaAction('play');
