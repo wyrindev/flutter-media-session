@@ -69,12 +69,12 @@ class _PlayerHomeState extends State<PlayerHome> {
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
   bool _isLiked = false;
-  
+
   MediaAction get _customLikeAction => MediaAction.custom(
-    name: 'like',
-    customLabel: 'Like',
-    customIconResource: _isLiked ? 'ic_thumb_up' : 'ic_thumb_up_outline',
-  );
+        name: 'like',
+        customLabel: 'Like',
+        customIconResource: _isLiked ? 'ic_thumb_up' : 'ic_thumb_up_outline',
+      );
 
   Set<MediaAction>? _availableActions;
 
@@ -154,7 +154,8 @@ class _PlayerHomeState extends State<PlayerHome> {
             setState(() {
               _isLiked = !_isLiked;
               if (_availableActions != null) {
-                _availableActions!.removeWhere((action) => action.name == 'like');
+                _availableActions!
+                    .removeWhere((action) => action.name == 'like');
                 _availableActions!.add(_customLikeAction);
               }
             });
@@ -699,19 +700,19 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Widget _singleActionChip(MediaAction action) {
     // Check by name instead of exact reference to handle dynamic custom actions
-    final isSelected = _availableActions?.any((a) => a.name == action.name) ?? false;
+    final isSelected =
+        _availableActions?.any((a) => a.name == action.name) ?? false;
 
     return FilterChip(
       label: Text(action.name),
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          if (_availableActions == null) {
-            _availableActions = {};
-          }
+          _availableActions ??= {};
           if (selected) {
             // For 'like', always add the dynamically evaluated getter
-            _availableActions!.add(action.name == 'like' ? _customLikeAction : action);
+            _availableActions!
+                .add(action.name == 'like' ? _customLikeAction : action);
           } else {
             _availableActions!.removeWhere((a) => a.name == action.name);
           }

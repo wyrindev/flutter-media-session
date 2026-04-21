@@ -41,7 +41,11 @@ class FlutterMediaSessionService : MediaSessionService() {
     private var isReceiverRegistered = false
 
     private var customLayout: List<androidx.media3.session.CommandButton> = emptyList()
-    private val baseControllerCommands = mutableMapOf<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>()
+    private val baseControllerCommands = object : LinkedHashMap<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>() {
+        override fun removeEldestEntry(eldest: Map.Entry<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>?): Boolean {
+            return size > 100
+        }
+    }
 
     private val audioManager: AudioManager by lazy {
         getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -230,17 +234,35 @@ class FlutterMediaSessionService : MediaSessionService() {
                 if (action is String) {
                     standardActions.add(action)
                 } else if (action is Map<*, *>) {
-                    val name = action["name"] as? String ?: continue
-                    val customLabel = action["customLabel"] as? String ?: continue
-                    val customIconResource = action["customIconResource"] as? String ?: continue
+                    val name = (action["name"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    val customLabel = (action["customLabel"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    val customIconResource = (action["customIconResource"] as? String)?.takeIf { it.isNotBlank() } ?: continue
                     
+                    if (!customIconResource.matches(Regex("^[a-z0-9_]+$"))) {
+                        android.util.Log.w("FlutterMediaSession", "Invalid resource name format: $customIconResource")
+                        continue
+                    }
+
                     @Suppress("UNCHECKED_CAST")
                     val customExtras = action["customExtras"] as? Map<String, Any>
 
                     val extrasBundle = Bundle()
+                    
+                    if (customExtras != null && customExtras.size > 50) {
+                        android.util.Log.w("FlutterMediaSession", "customExtras exceeds size limit")
+                        continue
+                    }
+
                     customExtras?.forEach { (key, value) ->
+                        if (!key.matches(Regex("^[a-zA-Z0-9_]+$"))) {
+                            android.util.Log.w("FlutterMediaSession", "Invalid extra key format: $key")
+                            return@forEach
+                        }
                         when (value) {
-                            is String -> extrasBundle.putString(key, value)
+                            is String -> {
+                                if (value.length > 1000) return@forEach
+                                extrasBundle.putString(key, value)
+                            }
                             is Int -> extrasBundle.putInt(key, value)
                             is Boolean -> extrasBundle.putBoolean(key, value)
                             is Double -> extrasBundle.putDouble(key, value)

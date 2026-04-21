@@ -19,7 +19,8 @@ class MediaAction {
 
   /// Creates a new [MediaAction] instance with the given [name] and optional
   /// [seekPosition].
-  const MediaAction(this.name, {
+  const MediaAction(
+    this.name, {
     this.seekPosition,
     this.customIconResource,
     this.customLabel,
