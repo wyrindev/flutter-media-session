@@ -1,3 +1,6 @@
+## 2.1.1
+* Fixed version number in README to match the actual release version
+
 ## 2.1.0
 
 * **Android Custom Media Actions**: Added support for adding custom buttons (like "Like", "Shuffle") to the system notification and lock screen controls via Media3.
