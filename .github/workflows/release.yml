@@ -1,0 +1,97 @@
+name: Release Notes Generator
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Release Notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const isPreRelease = tag.includes("-pre");
+            if (isPreRelease) return;
+
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const previousTag = releases.length > 0 ? releases[0].tag_name : null;
+
+            const compare = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: previousTag || "main",
+              head: tag,
+            });
+
+            const prNumbers = new Set();
+            for (const commit of compare.data.commits) {
+              const match = commit.commit.message.match(/#(\d+)/);
+              if (match) prNumbers.add(match[1]);
+            }
+
+            const buckets = {
+              feature: [],
+              fix: [],
+              improvement: [],
+              other: []
+            };
+
+            for (const prNumber of prNumbers) {
+              try {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                });
+
+                const labels = pr.labels.map(l => l.name);
+                if (!labels.length) continue;
+
+                const entry = `* ${pr.title}\n  (#${pr.number} @${pr.user.login})`;
+
+                if (labels.includes("feature")) buckets.feature.push(entry);
+                else if (labels.includes("fix")) buckets.fix.push(entry);
+                else if (labels.includes("improvement")) buckets.improvement.push(entry);
+                else buckets.other.push(entry);
+              } catch (e) {}
+            }
+
+            function section(title, items) {
+              if (!items.length) return "";
+              return `\n## ${title}\n\n${items.join("\n\n")}\n`;
+            }
+
+            const body = `# ${tag}
+            
+            ## What's Changed
+            ${section("✨ Features", buckets.feature)}
+            ${section("⚙️ Improvements", buckets.improvement)}
+            ${section("🐛 Fixes", buckets.fix)}
+            
+            ---
+            
+            ## 🔗 Full Changelog
+            https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`;
+
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: tag,
+              body: body,
+              draft: false,
+              prerelease: false
+            });
