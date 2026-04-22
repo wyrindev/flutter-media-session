@@ -1,4 +1,4 @@
-## 2.1.0-pre.1
+## 2.1.0
 
 * **Android Custom Media Actions**: Added support for adding custom buttons (like "Like", "Shuffle") to the system notification and lock screen controls via Media3.
     * Extended `MediaAction` to support custom labels and Android drawable resources.
