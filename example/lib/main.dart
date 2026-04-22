@@ -67,6 +67,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   bool _hasError = false;
   bool _isSwitchingTrack = false;
   int _currentIndex = 0;
+  int _trackVersion = 0;
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
   bool _isLiked = false;
@@ -234,9 +235,12 @@ class _PlayerHomeState extends State<PlayerHome> {
       );
     }
     await _plugin.activate();
+    if (!mounted) return;
     setState(() => _active = true);
-    await _updateAvailableActions();
-    await _updateAll();
+    await Future.wait([
+      _updateAvailableActions(),
+      _updateAll(),
+    ]);
   }
 
   Future<void> _updateAvailableActions() async {
@@ -308,6 +312,7 @@ class _PlayerHomeState extends State<PlayerHome> {
     await _audioPlayer.stop().catchError((_) {});
     setState(() {
       _isSwitchingTrack = true;
+      _trackVersion++;
       _currentIndex =
           (_currentIndex + step + _playlist.length) % _playlist.length;
       _position = Duration.zero;
@@ -417,12 +422,12 @@ class _PlayerHomeState extends State<PlayerHome> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Center(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 500),
-                    child: Card(
-                      key: ValueKey(track.artwork),
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      child: Card(
+                        key: ValueKey('${track.artwork}_$_trackVersion'),
+                        elevation: 8,
+                        shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
                       clipBehavior: Clip.antiAlias,
@@ -477,16 +482,19 @@ class _PlayerHomeState extends State<PlayerHome> {
                             borderRadius: BorderRadius.circular(6.0),
                           ),
                         )
-                      : SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 12,
-                            padding: EdgeInsets.zero,
-                            overlayShape: SliderComponentShape.noOverlay,
-                            thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 8.0,
-                            ),
-                          ),
-                          child: Slider(
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (constraints.maxWidth <= 0) return const SizedBox.shrink();
+                            return SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 12,
+                                padding: EdgeInsets.zero,
+                                overlayShape: SliderComponentShape.noOverlay,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 8.0,
+                                ),
+                              ),
+                              child: Slider(
                             value: _position.inMilliseconds.toDouble().clamp(
                                   0.0,
                                   _currentDuration.inMilliseconds.toDouble() > 0
@@ -530,7 +538,9 @@ class _PlayerHomeState extends State<PlayerHome> {
                                     _updatePlayback();
                                   },
                           ),
-                        ),
+                        );
+                      },
+                    ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(

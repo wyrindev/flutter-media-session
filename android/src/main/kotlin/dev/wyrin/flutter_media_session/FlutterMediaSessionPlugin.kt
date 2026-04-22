@@ -34,6 +34,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
     private var pendingMetadata: Map<String, Any?>? = null
     private var pendingPlaybackState: Map<String, Any?>? = null
     private var pendingAvailableActions: List<Any>? = null
+    private var pendingActivateResult: Result? = null
     /**
      * When true, the service requests audio focus while playing and forwards
      * focus events as media actions. Mirrors the user-facing
@@ -71,15 +72,36 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
         })
     }
 
+    private var serviceConnection: android.content.ServiceConnection? = null
+
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
             "activate" -> {
-                val intent = Intent(context, FlutterMediaSessionService::class.java)
-                ContextCompat.startForegroundService(context, intent)
-                result.success(null)
+                if (FlutterMediaSessionService.instance != null) {
+                    result.success(null)
+                } else {
+                    pendingActivateResult = result
+                    val intent = Intent(context, FlutterMediaSessionService::class.java)
+                    serviceConnection = object : android.content.ServiceConnection {
+                        override fun onServiceConnected(name: android.content.ComponentName?, service: android.os.IBinder?) {}
+                        override fun onServiceDisconnected(name: android.content.ComponentName?) {
+                            serviceConnection = null
+                        }
+                    }
+                    try {
+                        context.bindService(intent, serviceConnection!!, Context.BIND_AUTO_CREATE)
+                    } catch (e: Exception) {
+                        pendingActivateResult?.error("SERVICE_ERROR", "Failed to bind service: ${e.message}", null)
+                        pendingActivateResult = null
+                    }
+                }
             }
             "deactivate" -> {
                 val intent = Intent(context, FlutterMediaSessionService::class.java)
+                serviceConnection?.let {
+                    try { context.unbindService(it) } catch (e: Exception) {}
+                    serviceConnection = null
+                }
                 context.stopService(intent)
                 result.success(null)
             }
@@ -200,6 +222,14 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                 eventSink?.success(action)
             }
         }
+    }
+
+    /**
+     * Called when the MediaSessionService has finished creating and is ready.
+     */
+    fun onServiceCreated() {
+        pendingActivateResult?.success(null)
+        pendingActivateResult = null
     }
 
     /**

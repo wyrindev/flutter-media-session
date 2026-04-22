@@ -187,6 +187,7 @@ class FlutterMediaSessionService : MediaSessionService() {
 
         // Sync any data that was sent to the plugin before the service was ready
         FlutterMediaSessionPlugin.instance?.syncPendingData()
+        FlutterMediaSessionPlugin.instance?.onServiceCreated()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -200,9 +201,10 @@ class FlutterMediaSessionService : MediaSessionService() {
             isReceiverRegistered = false
         }
         abandonAudioFocus()
-        mediaSession?.run {
+        mediaSession?.let {
+            removeSession(it)
             player.release()
-            release()
+            it.release()
             mediaSession = null
         }
         super.onDestroy()
