@@ -1,3 +1,6 @@
+## 2.1.2
+* Fixed version number in README to match the actual release version
+
 ## 2.1.1
 * Fixed version number in README to match the actual release version
 
