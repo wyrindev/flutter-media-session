@@ -22,6 +22,8 @@ jobs:
             const isPreRelease = tag.includes("-pre");
             if (isPreRelease) return;
 
+            const version = tag.startsWith("v") ? tag.slice(1) : tag;
+
             const { data: releases } = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -58,39 +60,40 @@ jobs:
                 });
 
                 const labels = pr.labels.map(l => l.name);
-                if (!labels.length) continue;
-
-                const entry = `* ${pr.title}\n  (#${pr.number} @${pr.user.login})`;
+                const entry = `* ${pr.title} (#${pr.number} @${pr.user.login})`;
 
                 if (labels.includes("feature")) buckets.feature.push(entry);
                 else if (labels.includes("fix")) buckets.fix.push(entry);
                 else if (labels.includes("improvement")) buckets.improvement.push(entry);
                 else buckets.other.push(entry);
-              } catch (e) {}
+              } catch (e) {
+                console.log(`Error fetching PR #${prNumber}: ${e.message}`);
+              }
             }
 
             function section(title, items) {
               if (!items.length) return "";
-              return `\n## ${title}\n\n${items.join("\n\n")}\n`;
+              return `\n### ${title}\n${items.join("\n")}\n`;
             }
 
-            const body = `# ${tag}
+            const body = `# Version ${version}
             
-            ## What's Changed
+            flutter_media_session v${version}
+            
+            ## What's changed
             ${section("✨ Features", buckets.feature)}
             ${section("⚙️ Improvements", buckets.improvement)}
             ${section("🐛 Fixes", buckets.fix)}
-            
-            ---
+            ${section("📦 Other Changes", buckets.other)}
             
             ## 🔗 Full Changelog
-            https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`;
+            https://github.com{context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`;
 
             await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
-              name: tag,
+              name: `Version ${version}`,
               body: body,
               draft: false,
               prerelease: false
