@@ -137,6 +137,8 @@ void FlutterMediaSessionPlugin::InitSmtc() {
         try {
             smtc_.ShuffleEnabled(false);
             smtc_.AutoRepeatMode(MediaPlaybackAutoRepeatMode::None);
+        } catch (winrt::hresult_error const& ex) {
+            OutputDebugStringW((L"SMTC initial shuffle/repeat state error: " + ex.message() + L"\n").c_str());
         } catch (...) {}
 
         
@@ -283,11 +285,11 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       try {
                           std::wstring wArtwork = winrt::to_hstring(*artwork).c_str();
                           
-                          // Check if it's a local file path and convert to file URI if needed
-                          if (wArtwork.find(L":") != std::wstring::npos || wArtwork.find(L"\\") != std::wstring::npos) {
+                          // Check if it's a local file path (not a scheme-based URI)
+                          if (wArtwork.find(L"://") == std::wstring::npos) {
                               if (PathFileExistsW(wArtwork.c_str())) {
-                                  wchar_t uriPath[MAX_PATH];
-                                  DWORD uriLen = MAX_PATH;
+                                  wchar_t uriPath[2084]; // INTERNET_MAX_URL_LENGTH
+                                  DWORD uriLen = 2084;
                                   if (SUCCEEDED(UrlCreateFromPathW(wArtwork.c_str(), uriPath, &uriLen, 0))) {
                                       wArtwork = uriPath;
                                   }
@@ -297,6 +299,8 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                           auto uri = winrt::Windows::Foundation::Uri(wArtwork);
                           auto streamRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(uri);
                           updater.Thumbnail(streamRef);
+                      } catch (winrt::hresult_error const& ex) {
+                          OutputDebugStringW((L"SMTC Artwork URI error: " + ex.message() + L"\n").c_str());
                       } catch (...) {
                           OutputDebugStringA("Failed to set artwork URI in SMTC updater.\n");
                       }
@@ -312,21 +316,22 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   }
               }
           }
-          try {
-              updater.Update();
-              
-              if (duration_ms_ > 0) {
-                  winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
-                  if (has_seek_to_) {
-                      timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
-                      timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
-                      timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                      timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                      timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(position_ms_ * 10000));
-                  }
-                  smtc_.UpdateTimelineProperties(timelineProperties);
-              }
-          } catch (winrt::hresult_error const& ex) {
+            try {
+                updater.Update();
+                
+                // Only update timeline if seeking is supported and we have a valid duration.
+                // Doing this here ensures that even if only metadata changed, the progress bar
+                // stays in sync with our cached position.
+                if (has_seek_to_ && duration_ms_ > 0) {
+                    winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
+                    timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
+                    timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
+                    timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                    timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
+                    timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(position_ms_ * 10000));
+                    smtc_.UpdateTimelineProperties(timelineProperties);
+                }
+            } catch (winrt::hresult_error const& ex) {
               OutputDebugStringW((L"SMTC Metadata Update error: " + ex.message() + L"\n").c_str());
           }
       }

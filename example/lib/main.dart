@@ -673,7 +673,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                       : (v) {
                           setState(() {
                             _isDragging = true;
-                            if (_status == PlaybackStatus.playing) {
+                            if (_status == PlaybackStatus.playing || _status == PlaybackStatus.buffering) {
                               _shouldResumeAfterDrag = true;
                               _audioPlayer.pause();
                             } else {
