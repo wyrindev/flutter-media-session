@@ -194,6 +194,14 @@ class FlutterMediaSessionService : MediaSessionService() {
         return mediaSession
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         instance = null
         if (isReceiverRegistered) {
@@ -457,7 +465,7 @@ class FlutterMediaSessionService : MediaSessionService() {
                 "ended" -> Player.STATE_ENDED
                 else -> Player.STATE_IDLE
             }
-            val playWhenReady = playbackStatus == "playing"
+            val playWhenReady = playbackStatus == "playing" || playbackStatus == "buffering"
 
             val commandsBuilder = Player.Commands.Builder()
             val actions = availableActions

@@ -39,6 +39,8 @@ enum MediaActionId {
   SkipToNext,
   SkipToPrevious,
   SeekTo,
+  Shuffle,
+  Repeat,
 };
 
 // static
@@ -128,6 +130,15 @@ void FlutterMediaSessionPlugin::InitSmtc() {
         smtc_.IsNextEnabled(true);
         smtc_.IsPreviousEnabled(true);
         smtc_.IsEnabled(true);
+
+        // Initialize shuffle/repeat state so Windows recognises we handle these.
+        // Without this, ShuffleEnabledChangeRequested / AutoRepeatModeChangeRequested
+        // may never fire when the user clicks the media panel buttons.
+        try {
+            smtc_.ShuffleEnabled(false);
+            smtc_.AutoRepeatMode(MediaPlaybackAutoRepeatMode::None);
+        } catch (...) {}
+
         
         button_pressed_token_ = smtc_.ButtonPressed([this, root_hwnd](SystemMediaTransportControls const&, SystemMediaTransportControlsButtonPressedEventArgs const& args) {
             auto button = args.Button();
@@ -144,6 +155,18 @@ void FlutterMediaSessionPlugin::InitSmtc() {
             // Media session commands from WinRT threads must be dispatched to the main thread via WindowProc.
             if (action_id != 0 && root_hwnd) {
                 PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)action_id, 0);
+            }
+        });
+
+        shuffle_enabled_change_requested_token_ = smtc_.ShuffleEnabledChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, ShuffleEnabledChangeRequestedEventArgs const& /*args*/) {
+            if (root_hwnd) {
+                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::Shuffle, 0);
+            }
+        });
+
+        auto_repeat_mode_change_requested_token_ = smtc_.AutoRepeatModeChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, AutoRepeatModeChangeRequestedEventArgs const& /*args*/) {
+            if (root_hwnd) {
+                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::Repeat, 0);
             }
         });
 
@@ -171,10 +194,13 @@ void FlutterMediaSessionPlugin::DisposeSmtc() {
     if (smtc_) {
         smtc_.IsEnabled(false);
         smtc_.ButtonPressed(button_pressed_token_);
+        smtc_.ShuffleEnabledChangeRequested(shuffle_enabled_change_requested_token_);
+        smtc_.AutoRepeatModeChangeRequested(auto_repeat_mode_change_requested_token_);
         smtc_.PlaybackPositionChangeRequested(playback_position_change_requested_token_);
         smtc_ = nullptr;
     }
     duration_ms_ = 0;
+    position_ms_ = 0;
 }
 
 /**
@@ -190,6 +216,8 @@ std::optional<LRESULT> FlutterMediaSessionPlugin::HandleWindowProc(HWND hwnd, UI
             case MediaActionId::SkipToNext: actionStr = "skipToNext"; break;
             case MediaActionId::SkipToPrevious: actionStr = "skipToPrevious"; break;
             case MediaActionId::SeekTo: actionStr = "seekTo"; break;
+            case MediaActionId::Shuffle: actionStr = "shuffle"; break;
+            case MediaActionId::Repeat: actionStr = "repeat"; break;
             default: break;
         }
 
@@ -253,7 +281,20 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
               if (itArtwork != args->end() && !itArtwork->second.IsNull()) {
                   if (auto artwork = std::get_if<std::string>(&itArtwork->second)) {
                       try {
-                          auto uri = winrt::Windows::Foundation::Uri(winrt::to_hstring(*artwork));
+                          std::wstring wArtwork = winrt::to_hstring(*artwork).c_str();
+                          
+                          // Check if it's a local file path and convert to file URI if needed
+                          if (wArtwork.find(L":") != std::wstring::npos || wArtwork.find(L"\\") != std::wstring::npos) {
+                              if (PathFileExistsW(wArtwork.c_str())) {
+                                  wchar_t uriPath[MAX_PATH];
+                                  DWORD uriLen = MAX_PATH;
+                                  if (SUCCEEDED(UrlCreateFromPathW(wArtwork.c_str(), uriPath, &uriLen, 0))) {
+                                      wArtwork = uriPath;
+                                  }
+                              }
+                          }
+
+                          auto uri = winrt::Windows::Foundation::Uri(wArtwork);
                           auto streamRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(uri);
                           updater.Thumbnail(streamRef);
                       } catch (...) {
@@ -281,7 +322,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
                       timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
                       timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                      timelineProperties.Position(winrt::Windows::Foundation::TimeSpan::zero());
+                      timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(position_ms_ * 10000));
                   }
                   smtc_.UpdateTimelineProperties(timelineProperties);
               }
@@ -329,6 +370,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                               timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000)); // 100ns units
                               timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
                               timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(pos_ms * 10000));
+                              position_ms_ = pos_ms;
                           }
                           smtc_.UpdateTimelineProperties(timelineProperties);
                       } catch (winrt::hresult_error const& ex) {
@@ -346,6 +388,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
               // Check which actions are in the list
               bool hasPlay = false, hasPause = false, hasNext = false, hasPrevious = false;
               bool hasStop = false, hasFastForward = false, hasRewind = false;
+              bool hasShuffle = false, hasRepeat = false;
               has_seek_to_ = false;
               for (const auto& action : *actions) {
                   if (auto str = std::get_if<std::string>(&action)) {
@@ -357,6 +400,8 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       else if (*str == "fastForward") hasFastForward = true;
                       else if (*str == "rewind") hasRewind = true;
                       else if (*str == "seekTo") has_seek_to_ = true;
+                      else if (*str == "shuffle") hasShuffle = true;
+                      else if (*str == "repeat") hasRepeat = true;
                   }
               }
               try {
@@ -367,6 +412,16 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   smtc_.IsStopEnabled(hasStop);
                   smtc_.IsFastForwardEnabled(hasFastForward);
                   smtc_.IsRewindEnabled(hasRewind);
+                  
+                  // Shuffle and Repeat toggles
+                  try {
+                      smtc_.ShuffleEnabled(hasShuffle);
+                      smtc_.AutoRepeatMode(hasRepeat
+                          ? MediaPlaybackAutoRepeatMode::List
+                          : MediaPlaybackAutoRepeatMode::None);
+                  } catch (...) {
+                      // Some older versions of Windows 10 might not support this
+                  }
                   
                   if (!has_seek_to_) {
                       winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
@@ -386,6 +441,10 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   smtc_.IsStopEnabled(true);
                   smtc_.IsFastForwardEnabled(true);
                   smtc_.IsRewindEnabled(true);
+                  try {
+                      smtc_.ShuffleEnabled(true);
+                      smtc_.AutoRepeatMode(MediaPlaybackAutoRepeatMode::List);
+                  } catch (...) {}
               } catch (...) {}
           }
       }

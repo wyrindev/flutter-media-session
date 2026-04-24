@@ -68,7 +68,8 @@ private:
   winrt::Windows::Media::SystemMediaTransportControls smtc_{nullptr};
   winrt::event_token button_pressed_token_;
   winrt::event_token playback_position_change_requested_token_;
-  winrt::event_token status_changed_token_;
+  winrt::event_token shuffle_enabled_change_requested_token_;
+  winrt::event_token auto_repeat_mode_change_requested_token_;
 
   /**
    * Delegates window messages to this plugin for processing media actions.
@@ -92,6 +93,7 @@ private:
   void DisposeSmtc();
 
   int64_t duration_ms_ = 0;
+  int64_t position_ms_ = 0;
   bool has_seek_to_ = true;
 };
 
