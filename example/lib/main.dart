@@ -220,7 +220,8 @@ class _PlayerHomeState extends State<PlayerHome> {
             _isSwitchingTrack = false;
           } else if (state == PlayerState.paused) {
             _status = PlaybackStatus.paused;
-            _isBuffering = false;
+            // Only stop buffering if we actually have metadata/duration
+            if (_currentDuration > Duration.zero) _isBuffering = false;
           } else if (state == PlayerState.completed ||
               state == PlayerState.stopped) {
             _status = PlaybackStatus.idle;
@@ -757,9 +758,15 @@ class _PlayerHomeState extends State<PlayerHome> {
             const SizedBox(width: 6),
             Expanded(
               child: PlayerActionButton(
-                onTap: _hasError
-                    ? _play
-                    : (_status == PlaybackStatus.playing ? _pause : _play),
+                onTap: (_isBuffering || _isSwitchingTrack)
+                    ? null
+                    : () {
+                        if (_hasError || _status != PlaybackStatus.playing) {
+                          _play();
+                        } else {
+                          _pause();
+                        }
+                      },
                 icon: _status == PlaybackStatus.playing
                     ? Icons.pause_rounded
                     : Icons.play_arrow_rounded,

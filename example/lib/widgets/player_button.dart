@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// A filled (play/pause) or tonal (prev/next) action button.
 /// - All buttons: expand on press with spring release (width animation).
 class PlayerActionButton extends StatefulWidget {
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final IconData icon;
   final bool isFilled;
   final double? normalWidth;
@@ -14,7 +14,7 @@ class PlayerActionButton extends StatefulWidget {
 
   const PlayerActionButton({
     super.key,
-    required this.onTap,
+    this.onTap,
     required this.icon,
     required this.isFilled,
     required this.normalWidth,
@@ -54,25 +54,30 @@ class _PlayerActionButtonState extends State<PlayerActionButton> {
     final radius = _hovered ? 16.0 : 32.0;
     final isExpanded = widget.normalWidth == null;
 
+    final isEnabled = widget.onTap != null;
     final button = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
+      cursor: isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _hovered = isEnabled),
       onExit: (_) => setState(() => _hovered = false),
       child: Listener(
-        onPointerDown: (_) => _setPressed(true),
+        onPointerDown: isEnabled ? (_) => _setPressed(true) : null,
         onPointerUp: (_) => _setPressed(false),
         onPointerCancel: (_) => _setPressed(false),
         child: GestureDetector(
           onTap: widget.onTap,
-          child: AnimatedContainer(
+          child: AnimatedOpacity(
             duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(radius),
-            ),
-            child: Center(
-              child: Icon(widget.icon, color: fg, size: 28),
+            opacity: isEnabled ? 1.0 : 0.5,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(radius),
+              ),
+              child: Center(
+                child: Icon(widget.icon, color: fg, size: 28),
+              ),
             ),
           ),
         ),
@@ -155,11 +160,11 @@ class _PlayerToggleButtonState extends State<PlayerToggleButton> {
     final bg = isOn ? cs.secondaryContainer : Colors.transparent;
     final fg = isOn
         ? cs.secondary
-        : (widget.enabled ? cs.onSurfaceVariant : cs.onSurface.withOpacity(0.38));
+        : (widget.enabled ? cs.onSurfaceVariant : cs.onSurface.withValues(alpha: 0.38));
     final border = isOn
         ? BorderSide.none
         : BorderSide(
-            color: cs.outline.withOpacity(widget.enabled ? 0.5 : 0.2),
+            color: cs.outline.withValues(alpha: widget.enabled ? 0.5 : 0.2),
             width: 1.5,
           );
 
