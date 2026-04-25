@@ -76,9 +76,7 @@ jobs:
               return `\n### ${title}\n${items.join("\n")}\n`;
             }
 
-            const body = `# Version ${version}
-            
-            flutter_media_session v${version}
+            const body = `# flutter_media_session v${version}
             
             ## What's changed
             ${section("✨ Features", buckets.feature)}
