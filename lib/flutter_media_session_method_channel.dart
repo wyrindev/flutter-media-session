@@ -38,19 +38,16 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   Future<void> updateAvailableActions(Set<MediaAction>? actions) async {
     List<dynamic>? mappedActions;
     if (actions != null) {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        mappedActions = actions.map((a) {
-          if (a.customLabel != null || a.customIconResource != null) {
-            return a.toJson();
-          }
-          return a.name;
-        }).toList();
-      } else {
-        mappedActions = actions
-            .where((a) => a.customLabel == null && a.customIconResource == null)
-            .map((a) => a.name)
-            .toList();
-      }
+      mappedActions = actions.map((a) {
+        // Only Android currently supports custom visuals (labels/icons) for actions.
+        // On other platforms, we just send the action name so the platform can
+        // enable the corresponding native button if it exists.
+        if (defaultTargetPlatform == TargetPlatform.android &&
+            (a.customLabel != null || a.customIconResource != null)) {
+          return a.toJson();
+        }
+        return a.name;
+      }).toList();
     }
     await methodChannel.invokeMethod('updateAvailableActions', mappedActions);
   }

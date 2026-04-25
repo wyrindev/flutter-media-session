@@ -82,6 +82,12 @@ class MediaAction {
   /// Action to fast-forward playback by a standard interval.
   static const fastForward = MediaAction('fastForward');
 
+  /// Action to toggle shuffle mode.
+  static const shuffle = MediaAction('shuffle');
+
+  /// Action to toggle repeat mode.
+  static const repeat = MediaAction('repeat');
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

@@ -45,4 +45,23 @@ void main() {
   test('$MethodChannelFlutterMediaSession is the default instance', () {
     expect(initialPlatform, isInstanceOf<MethodChannelFlutterMediaSession>());
   });
+
+  test('updateAvailableActions handles shuffle and repeat', () async {
+    FlutterMediaSession flutterMediaSessionPlugin = FlutterMediaSession();
+    MockFlutterMediaSessionPlatform fakePlatform =
+        MockFlutterMediaSessionPlatform();
+    FlutterMediaSessionPlatform.instance = fakePlatform;
+
+    final shuffle = MediaAction.custom(
+        name: 'shuffle',
+        customLabel: 'Shuffle',
+        customIconResource: 'ic_shuffle');
+    final repeat = MediaAction.custom(
+        name: 'repeat',
+        customLabel: 'Repeat',
+        customIconResource: 'ic_repeat');
+
+    await flutterMediaSessionPlugin.updateAvailableActions({shuffle, repeat});
+    // This just verifies it doesn't throw, as the mock is empty.
+  });
 }
