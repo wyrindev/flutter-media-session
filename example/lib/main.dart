@@ -78,21 +78,20 @@ class _PlayerHomeState extends State<PlayerHome> {
   bool _shouldResumeAfterDrag = false;
   final _random = Random();
 
-  MediaAction get _shuffleAction => !kIsWeb && Platform.isAndroid
-      ? MediaAction.custom(
-          name: 'shuffle',
-          customLabel: 'Shuffle',
-          customIconResource: _isShuffle ? 'ic_shuffle_on' : 'ic_shuffle_off',
-        )
-      : MediaAction.shuffle;
+  // Note: Custom icons (ic_shuffle_on, etc.) must be added to Android's
+  // res/drawable folder to appear in the notification. On other platforms,
+  // these will automatically fall back to standard shuffle/repeat buttons.
+  MediaAction get _shuffleAction => MediaAction.custom(
+        name: 'shuffle',
+        customLabel: 'Shuffle',
+        customIconResource: _isShuffle ? 'ic_shuffle_on' : 'ic_shuffle_off',
+      );
 
-  MediaAction get _repeatAction => !kIsWeb && Platform.isAndroid
-      ? MediaAction.custom(
-          name: 'repeat',
-          customLabel: 'Repeat',
-          customIconResource: _isRepeat ? 'ic_repeat_on' : 'ic_repeat_off',
-        )
-      : MediaAction.repeat;
+  MediaAction get _repeatAction => MediaAction.custom(
+        name: 'repeat',
+        customLabel: 'Repeat',
+        customIconResource: _isRepeat ? 'ic_repeat_on' : 'ic_repeat_off',
+      );
 
   Set<MediaAction>? _availableActions;
 
@@ -253,6 +252,26 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Future<void> _updateAvailableActions() async {
     if (!_active) return;
+    
+    // Ensure actions maintain a fixed order to prevent Android custom buttons from jumping
+    if (_availableActions != null) {
+      final fixedOrder = [
+        MediaAction.play,
+        MediaAction.pause,
+        MediaAction.skipToNext,
+        MediaAction.skipToPrevious,
+        MediaAction.seekTo,
+        MediaAction.stop,
+        MediaAction.rewind,
+        MediaAction.fastForward,
+        _repeatAction, // Fixed order: e.g. repeat before shuffle
+        _shuffleAction,
+      ];
+      _availableActions = fixedOrder
+          .where((ref) => _availableActions!.any((a) => a.name == ref.name))
+          .toSet();
+    }
+
     await _plugin.updateAvailableActions(_availableActions);
   }
 
@@ -293,6 +312,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _hasError = false;
       if (_status != PlaybackStatus.playing) _isBuffering = true;
     });
+    _updatePlayback(); // Ensure buffering state is sent immediately
     try {
       if (wasError ||
           _loadedUrl != current.url ||
@@ -432,10 +452,10 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _updatePlayback() async {
     if (!_active) return;
     PlaybackStatus status = _status;
-    if (_isSwitchingTrack) {
-      status = PlaybackStatus.idle;
-    } else if (_isBuffering) {
+    if (_isBuffering) {
       status = PlaybackStatus.buffering;
+    } else if (_isSwitchingTrack) {
+      status = PlaybackStatus.idle;
     }
 
     await _plugin.updatePlaybackState(
@@ -646,71 +666,78 @@ class _PlayerHomeState extends State<PlayerHome> {
                   borderRadius: BorderRadius.circular(6.0),
                 ),
               )
-            : SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 12,
-                  padding: EdgeInsets.zero,
-                  overlayShape: SliderComponentShape.noOverlay,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 8.0,
-                  ),
-                ),
-                child: Slider(
-                  value: _position.inMilliseconds.toDouble().clamp(
-                        0.0,
-                        _currentDuration.inMilliseconds.toDouble() > 0
-                            ? _currentDuration.inMilliseconds.toDouble()
-                            : 1.0,
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth <= 0) return const SizedBox.shrink();
+                  return SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 12,
+                      padding: EdgeInsets.zero,
+                      overlayShape: SliderComponentShape.noOverlay,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 8.0,
                       ),
-                  min: 0.0,
-                  max: _currentDuration.inMilliseconds.toDouble() > 0
-                      ? _currentDuration.inMilliseconds.toDouble()
-                      : 1.0,
-                  onChangeStart: (_hasError ||
-                          _currentDuration <= Duration.zero ||
-                          (_availableActions != null &&
-                              !_availableActions!.contains(MediaAction.seekTo)))
-                      ? null
-                      : (v) {
-                          setState(() {
-                            _isDragging = true;
-                            if (_status == PlaybackStatus.playing || _status == PlaybackStatus.buffering) {
-                              _shouldResumeAfterDrag = true;
-                              _audioPlayer.pause();
-                            } else {
-                              _shouldResumeAfterDrag = false;
-                            }
-                          });
-                        },
-                  onChanged: (_hasError ||
-                          _currentDuration <= Duration.zero ||
-                          (_availableActions != null &&
-                              !_availableActions!.contains(MediaAction.seekTo)))
-                      ? null
-                      : (v) {
-                          setState(() {
-                            _position = Duration(milliseconds: v.toInt());
-                          });
-                        },
-                  onChangeEnd: (_hasError ||
-                          _currentDuration <= Duration.zero ||
-                          (_availableActions != null &&
-                              !_availableActions!.contains(MediaAction.seekTo)))
-                      ? null
-                      : (v) async {
-                          final newPosition = Duration(milliseconds: v.toInt());
-                          await _audioPlayer.seek(newPosition);
-                          if (_shouldResumeAfterDrag) {
-                            await _audioPlayer.resume();
-                          }
-                          setState(() {
-                            _isDragging = false;
-                            _position = newPosition;
-                            _lastSeekTime = DateTime.now();
-                          });
-                          _updatePlayback();
-                        },
-                ),
+                    ),
+                    child: (() {
+                      final double durationMs = _currentDuration.inMilliseconds.toDouble();
+                      final double positionMs = _position.inMilliseconds.toDouble();
+                      // Ensure max is always at least 1.0 and greater than min (0.0)
+                      final double safeMax = durationMs > 0 ? durationMs : 1.0;
+                      // Ensure value is strictly within [0.0, safeMax]
+                      final double safeValue = positionMs.clamp(0.0, safeMax);
+
+                      return Slider(
+                        value: safeValue,
+                        min: 0.0,
+                        max: safeMax,
+                        onChangeStart: (_hasError ||
+                                _currentDuration <= Duration.zero ||
+                                (_availableActions != null &&
+                                    !_availableActions!.contains(MediaAction.seekTo)))
+                            ? null
+                            : (v) {
+                                setState(() {
+                                  _isDragging = true;
+                                  if (_status == PlaybackStatus.playing || _status == PlaybackStatus.buffering) {
+                                    _shouldResumeAfterDrag = true;
+                                    _audioPlayer.pause();
+                                  } else {
+                                    _shouldResumeAfterDrag = false;
+                                  }
+                                });
+                              },
+                        onChanged: (_hasError ||
+                                _currentDuration <= Duration.zero ||
+                                (_availableActions != null &&
+                                    !_availableActions!.contains(MediaAction.seekTo)))
+                            ? null
+                            : (v) {
+                                setState(() {
+                                  _position = Duration(milliseconds: v.toInt());
+                                });
+                              },
+                        onChangeEnd: (_hasError ||
+                                _currentDuration <= Duration.zero ||
+                                (_availableActions != null &&
+                                    !_availableActions!.contains(MediaAction.seekTo)))
+                            ? null
+                            : (v) async {
+                                final newPosition = Duration(milliseconds: v.toInt());
+                                await _audioPlayer.seek(newPosition);
+                                if (_shouldResumeAfterDrag) {
+                                  await _audioPlayer.resume();
+                                }
+                                setState(() {
+                                  _isDragging = false;
+                                  _position = newPosition;
+                                  _lastSeekTime = DateTime.now();
+                                });
+                                _updatePlayback();
+                              },
+                      );
+                    })(),
+                  );
+                },
               ),
       ),
       Padding(

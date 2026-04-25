@@ -29,7 +29,7 @@ class PlayerActionButton extends StatefulWidget {
 }
 
 class _PlayerActionButtonState extends State<PlayerActionButton> {
-  bool _hovered = false;
+  bool _isMouseInside = false;
   bool _pressed = false;
 
   void _setPressed(bool v) {
@@ -51,14 +51,16 @@ class _PlayerActionButtonState extends State<PlayerActionButton> {
     final cs = widget.colorScheme;
     final bg = widget.isFilled ? cs.primary : cs.secondaryContainer;
     final fg = widget.isFilled ? cs.onPrimary : cs.onSecondaryContainer;
-    final radius = _hovered ? 16.0 : 32.0;
-    final isExpanded = widget.normalWidth == null;
 
     final isEnabled = widget.onTap != null;
+    final isHovered = isEnabled && (_isMouseInside || _pressed);
+    final radius = isHovered ? 16.0 : 32.0;
+    final isExpanded = widget.normalWidth == null;
+
     final button = MouseRegion(
       cursor: isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      onEnter: (_) => setState(() => _hovered = isEnabled),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => setState(() => _isMouseInside = true),
+      onExit: (_) => setState(() => _isMouseInside = false),
       child: Listener(
         onPointerDown: isEnabled ? (_) => _setPressed(true) : null,
         onPointerUp: (_) => _setPressed(false),
@@ -136,7 +138,7 @@ class PlayerToggleButton extends StatefulWidget {
 }
 
 class _PlayerToggleButtonState extends State<PlayerToggleButton> {
-  bool _hovered = false;
+  bool _isMouseInside = false;
   bool _pressed = false;
 
   void _setPressed(bool v) {
@@ -155,7 +157,8 @@ class _PlayerToggleButtonState extends State<PlayerToggleButton> {
   Widget build(BuildContext context) {
     final cs = widget.colorScheme;
     final isOn = widget.isOn && widget.enabled;
-    final radius = _hovered ? 16.0 : 32.0;
+    final isHovered = widget.enabled && (_isMouseInside || _pressed);
+    final radius = isHovered ? 16.0 : 32.0;
 
     final bg = isOn ? cs.secondaryContainer : Colors.transparent;
     final fg = isOn
@@ -170,10 +173,8 @@ class _PlayerToggleButtonState extends State<PlayerToggleButton> {
 
     final content = MouseRegion(
       cursor: widget.enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      onEnter: (_) {
-        if (widget.enabled) setState(() => _hovered = true);
-      },
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => setState(() => _isMouseInside = true),
+      onExit: (_) => setState(() => _isMouseInside = false),
       child: Listener(
         onPointerDown: widget.enabled ? (_) => _setPressed(true) : null,
         onPointerUp: (_) => _setPressed(false),

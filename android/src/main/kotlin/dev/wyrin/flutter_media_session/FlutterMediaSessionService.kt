@@ -245,8 +245,14 @@ class FlutterMediaSessionService : MediaSessionService() {
                     standardActions.add(action)
                 } else if (action is Map<*, *>) {
                     val name = (action["name"] as? String)?.takeIf { it.isNotBlank() } ?: continue
-                    val customLabel = (action["customLabel"] as? String)?.takeIf { it.isNotBlank() } ?: continue
-                    val customIconResource = (action["customIconResource"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    val customLabel = (action["customLabel"] as? String)?.takeIf { it.isNotBlank() }
+                    val customIconResource = (action["customIconResource"] as? String)?.takeIf { it.isNotBlank() }
+                    
+                    if (customLabel == null || customIconResource == null) {
+                        // If it's a map but missing custom visual fields, treat it as a standard action name
+                        standardActions.add(name)
+                        continue
+                    }
                     
                     if (!customIconResource.matches(Regex("^[a-z0-9_]+$"))) {
                         android.util.Log.w("FlutterMediaSession", "Invalid resource name format: $customIconResource")
@@ -500,6 +506,12 @@ class FlutterMediaSessionService : MediaSessionService() {
                 if (actions.contains("fastForward")) {
                     commandsBuilder.add(Player.COMMAND_SEEK_FORWARD)
                 }
+                if (actions.contains("shuffle")) {
+                    commandsBuilder.add(Player.COMMAND_SET_SHUFFLE_MODE)
+                }
+                if (actions.contains("repeat")) {
+                    commandsBuilder.add(Player.COMMAND_SET_REPEAT_MODE)
+                }
             }
             
             return State.Builder()
@@ -566,10 +578,12 @@ class FlutterMediaSessionService : MediaSessionService() {
         }
 
         override fun handleSetRepeatMode(repeatMode: Int): ListenableFuture<*> {
+            FlutterMediaSessionPlugin.instance?.sendAction("repeat")
             return Futures.immediateVoidFuture()
         }
 
         override fun handleSetShuffleModeEnabled(shuffleModeEnabled: Boolean): ListenableFuture<*> {
+            FlutterMediaSessionPlugin.instance?.sendAction("shuffle")
             return Futures.immediateVoidFuture()
         }
     }
