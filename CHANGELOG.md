@@ -1,3 +1,13 @@
+## 2.1.3
+* **New Actions**: Added `MediaAction.shuffle` and `MediaAction.repeat` for native shuffle and repeat toggles.
+* **Windows Improvements**: 
+    * Enhanced artwork handling for local file paths (converting to `file://` URIs).
+    * Improved timeline synchronization to prevent progress bar drift in system controls.
+    * Added support for native Shuffle and Repeat buttons in the System Media Transport Controls (SMTC).
+    * Added robust safety checks and error handling for SMTC updates.
+* **Android Improvements**: Refined custom action rendering and fixed potential slider rendering issues.
+* **Example App**: Modularized UI components and implemented a "ping-pong" player strategy for smoother track transitions on Windows.
+
 ## 2.1.2
 * Fixed version number in README to match the actual release version
 
