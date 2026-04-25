@@ -59,7 +59,9 @@ class PlayerHome extends StatefulWidget {
 
 class _PlayerHomeState extends State<PlayerHome> {
   final _plugin = FlutterMediaSession();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final List<AudioPlayer> _players = [AudioPlayer(), AudioPlayer()];
+  int _currentPlayerIndex = 0;
+  AudioPlayer get _audioPlayer => _players[_currentPlayerIndex];
 
   bool _active = false;
   PlaybackStatus _status = PlaybackStatus.idle;
@@ -77,6 +79,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   bool _isDragging = false;
   bool _shouldResumeAfterDrag = false;
   final _random = Random();
+  final List<int> _history = [];
 
   // Note: Custom icons (ic_shuffle_on, etc.) must be added to Android's
   // res/drawable folder to appear in the notification. On other platforms,
@@ -99,6 +102,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   Timer? _seekDebounce;
   DateTime _lastSeekTime = DateTime.fromMillisecondsSinceEpoch(0);
   final List<StreamSubscription> _subscriptions = [];
+  final List<StreamSubscription> _audioSubscriptions = [];
 
   final List<Track> _playlist = List.generate(17, (index) {
     final id = index + 1;
@@ -176,7 +180,12 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   void _listenAudioPlayerEvents() {
-    _subscriptions.add(_audioPlayer.onDurationChanged.listen((Duration d) {
+    for (final s in _audioSubscriptions) {
+      s.cancel();
+    }
+    _audioSubscriptions.clear();
+
+    _audioSubscriptions.add(_audioPlayer.onDurationChanged.listen((Duration d) {
       if (mounted) {
         setState(() {
           _currentDuration = d;
@@ -186,7 +195,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       }
     }));
 
-    _subscriptions.add(_audioPlayer.onPositionChanged.listen((p) {
+    _audioSubscriptions.add(_audioPlayer.onPositionChanged.listen((p) {
       if (mounted) {
         if (_isDragging) return;
         if (DateTime.now().difference(_lastSeekTime).inMilliseconds < 500) {
@@ -202,7 +211,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       }
     }));
 
-    _subscriptions.add(_audioPlayer.onPlayerComplete.listen((event) {
+    _audioSubscriptions.add(_audioPlayer.onPlayerComplete.listen((event) {
       if (_isRepeat) {
         _replayTrack();
       } else {
@@ -210,7 +219,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       }
     }));
 
-    _subscriptions.add(_audioPlayer.onPlayerStateChanged.listen((state) {
+    _audioSubscriptions.add(_audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
         setState(() {
           if (state == PlayerState.playing) {
@@ -295,12 +304,20 @@ class _PlayerHomeState extends State<PlayerHome> {
         await _audioPlayer.play(UrlSource(current.url));
         return;
       } catch (e) {
+        debugPrint("Play attempt ${i + 1} failed: $e");
         if (e.toString().contains('AbortError') ||
             e.toString().contains('interrupted')) {
-          return;
+          rethrow;
         }
-        debugPrint("Play attempt ${i + 1} failed: $e");
         if (i == 1) rethrow;
+        
+        // On Windows, if attempt 1 fails (e.g., Failed to set source), the native 
+        // player instance is often hopelessly corrupted and won't emit further events.
+        // We must switch to our alternate clean player before attempt 2.
+        _currentPlayerIndex = (_currentPlayerIndex + 1) % 2;
+        await _audioPlayer.stop().catchError((_) {});
+        _listenAudioPlayerEvents();
+        
         await Future.delayed(const Duration(milliseconds: 500));
       }
     }
@@ -323,11 +340,18 @@ class _PlayerHomeState extends State<PlayerHome> {
         await _audioPlayer.resume();
       }
     } catch (e) {
+      debugPrint("Play error: $e");
       if (e.toString().contains('AbortError') ||
           e.toString().contains('interrupted')) {
+        if (mounted) {
+          setState(() {
+            _isBuffering = false;
+            if (_status == PlaybackStatus.playing) _status = PlaybackStatus.paused;
+          });
+          _updatePlayback();
+        }
         return;
       }
-      debugPrint("Play error: $e");
       _handleError();
     }
   }
@@ -339,18 +363,35 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _next() async {
-    _changeTrack(1);
+    int nextIndex;
+    if (_isShuffle && _playlist.length > 1) {
+      do {
+        nextIndex = _random.nextInt(_playlist.length);
+      } while (nextIndex == _currentIndex);
+    } else {
+      nextIndex = (_currentIndex + 1) % _playlist.length;
+    }
+    _playIndex(nextIndex, pushHistory: true);
   }
 
   Future<void> _prev() async {
-    _changeTrack(-1);
+    if (_position.inSeconds >= 5 || (_history.isEmpty && _isShuffle)) {
+      await _audioPlayer.seek(Duration.zero);
+      return;
+    }
+
+    int prevIndex;
+    if (_history.isNotEmpty) {
+      prevIndex = _history.removeLast();
+    } else {
+      prevIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
+    }
+    _playIndex(prevIndex, pushHistory: false);
   }
 
   void _toggleShuffle() {
     setState(() {
       _isShuffle = !_isShuffle;
-      _availableActions?.removeWhere((a) => a.name == 'shuffle');
-      _availableActions?.add(_shuffleAction);
     });
     _updateAvailableActions();
   }
@@ -358,30 +399,32 @@ class _PlayerHomeState extends State<PlayerHome> {
   void _toggleRepeat() {
     setState(() {
       _isRepeat = !_isRepeat;
-      _availableActions?.removeWhere((a) => a.name == 'repeat');
-      _availableActions?.add(_repeatAction);
     });
     _updateAvailableActions();
   }
 
-  void _changeTrack(int step) async {
+  void _playIndex(int newIndex, {bool pushHistory = true}) async {
+    if (pushHistory) {
+      _history.add(_currentIndex);
+      if (_history.length > 10) {
+        _history.removeAt(0);
+      }
+    }
+
     _seekDebounce?.cancel();
-    await _audioPlayer.stop().catchError((_) {});
+    // Use ping-pong players to avoid Windows Media Foundation bugs where the old source
+    // gets accidentally resumed for a split second during rapid track switches.
+    final oldPlayer = _audioPlayer;
+    oldPlayer.pause().catchError((_) {});
+
+    _currentPlayerIndex = (_currentPlayerIndex + 1) % 2;
+    _listenAudioPlayerEvents();
 
     final versionAtStart = ++_trackVersion;
 
     setState(() {
       _isSwitchingTrack = true;
-      if (_isShuffle && _playlist.length > 1) {
-        int newIndex;
-        do {
-          newIndex = _random.nextInt(_playlist.length);
-        } while (newIndex == _currentIndex);
-        _currentIndex = newIndex;
-      } else {
-        _currentIndex =
-            (_currentIndex + step + _playlist.length) % _playlist.length;
-      }
+      _currentIndex = newIndex;
       _position = Duration.zero;
       _currentDuration = Duration.zero;
       _isBuffering = true;
@@ -397,11 +440,17 @@ class _PlayerHomeState extends State<PlayerHome> {
       try {
         await _attemptPlay();
       } catch (e) {
+        debugPrint("Change track error: $e");
         if (e.toString().contains('AbortError') ||
             e.toString().contains('interrupted')) {
+          if (mounted && _trackVersion == versionAtStart) {
+            setState(() {
+              _isBuffering = false;
+            });
+            _updatePlayback();
+          }
           return;
         }
-        debugPrint("Change track error: $e");
         _handleError();
       }
     });
@@ -472,8 +521,14 @@ class _PlayerHomeState extends State<PlayerHome> {
       subscription.cancel();
     }
     _subscriptions.clear();
+    for (final s in _audioSubscriptions) {
+      s.cancel();
+    }
+    _audioSubscriptions.clear();
     _seekDebounce?.cancel();
-    _audioPlayer.dispose();
+    for (final p in _players) {
+      p.dispose();
+    }
     super.dispose();
   }
 
