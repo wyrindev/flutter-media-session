@@ -103,6 +103,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   DateTime _lastSeekTime = DateTime.fromMillisecondsSinceEpoch(0);
   final List<StreamSubscription> _subscriptions = [];
   final List<StreamSubscription> _audioSubscriptions = [];
+  Timer? _positionSyncTimer;
 
   final List<Track> _playlist = List.generate(17, (index) {
     final id = index + 1;
@@ -257,6 +258,13 @@ class _PlayerHomeState extends State<PlayerHome> {
       _updateAvailableActions(),
       _updateAll(),
     ]);
+
+    _positionSyncTimer?.cancel();
+    _positionSyncTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (_status == PlaybackStatus.playing && !_isBuffering) {
+        _updatePlayback();
+      }
+    });
   }
 
   Future<void> _updateAvailableActions() async {
@@ -286,6 +294,7 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Future<void> _deactivate() async {
     _seekDebounce?.cancel();
+    _positionSyncTimer?.cancel();
     await _plugin.deactivate();
     await _audioPlayer.stop();
     setState(() {
@@ -526,6 +535,7 @@ class _PlayerHomeState extends State<PlayerHome> {
     }
     _audioSubscriptions.clear();
     _seekDebounce?.cancel();
+    _positionSyncTimer?.cancel();
     for (final p in _players) {
       p.dispose();
     }
