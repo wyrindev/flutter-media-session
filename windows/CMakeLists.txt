@@ -41,6 +41,9 @@ apply_standard_settings(${PLUGIN_NAME})
 set_target_properties(${PLUGIN_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden)
 target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
+if(MSVC)
+  target_compile_options(${PLUGIN_NAME} PRIVATE "/await")
+endif()
 
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.

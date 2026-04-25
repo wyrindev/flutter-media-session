@@ -46,6 +46,12 @@ _mediaSession.onMediaAction.listen((action) {
     case MediaAction.stop:
       // Stop the player
       break;
+    case MediaAction.shuffle:
+      // Toggle shuffle mode
+      break;
+    case MediaAction.repeat:
+      // Toggle repeat mode
+      break;
     // Handle other actions...
   }
 });
@@ -105,11 +111,13 @@ await _mediaSession.updateMetadata(
     title: 'SoundHelix Song 1',
     artist: 'SoundHelix',
     album: 'SoundHelix Demo',
-    artworkUri: 'https://example.com/artwork.png',
+    artworkUri: 'https://example.com/artwork.png', // Or a local file path on Windows
     duration: const Duration(minutes: 6, seconds: 12),
   ),
 );
 ```
+
+> **Windows Tip:** On Windows, `artworkUri` can be a local file path (e.g., `C:\Users\Name\Music\cover.jpg`). The plugin will automatically convert it to a valid file URI for the system media controls.
 
 ## 5. Update Playback State
 

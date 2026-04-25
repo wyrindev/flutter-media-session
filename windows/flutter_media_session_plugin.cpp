@@ -11,10 +11,14 @@
 #include <shlwapi.h>
 #include <appmodel.h>
 #include <algorithm>
+#include <winrt/Windows.Foundation.h>
+#include <pplawait.h>
 
 #pragma comment(lib, "shlwapi.lib")
 
+#include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.Foundation.Collections.h>
 
 using namespace winrt::Windows::Media;
 using namespace winrt::Windows::Media::Playback;
@@ -252,59 +256,29 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
       result->Success();
   } else if (method_name == "updateMetadata") {
       if (smtc_) {
-          auto updater = smtc_.DisplayUpdater();
-          updater.Type(MediaPlaybackType::Music);
-          auto prop = updater.MusicProperties();
+          std::string titleStr, artistStr, albumStr, artworkStr;
+          bool hasTitle = false, hasArtist = false, hasAlbum = false, hasArtwork = false;
 
           const auto* args = std::get_if<flutter::EncodableMap>(method_call.arguments());
           if (args) {
               auto itTitle = args->find(flutter::EncodableValue("title"));
               if (itTitle != args->end() && !itTitle->second.IsNull()) {
-                  if (auto title = std::get_if<std::string>(&itTitle->second)) {
-                      prop.Title(winrt::to_hstring(*title));
-                  }
+                  if (auto title = std::get_if<std::string>(&itTitle->second)) { titleStr = *title; hasTitle = true; }
               }
 
               auto itArtist = args->find(flutter::EncodableValue("artist"));
               if (itArtist != args->end() && !itArtist->second.IsNull()) {
-                  if (auto artist = std::get_if<std::string>(&itArtist->second)) {
-                      prop.Artist(winrt::to_hstring(*artist));
-                  }
+                  if (auto artist = std::get_if<std::string>(&itArtist->second)) { artistStr = *artist; hasArtist = true; }
               }
 
               auto itAlbum = args->find(flutter::EncodableValue("album"));
               if (itAlbum != args->end() && !itAlbum->second.IsNull()) {
-                  if (auto album = std::get_if<std::string>(&itAlbum->second)) {
-                      prop.AlbumTitle(winrt::to_hstring(*album));
-                  }
+                  if (auto album = std::get_if<std::string>(&itAlbum->second)) { albumStr = *album; hasAlbum = true; }
               }
 
               auto itArtwork = args->find(flutter::EncodableValue("artworkUri"));
               if (itArtwork != args->end() && !itArtwork->second.IsNull()) {
-                  if (auto artwork = std::get_if<std::string>(&itArtwork->second)) {
-                      try {
-                          std::wstring wArtwork = winrt::to_hstring(*artwork).c_str();
-                          
-                          // Check if it's a local file path (not a scheme-based URI)
-                          if (wArtwork.find(L"://") == std::wstring::npos) {
-                              if (PathFileExistsW(wArtwork.c_str())) {
-                                  wchar_t uriPath[2084]; // INTERNET_MAX_URL_LENGTH
-                                  DWORD uriLen = 2084;
-                                  if (SUCCEEDED(UrlCreateFromPathW(wArtwork.c_str(), uriPath, &uriLen, 0))) {
-                                      wArtwork = uriPath;
-                                  }
-                              }
-                          }
-
-                          auto uri = winrt::Windows::Foundation::Uri(wArtwork);
-                          auto streamRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(uri);
-                          updater.Thumbnail(streamRef);
-                      } catch (winrt::hresult_error const& ex) {
-                          OutputDebugStringW((L"SMTC Artwork URI error: " + ex.message() + L"\n").c_str());
-                      } catch (...) {
-                          OutputDebugStringA("Failed to set artwork URI in SMTC updater.\n");
-                      }
-                  }
+                  if (auto artwork = std::get_if<std::string>(&itArtwork->second)) { artworkStr = *artwork; hasArtwork = true; }
               }
               
               auto itDuration = args->find(flutter::EncodableValue("durationMs"));
@@ -316,24 +290,62 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   }
               }
           }
-            try {
-                updater.Update();
-                
-                // Only update timeline if seeking is supported and we have a valid duration.
-                // Doing this here ensures that even if only metadata changed, the progress bar
-                // stays in sync with our cached position.
-                if (has_seek_to_ && duration_ms_ > 0) {
-                    winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
-                    timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
-                    timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
-                    timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                    timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(duration_ms_ * 10000));
-                    timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(position_ms_ * 10000));
-                    smtc_.UpdateTimelineProperties(timelineProperties);
-                }
-            } catch (winrt::hresult_error const& ex) {
-              OutputDebugStringW((L"SMTC Metadata Update error: " + ex.message() + L"\n").c_str());
-          }
+
+          int64_t dur_ms = duration_ms_;
+          int64_t pos_ms = position_ms_;
+          bool seek_to = has_seek_to_;
+
+          auto update_task = [smtc = smtc_, titleStr, hasTitle, artistStr, hasArtist, albumStr, hasAlbum, artworkStr, hasArtwork, dur_ms, pos_ms, seek_to]() -> winrt::fire_and_forget {
+              try {
+                  auto updater = smtc.DisplayUpdater();
+                  updater.Type(MediaPlaybackType::Music);
+                  auto prop = updater.MusicProperties();
+
+                  if (hasTitle) prop.Title(winrt::to_hstring(titleStr));
+                  if (hasArtist) prop.Artist(winrt::to_hstring(artistStr));
+                  if (hasAlbum) prop.AlbumTitle(winrt::to_hstring(albumStr));
+
+                  if (hasArtwork) {
+                      std::wstring wArtwork = winrt::to_hstring(artworkStr).c_str();
+                      
+                      // Check if it's a local file path (not a scheme-based URI)
+                      if (wArtwork.find(L"://") == std::wstring::npos && PathFileExistsW(wArtwork.c_str())) {
+                          // Local file path: must use CreateFromFile asynchronously to get brokered access
+                          auto storageFile = co_await winrt::Windows::Storage::StorageFile::GetFileFromPathAsync(wArtwork);
+                          auto streamRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromFile(storageFile);
+                          updater.Thumbnail(streamRef);
+                      } else {
+                          // Fallback to URI for network paths or non-existent local paths
+                          if (wArtwork.find(L"://") == std::wstring::npos) {
+                              wchar_t uriPath[2084]; DWORD uriLen = 2084;
+                              if (SUCCEEDED(UrlCreateFromPathW(wArtwork.c_str(), uriPath, &uriLen, 0))) {
+                                  wArtwork = uriPath;
+                              }
+                          }
+                          auto uri = winrt::Windows::Foundation::Uri(wArtwork);
+                          auto streamRef = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromUri(uri);
+                          updater.Thumbnail(streamRef);
+                      }
+                  }
+
+                  updater.Update();
+                  
+                  if (seek_to && dur_ms > 0) {
+                      winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
+                      timelineProperties.StartTime(winrt::Windows::Foundation::TimeSpan::zero());
+                      timelineProperties.MinSeekTime(winrt::Windows::Foundation::TimeSpan::zero());
+                      timelineProperties.EndTime(winrt::Windows::Foundation::TimeSpan(dur_ms * 10000));
+                      timelineProperties.MaxSeekTime(winrt::Windows::Foundation::TimeSpan(dur_ms * 10000));
+                      timelineProperties.Position(winrt::Windows::Foundation::TimeSpan(pos_ms * 10000));
+                      smtc.UpdateTimelineProperties(timelineProperties);
+                  }
+              } catch (winrt::hresult_error const& ex) {
+                  OutputDebugStringW((L"SMTC Metadata Update error: " + ex.message() + L"\n").c_str());
+              } catch (...) {
+                  OutputDebugStringA("Failed to update SMTC metadata.\n");
+              }
+          };
+          update_task();
       }
       result->Success();
   } else if (method_name == "updatePlaybackState") {
