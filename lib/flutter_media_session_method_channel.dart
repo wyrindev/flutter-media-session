@@ -70,8 +70,8 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
-  Future<void> setHandlesInterruptions(bool enabled) async {
-    await methodChannel.invokeMethod('setHandlesInterruptions', enabled);
+  Future<void> setAutoHandleInterruptions(bool enabled) async {
+    await methodChannel.invokeMethod('setAutoHandleInterruptions', enabled);
   }
 
   @override

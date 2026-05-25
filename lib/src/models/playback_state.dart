@@ -1,3 +1,15 @@
+/// Represents the various repeat modes of media playback.
+enum MediaRepeatMode {
+  /// Repeat is disabled.
+  none,
+
+  /// Repeat the entire playlist/list.
+  all,
+
+  /// Repeat the current single track/item.
+  one,
+}
+
 /// Represents the various statuses of media playback.
 enum PlaybackStatus {
   /// The player is idle and not ready to play.
@@ -22,7 +34,7 @@ enum PlaybackStatus {
 /// Represents the current state of media playback.
 ///
 /// This information is synchronized with the system media session to show
-/// progress, speed, and status in the system controls.
+/// progress, speed, status, and repeat mode in the system controls.
 class PlaybackState {
   /// The current [PlaybackStatus] of the player.
   final PlaybackStatus status;
@@ -36,12 +48,20 @@ class PlaybackState {
   /// The currently buffered position in the media.
   final Duration bufferedPosition;
 
+  /// The active [MediaRepeatMode].
+  final MediaRepeatMode repeatMode;
+
+  /// Whether shuffle mode is enabled on the player.
+  final bool shuffleModeEnabled;
+
   /// Creates a new [PlaybackState] instance.
   const PlaybackState({
     required this.status,
     this.position = Duration.zero,
     this.speed = 1.0,
     this.bufferedPosition = Duration.zero,
+    this.repeatMode = MediaRepeatMode.none,
+    this.shuffleModeEnabled = false,
   });
 
   /// Converts the playback state to a JSON map for platform channel communication.
@@ -50,6 +70,8 @@ class PlaybackState {
         'positionMs': position.inMilliseconds,
         'speed': speed,
         'bufferedPositionMs': bufferedPosition.inMilliseconds,
+        'repeatMode': repeatMode.index,
+        'shuffleModeEnabled': shuffleModeEnabled,
       };
 
   /// Creates a [PlaybackState] instance from a JSON map.
@@ -60,6 +82,10 @@ class PlaybackState {
       speed: (json['speed'] as num).toDouble(),
       bufferedPosition:
           Duration(milliseconds: json['bufferedPositionMs'] as int),
+      repeatMode: json['repeatMode'] != null
+          ? MediaRepeatMode.values[json['repeatMode'] as int]
+          : MediaRepeatMode.none,
+      shuffleModeEnabled: json['shuffleModeEnabled'] as bool? ?? false,
     );
   }
 }

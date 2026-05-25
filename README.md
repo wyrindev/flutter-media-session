@@ -159,7 +159,7 @@ Add `flutter_media_session` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_media_session: ^2.1.3
+  flutter_media_session: ^2.2.0
 ```
 
 ## Setup
@@ -184,8 +184,6 @@ dependencies:
     </array>
     ```
     This allows the Now Playing controls to work when the app is backgrounded.
-
-2. **Audio Session**: Call `requestNotificationPermission()` before activating the session. On iOS, this configures the `AVAudioSession` with the `.playback` category.
 
 ### macOS
 

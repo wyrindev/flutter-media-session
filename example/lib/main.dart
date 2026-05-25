@@ -74,7 +74,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
   bool _isShuffle = false;
-  bool _isRepeat = false;
+  int _repeatMode = 0; // 0 = off, 2 = one (Track), 1 = all (List)
   bool _playPressed = false;
   bool _isDragging = false;
   bool _shouldResumeAfterDrag = false;
@@ -90,11 +90,19 @@ class _PlayerHomeState extends State<PlayerHome> {
         customIconResource: _isShuffle ? 'ic_shuffle_on' : 'ic_shuffle_off',
       );
 
-  MediaAction get _repeatAction => MediaAction.custom(
-        name: 'repeat',
-        customLabel: 'Repeat',
-        customIconResource: _isRepeat ? 'ic_repeat_on' : 'ic_repeat_off',
-      );
+  MediaAction get _repeatAction {
+    String icon = 'ic_repeat_off';
+    if (_repeatMode == 2) {
+      icon = 'ic_repeat_one';
+    } else if (_repeatMode == 1) {
+      icon = 'ic_repeat_on';
+    }
+    return MediaAction.custom(
+      name: 'repeat',
+      customLabel: 'Repeat',
+      customIconResource: icon,
+    );
+  }
 
   Set<MediaAction>? _availableActions;
 
@@ -110,16 +118,19 @@ class _PlayerHomeState extends State<PlayerHome> {
     return Track(
       title: 'SoundHelix Song $id',
       artist: 'SoundHelix',
-      artwork: 'https://picsum.photos/400/400?seed=$id',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-$id.mp3',
+      artwork: 'https://static.wyrin.dev/Artwork-$id.jpg',
+      url: 'https://static.wyrin.dev/SoundHelix-Song-$id.mp3',
     );
   });
 
   Track get current => _playlist[_currentIndex];
 
+  late final _ExamplePlayerAdapter _adapter;
+
   @override
   void initState() {
     super.initState();
+    _adapter = _ExamplePlayerAdapter(this);
     _availableActions = {
       MediaAction.play,
       MediaAction.pause,
@@ -137,47 +148,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   void _listenMediaSessionActions() {
-    _subscriptions.add(_plugin.onMediaAction.listen((action) {
-      switch (action) {
-        case MediaAction.play:
-          _play();
-          break;
-        case MediaAction.pause:
-          _pause();
-          break;
-        case MediaAction.skipToNext:
-          _next();
-          break;
-        case MediaAction.skipToPrevious:
-          _prev();
-          break;
-        case MediaAction.seekTo:
-          if (action.seekPosition != null) {
-            final newPosition = action.seekPosition!;
-            if (mounted) {
-              setState(() {
-                _position = newPosition;
-                _lastSeekTime = DateTime.now();
-              });
-            }
-            _updatePlayback();
-            _seekDebounce?.cancel();
-            _seekDebounce = Timer(const Duration(milliseconds: 200), () {
-              if (mounted) {
-                _audioPlayer.seek(newPosition).catchError((_) {});
-              }
-            });
-          }
-          break;
-        default:
-          if (action.name == 'shuffle') {
-            if (mounted) _toggleShuffle();
-          } else if (action.name == 'repeat') {
-            if (mounted) _toggleRepeat();
-          }
-          break;
-      }
-    }));
+    _plugin.bind(_adapter);
   }
 
   void _listenAudioPlayerEvents() {
@@ -213,7 +184,7 @@ class _PlayerHomeState extends State<PlayerHome> {
     }));
 
     _audioSubscriptions.add(_audioPlayer.onPlayerComplete.listen((event) {
-      if (_isRepeat) {
+      if (_repeatMode == 2) {
         _replayTrack();
       } else {
         _next();
@@ -243,14 +214,6 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _activate() async {
-    final granted = await _plugin.requestNotificationPermission();
-    if (!granted && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('Notification permission is required for media controls')),
-      );
-    }
     await _plugin.activate();
     if (!mounted) return;
     setState(() => _active = true);
@@ -269,7 +232,7 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Future<void> _updateAvailableActions() async {
     if (!_active) return;
-    
+
     // Ensure actions maintain a fixed order to prevent Android custom buttons from jumping
     if (_availableActions != null) {
       final fixedOrder = [
@@ -289,12 +252,13 @@ class _PlayerHomeState extends State<PlayerHome> {
           .toSet();
     }
 
-    await _plugin.updateAvailableActions(_availableActions);
+    _adapter.syncAvailableActions(_availableActions);
   }
 
   Future<void> _deactivate() async {
     _seekDebounce?.cancel();
     _positionSyncTimer?.cancel();
+    _plugin.unbind();
     await _plugin.deactivate();
     await _audioPlayer.stop();
     setState(() {
@@ -304,6 +268,22 @@ class _PlayerHomeState extends State<PlayerHome> {
       _position = Duration.zero;
       _isSwitchingTrack = false;
       _handlesInterruptions = false;
+    });
+  }
+
+  void handleSeekAction(Duration newPosition) {
+    if (mounted) {
+      setState(() {
+        _position = newPosition;
+        _lastSeekTime = DateTime.now();
+      });
+    }
+    _updatePlayback();
+    _seekDebounce?.cancel();
+    _seekDebounce = Timer(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        _audioPlayer.seek(newPosition).catchError((_) {});
+      }
     });
   }
 
@@ -319,14 +299,14 @@ class _PlayerHomeState extends State<PlayerHome> {
           rethrow;
         }
         if (i == 1) rethrow;
-        
-        // On Windows, if attempt 1 fails (e.g., Failed to set source), the native 
+
+        // On Windows, if attempt 1 fails (e.g., Failed to set source), the native
         // player instance is often hopelessly corrupted and won't emit further events.
         // We must switch to our alternate clean player before attempt 2.
         _currentPlayerIndex = (_currentPlayerIndex + 1) % 2;
         await _audioPlayer.stop().catchError((_) {});
         _listenAudioPlayerEvents();
-        
+
         await Future.delayed(const Duration(milliseconds: 500));
       }
     }
@@ -355,7 +335,9 @@ class _PlayerHomeState extends State<PlayerHome> {
         if (mounted) {
           setState(() {
             _isBuffering = false;
-            if (_status == PlaybackStatus.playing) _status = PlaybackStatus.paused;
+            if (_status == PlaybackStatus.playing) {
+              _status = PlaybackStatus.paused;
+            }
           });
           _updatePlayback();
         }
@@ -407,9 +389,16 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   void _toggleRepeat() {
     setState(() {
-      _isRepeat = !_isRepeat;
+      if (_repeatMode == 0) {
+        _repeatMode = 2; // Repeat One
+      } else if (_repeatMode == 2) {
+        _repeatMode = 1; // Repeat All
+      } else {
+        _repeatMode = 0; // Off
+      }
     });
     _updateAvailableActions();
+    _updatePlayback();
   }
 
   void _playIndex(int newIndex, {bool pushHistory = true}) async {
@@ -495,33 +484,12 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Future<void> _updateAll() async {
     if (!_active) return;
-    await _plugin.updateMetadata(
-      MediaMetadata(
-        title: current.title,
-        artist: current.artist,
-        album: 'SoundHelix Demo',
-        artworkUri: current.artwork,
-        duration: _currentDuration,
-      ),
-    );
-    await _updatePlayback();
+    _adapter.sync();
   }
 
   Future<void> _updatePlayback() async {
     if (!_active) return;
-    PlaybackStatus status = _status;
-    if (_isBuffering) {
-      status = PlaybackStatus.buffering;
-    } else if (_isSwitchingTrack) {
-      status = PlaybackStatus.idle;
-    }
-
-    await _plugin.updatePlaybackState(
-      PlaybackState(
-        status: status,
-        position: _position,
-      ),
-    );
+    _adapter.sync();
   }
 
   @override
@@ -628,7 +596,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                               handlesInterruptions: _handlesInterruptions,
                               onHandleInterruptionsChanged: (val) {
                                 setState(() => _handlesInterruptions = val);
-                                _plugin.setHandlesInterruptions(val);
+                                _plugin.setAutoHandleInterruptions(val);
                               },
                             ),
                           ],
@@ -684,7 +652,7 @@ class _PlayerHomeState extends State<PlayerHome> {
                       handlesInterruptions: _handlesInterruptions,
                       onHandleInterruptionsChanged: (val) {
                         setState(() => _handlesInterruptions = val);
-                        _plugin.setHandlesInterruptions(val);
+                        _plugin.setAutoHandleInterruptions(val);
                       },
                     ),
                   ],
@@ -744,8 +712,10 @@ class _PlayerHomeState extends State<PlayerHome> {
                       ),
                     ),
                     child: (() {
-                      final double durationMs = _currentDuration.inMilliseconds.toDouble();
-                      final double positionMs = _position.inMilliseconds.toDouble();
+                      final double durationMs =
+                          _currentDuration.inMilliseconds.toDouble();
+                      final double positionMs =
+                          _position.inMilliseconds.toDouble();
                       // Ensure max is always at least 1.0 and greater than min (0.0)
                       final double safeMax = durationMs > 0 ? durationMs : 1.0;
                       // Ensure value is strictly within [0.0, safeMax]
@@ -758,12 +728,14 @@ class _PlayerHomeState extends State<PlayerHome> {
                         onChangeStart: (_hasError ||
                                 _currentDuration <= Duration.zero ||
                                 (_availableActions != null &&
-                                    !_availableActions!.contains(MediaAction.seekTo)))
+                                    !_availableActions!
+                                        .contains(MediaAction.seekTo)))
                             ? null
                             : (v) {
                                 setState(() {
                                   _isDragging = true;
-                                  if (_status == PlaybackStatus.playing || _status == PlaybackStatus.buffering) {
+                                  if (_status == PlaybackStatus.playing ||
+                                      _status == PlaybackStatus.buffering) {
                                     _shouldResumeAfterDrag = true;
                                     _audioPlayer.pause();
                                   } else {
@@ -774,7 +746,8 @@ class _PlayerHomeState extends State<PlayerHome> {
                         onChanged: (_hasError ||
                                 _currentDuration <= Duration.zero ||
                                 (_availableActions != null &&
-                                    !_availableActions!.contains(MediaAction.seekTo)))
+                                    !_availableActions!
+                                        .contains(MediaAction.seekTo)))
                             ? null
                             : (v) {
                                 setState(() {
@@ -784,10 +757,12 @@ class _PlayerHomeState extends State<PlayerHome> {
                         onChangeEnd: (_hasError ||
                                 _currentDuration <= Duration.zero ||
                                 (_availableActions != null &&
-                                    !_availableActions!.contains(MediaAction.seekTo)))
+                                    !_availableActions!
+                                        .contains(MediaAction.seekTo)))
                             ? null
                             : (v) async {
-                                final newPosition = Duration(milliseconds: v.toInt());
+                                final newPosition =
+                                    Duration(milliseconds: v.toInt());
                                 await _audioPlayer.seek(newPosition);
                                 if (_shouldResumeAfterDrag) {
                                   await _audioPlayer.resume();
@@ -829,10 +804,10 @@ class _PlayerHomeState extends State<PlayerHome> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             PlayerToggleButton(
-              isOn: _isRepeat,
+              isOn: _repeatMode != 0,
               enabled: _active,
               onTap: _toggleRepeat,
-              icon: _isRepeat ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+              icon: _repeatMode == 2 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
               normalWidth: 40,
               pressedWidth: 50,
               colorScheme: colorScheme,
@@ -893,5 +868,96 @@ class _PlayerHomeState extends State<PlayerHome> {
         ),
       ),
     ];
+  }
+}
+
+/// A custom application-level adapter mapping the example app's players
+/// state to the [FlutterMediaSession] plugin.
+class _ExamplePlayerAdapter implements MediaSessionAdapter {
+  final _PlayerHomeState state;
+  FlutterMediaSession? _session;
+  StreamSubscription? _actionSubscription;
+
+  _ExamplePlayerAdapter(this.state);
+
+  @override
+  void bind(FlutterMediaSession session) {
+    _session = session;
+    // ignore: deprecated_member_use
+    _actionSubscription = _session!.onMediaAction.listen((action) {
+      switch (action.name) {
+        case 'play':
+          state._play();
+          break;
+        case 'pause':
+          state._pause();
+          break;
+        case 'skipToNext':
+          state._next();
+          break;
+        case 'skipToPrevious':
+          state._prev();
+          break;
+        case 'seekTo':
+          if (action.seekPosition != null) {
+            state.handleSeekAction(action.seekPosition!);
+          }
+          break;
+        default:
+          if (action.name == 'shuffle') {
+            if (state.mounted) state._toggleShuffle();
+          } else if (action.name == 'repeat') {
+            if (state.mounted) state._toggleRepeat();
+          }
+          break;
+      }
+    });
+  }
+
+  @override
+  void unbind() {
+    _actionSubscription?.cancel();
+    _actionSubscription = null;
+    _session = null;
+  }
+
+  /// Synchronizes all metadata and playback states to the system controls.
+  void sync() {
+    if (_session == null) return;
+
+    // ignore: deprecated_member_use
+    _session!.updateMetadata(
+      MediaMetadata(
+        title: state.current.title,
+        artist: state.current.artist,
+        album: 'SoundHelix Demo',
+        artworkUri: state.current.artwork,
+        duration: state._currentDuration,
+      ),
+    );
+
+    PlaybackStatus status = state._status;
+    if (state._isBuffering) {
+      status = PlaybackStatus.buffering;
+    } else if (state._isSwitchingTrack) {
+      status = PlaybackStatus.idle;
+    }
+
+    // ignore: deprecated_member_use
+    _session!.updatePlaybackState(
+      PlaybackState(
+        status: status,
+        position: state._position,
+        repeatMode: MediaRepeatMode.values[state._repeatMode],
+        shuffleModeEnabled: state._isShuffle,
+      ),
+    );
+  }
+
+  /// Synchronizes available system actions.
+  void syncAvailableActions(Set<MediaAction>? actions) {
+    if (_session == null) return;
+    // ignore: deprecated_member_use
+    _session!.updateAvailableActions(actions);
   }
 }

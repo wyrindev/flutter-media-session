@@ -95,6 +95,11 @@ private:
   int64_t duration_ms_ = 0;
   int64_t position_ms_ = 0;
   bool has_seek_to_ = true;
+
+  std::string last_title_;
+  std::string last_artist_;
+  std::string last_album_;
+  std::string last_artwork_str_;
 };
 
 } // namespace flutter_media_session
