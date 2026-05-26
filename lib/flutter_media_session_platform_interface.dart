@@ -82,6 +82,11 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'setWindowsAppUserModelId() has not been implemented.');
   }
 
+  @Deprecated('Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
+  Future<void> setHandlesInterruptions(bool enabled) {
+    return setAutoHandleInterruptions(enabled);
+  }
+
   /// Opts the plugin into handling system audio interruptions
   /// (calls, navigation prompts, other apps grabbing audio).
   ///
@@ -94,9 +99,9 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   /// (e.g. `audioplayers`, `just_audio`), otherwise both will fight
   /// for it and silently pause each other. Turn it on for players
   /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
-  Future<void> setHandlesInterruptions(bool enabled) {
+  Future<void> setAutoHandleInterruptions(bool enabled) {
     throw UnimplementedError(
-        'setHandlesInterruptions() has not been implemented.');
+        'setAutoHandleInterruptions() has not been implemented.');
   }
 
   /// A stream of media actions emitted by the current platform.

@@ -1,3 +1,16 @@
+## 2.2.0
+* **Professional Adapter Architecture**: Introduced `MediaSessionAdapter` interface to completely decouple player implementations from system-level media session controls.
+* **Copy-Ready Player Adapters**: Provided standalone, copy-ready adapter classes for `just_audio` and `media_kit` in `doc/adapters/` and the official wiki documentation, keeping the core package completely free of third-party player dependencies.
+* **Lifecycle Modernization**: Clear lifecycle state management (`Idle` -> `Active` -> `Bound` -> `Unbound` -> `Deactivated`).
+* **Naming Standardization**: Renamed `setHandlesInterruptions` to `setAutoHandleInterruptions` full-stack across platform interfaces, Android, Windows, and Dart layers for improved API clarity.
+* **Windows SMTC Refinements**:
+  * **Visual Flashing Fix**: Added metadata deduplication caching in C++ to prevent cover art/thumbnail flashing on progress/playback state changes.
+  * **Shuffle/Repeat Sync Fix**: Implemented robust type parsing (`bool`, `int32_t`, `int64_t`) and synchronous feedback in WinRT callbacks to prevent button states from resetting or locking to "Closed" in the OS UI.
+* **Darwin Package Manager Fix**: Updated Swift package configuration (`Package.swift`) to correctly declare the `FlutterFramework` dependency, resolving iOS/macOS compiler warnings.
+* **Deprecations**: Marked legacy manual sync APIs (`updateMetadata`, `updatePlaybackState`, `updateAvailableActions`, `onMediaAction`) as deprecated. Scheduled for removal in `3.0.0`.
+
+
+
 ## 2.1.3
 * **New Actions**: Added `MediaAction.shuffle` and `MediaAction.repeat` for native shuffle and repeat toggles.
 * **Windows Improvements**: 

@@ -148,7 +148,7 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     /**
-     * Called by the plugin when the user toggles `setHandlesInterruptions`.
+     * Called by the plugin when the user toggles `setAutoHandleInterruptions`.
      * If turning off, drops any focus we currently hold so other audio
      * plugins (audioplayers, just_audio) can take it back without
      * fighting us.
@@ -228,8 +228,8 @@ class FlutterMediaSessionService : MediaSessionService() {
     /**
      * Updates the playback state (status, position, speed) in the system controls.
      */
-    fun updatePlaybackState(status: String, positionMs: Long, speed: Float, bufferedPositionMs: Long) {
-        player.updatePlaybackState(status, positionMs, speed, bufferedPositionMs)
+    fun updatePlaybackState(status: String, positionMs: Long, speed: Float, bufferedPositionMs: Long, repeatMode: Int) {
+        player.updatePlaybackState(status, positionMs, speed, bufferedPositionMs, repeatMode)
     }
 
     /**
@@ -399,6 +399,7 @@ class FlutterMediaSessionService : MediaSessionService() {
         private var speed: Float = 1.0f
         private var bufferedPositionMs: Long = 0
         private var durationMs: Long = C.TIME_UNSET
+        private var repeatMode: Int = Player.REPEAT_MODE_OFF
         private var availableActions: List<String>? = null
 
         /**
@@ -430,7 +431,7 @@ class FlutterMediaSessionService : MediaSessionService() {
          * Updates the internal playback state and triggers a state invalidation.
          * Also manages the registration of the ACTION_AUDIO_BECOMING_NOISY receiver.
          */
-        fun updatePlaybackState(status: String, positionMs: Long, speed: Float, bufferedPositionMs: Long) {
+        fun updatePlaybackState(status: String, positionMs: Long, speed: Float, bufferedPositionMs: Long, repeatMode: Int) {
             val isPlaying = status == "playing"
             
             this.playbackStatus = status
@@ -438,6 +439,11 @@ class FlutterMediaSessionService : MediaSessionService() {
             this.lastPositionUpdateTimeMs = android.os.SystemClock.elapsedRealtime()
             this.speed = speed
             this.bufferedPositionMs = bufferedPositionMs
+            this.repeatMode = when (repeatMode) {
+                1 -> Player.REPEAT_MODE_ALL  // 1 = all in Dart
+                2 -> Player.REPEAT_MODE_ONE  // 2 = one in Dart
+                else -> Player.REPEAT_MODE_OFF
+            }
             invalidateState()
 
             // Manage AudioBecomingNoisy receiver based on playback state
@@ -518,6 +524,7 @@ class FlutterMediaSessionService : MediaSessionService() {
                 .setAvailableCommands(commandsBuilder.build())
                 .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
                 .setPlaybackState(playerState)
+                .setRepeatMode(repeatMode)
                 .setCurrentMediaItemIndex(0)
                 .setPlaylist(listOf(
                     MediaItemData.Builder("channel_0")

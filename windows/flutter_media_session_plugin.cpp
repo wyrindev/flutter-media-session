@@ -120,6 +120,12 @@ FlutterMediaSessionPlugin::~FlutterMediaSessionPlugin() {
  */
 void FlutterMediaSessionPlugin::InitSmtc() {
     if (smtc_ != nullptr || !registrar_->GetView()) return;
+    
+    last_title_ = "";
+    last_artist_ = "";
+    last_album_ = "";
+    last_artwork_str_ = "";
+
     try {
         HWND hwnd = registrar_->GetView()->GetNativeWindow();
         HWND root_hwnd = GetAncestor(hwnd, GA_ROOT);
@@ -164,15 +170,26 @@ void FlutterMediaSessionPlugin::InitSmtc() {
             }
         });
 
-        shuffle_enabled_change_requested_token_ = smtc_.ShuffleEnabledChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, ShuffleEnabledChangeRequestedEventArgs const& /*args*/) {
+        shuffle_enabled_change_requested_token_ = smtc_.ShuffleEnabledChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, ShuffleEnabledChangeRequestedEventArgs const& args) {
+            bool requested = args.RequestedShuffleEnabled();
+            try {
+                smtc_.ShuffleEnabled(requested);
+            } catch (...) {}
             if (root_hwnd) {
-                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::Shuffle, 0);
+                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::Shuffle, requested ? 1 : 0);
             }
         });
 
-        auto_repeat_mode_change_requested_token_ = smtc_.AutoRepeatModeChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, AutoRepeatModeChangeRequestedEventArgs const& /*args*/) {
+        auto_repeat_mode_change_requested_token_ = smtc_.AutoRepeatModeChangeRequested([this, root_hwnd](SystemMediaTransportControls const&, AutoRepeatModeChangeRequestedEventArgs const& args) {
+            auto requested = args.RequestedAutoRepeatMode();
+            try {
+                smtc_.AutoRepeatMode(requested);
+            } catch (...) {}
             if (root_hwnd) {
-                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::Repeat, 0);
+                int repeat_val = 0; // none
+                if (requested == MediaPlaybackAutoRepeatMode::Track) repeat_val = 2; // one
+                else if (requested == MediaPlaybackAutoRepeatMode::List) repeat_val = 1; // all
+                PostMessage(root_hwnd, WM_MEDIA_ACTION, (WPARAM)MediaActionId::Repeat, repeat_val);
             }
         });
 
@@ -291,6 +308,22 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
               }
           }
 
+          // Deduplicate metadata updates to prevent flickering/flashing in SMTC
+          bool metadata_changed = (titleStr != last_title_ ||
+                                   artistStr != last_artist_ ||
+                                   albumStr != last_album_ ||
+                                   artworkStr != last_artwork_str_);
+          
+          if (!metadata_changed) {
+              result->Success();
+              return;
+          }
+          
+          last_title_ = titleStr;
+          last_artist_ = artistStr;
+          last_album_ = albumStr;
+          last_artwork_str_ = artworkStr;
+
           int64_t dur_ms = duration_ms_;
           int64_t pos_ms = position_ms_;
           bool seek_to = has_seek_to_;
@@ -395,6 +428,38 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                       }
                   }
               }
+
+              auto itRepeat = args->find(flutter::EncodableValue("repeatMode"));
+              if (itRepeat != args->end() && !itRepeat->second.IsNull()) {
+                  int repeat_mode = 0;
+                  if (auto repeat64 = std::get_if<int64_t>(&itRepeat->second)) repeat_mode = static_cast<int>(*repeat64);
+                  else if (auto repeat32 = std::get_if<int32_t>(&itRepeat->second)) repeat_mode = *repeat32;
+
+                  try {
+                      MediaPlaybackAutoRepeatMode smtcRepeat = MediaPlaybackAutoRepeatMode::None;
+                      if (repeat_mode == 2) { // 2 = one (Track)
+                          smtcRepeat = MediaPlaybackAutoRepeatMode::Track;
+                      } else if (repeat_mode == 1) { // 1 = all (List)
+                          smtcRepeat = MediaPlaybackAutoRepeatMode::List;
+                      }
+                      smtc_.AutoRepeatMode(smtcRepeat);
+                  } catch (...) {}
+              }
+
+              auto itShuffle = args->find(flutter::EncodableValue("shuffleModeEnabled"));
+              if (itShuffle != args->end() && !itShuffle->second.IsNull()) {
+                  bool shuffle_enabled = false;
+                  if (auto shuffle_val = std::get_if<bool>(&itShuffle->second)) {
+                      shuffle_enabled = *shuffle_val;
+                  } else if (auto shuffle_i32 = std::get_if<int32_t>(&itShuffle->second)) {
+                      shuffle_enabled = (*shuffle_i32 != 0);
+                  } else if (auto shuffle_i64 = std::get_if<int64_t>(&itShuffle->second)) {
+                      shuffle_enabled = (*shuffle_i64 != 0);
+                  }
+                  try {
+                      smtc_.ShuffleEnabled(shuffle_enabled);
+                  } catch (...) {}
+              }
           }
       }
       result->Success();
@@ -430,16 +495,6 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   smtc_.IsFastForwardEnabled(hasFastForward);
                   smtc_.IsRewindEnabled(hasRewind);
                   
-                  // Shuffle and Repeat toggles
-                  try {
-                      smtc_.ShuffleEnabled(hasShuffle);
-                      smtc_.AutoRepeatMode(hasRepeat
-                          ? MediaPlaybackAutoRepeatMode::List
-                          : MediaPlaybackAutoRepeatMode::None);
-                  } catch (...) {
-                      // Some older versions of Windows 10 might not support this
-                  }
-                  
                   if (!has_seek_to_) {
                       winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timelineProperties;
                       smtc_.UpdateTimelineProperties(timelineProperties);
@@ -458,10 +513,6 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   smtc_.IsStopEnabled(true);
                   smtc_.IsFastForwardEnabled(true);
                   smtc_.IsRewindEnabled(true);
-                  try {
-                      smtc_.ShuffleEnabled(true);
-                      smtc_.AutoRepeatMode(MediaPlaybackAutoRepeatMode::List);
-                  } catch (...) {}
               } catch (...) {}
           }
       }
@@ -572,7 +623,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
       } else {
           result->Error("INVALID_ARGUMENT", "AppUserModelID must be a string or map with 'id'");
       }
-  } else if (method_name == "setHandlesInterruptions") {
+  } else if (method_name == "setHandlesInterruptions" || method_name == "setAutoHandleInterruptions") {
       // No-op on Windows: SMTC manages session focus implicitly.
       result->Success();
   } else {
