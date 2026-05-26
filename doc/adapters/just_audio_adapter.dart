@@ -76,18 +76,46 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       String? artworkUri;
 
       if (tag != null) {
-        try {
-          title = (tag as dynamic).title?.toString();
-          artist = (tag as dynamic).artist?.toString();
-          album = (tag as dynamic).album?.toString();
-          artworkUri = (tag as dynamic).artworkUri?.toString();
-        } catch (_) {
-          title = tag.toString();
+        if (tag is Map) {
+          title = tag['title']?.toString();
+          artist = tag['artist']?.toString();
+          album = tag['album']?.toString();
+          artworkUri = tag['artworkUri']?.toString() ?? tag['artwork']?.toString();
+        } else if (tag is String) {
+          title = tag;
+        } else {
+          try {
+            title = (tag as dynamic).title?.toString();
+          } catch (_) {}
+          try {
+            artist = (tag as dynamic).artist?.toString();
+          } catch (_) {}
+          try {
+            album = (tag as dynamic).album?.toString();
+          } catch (_) {}
+          try {
+            artworkUri = (tag as dynamic).artworkUri?.toString() ?? (tag as dynamic).artwork?.toString();
+          } catch (_) {}
         }
       }
 
+      // Try to parse filename from URI if title is still unresolved
+      if (title == null || title.isEmpty) {
+        try {
+          final uriStr = (currentItem as dynamic).uri?.toString() ?? (currentItem as dynamic).url?.toString();
+          if (uriStr != null) {
+            title = Uri.decodeFull(uriStr.split('/').last.split('?').first);
+          }
+        } catch (_) {}
+      }
+
+      // Final fallback to string representation of tag
+      if (title == null || title.isEmpty) {
+        title = tag?.toString() ?? 'Unknown Title';
+      }
+
       metadata = MediaMetadata(
-        title: title ?? 'Unknown Title',
+        title: title,
         artist: artist ?? 'Unknown Artist',
         album: album,
         artworkUri: artworkUri,

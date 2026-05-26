@@ -21,6 +21,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  just_audio: ^0.9.40
+  media_kit: ^1.1.10
 
 flutter:
   plugin:
