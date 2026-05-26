@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
 /// A production-ready adapter to bridge `media_kit` [Player] and [FlutterMediaSession].
 class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
@@ -39,7 +40,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
     _subscriptions.add(player.stream.rate.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.stream.buffer.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.stream.playlist.listen((_) => _syncMetadata()));
-    _subscriptions.add(session.onMediaAction.listen(_handleMediaAction));
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen(_handleMediaAction));
 
     _syncMetadata();
     _syncPlaybackState();
@@ -115,7 +116,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
     }
 
     _isUpdating = true;
-    _session!.updateMetadata(metadata).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateMetadata(metadata).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update metadata: $e');
     }).whenComplete(() => _isUpdating = false);
   }
@@ -153,7 +154,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       shuffleModeEnabled: false, // update as needed for media_kit shuffle
     );
 
-    _session!.updatePlaybackState(playbackState).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update playback state: $e');
     });
 
@@ -219,7 +220,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       ),
     };
 
-    _session!.updateAvailableActions(actions).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update available actions: $e');
     });
   }

@@ -39,8 +39,7 @@ class FakeFlutterMediaSessionPlatform
   @override
   Future<bool> requestNotificationPermission() => Future.value(true);
 
-  @override
-  Future<void> setHandlesInterruptions(bool enabled) => Future.value();
+
 
   @override
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
@@ -66,7 +65,7 @@ class TestCustomAdapter extends MediaSessionAdapter {
     isBound = true;
 
     // Listen to mock system actions
-    _actionSub = _session.onMediaAction.listen((action) {
+    _actionSub = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       playerEvents.add('action_${action.name}');
     });
   }
@@ -78,11 +77,11 @@ class TestCustomAdapter extends MediaSessionAdapter {
   }
 
   void simulateMetadataChange(String title, String artist) {
-    _session.updateMetadata(MediaMetadata(title: title, artist: artist));
+    FlutterMediaSessionPlatform.instance.updateMetadata(MediaMetadata(title: title, artist: artist));
   }
 
   void simulateStateChange(PlaybackStatus status, Duration position) {
-    _session.updatePlaybackState(PlaybackState(status: status, position: position));
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(PlaybackState(status: status, position: position));
   }
 }
 

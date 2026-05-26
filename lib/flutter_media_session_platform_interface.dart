@@ -82,10 +82,7 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'setWindowsAppUserModelId() has not been implemented.');
   }
 
-  @Deprecated('Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
-  Future<void> setHandlesInterruptions(bool enabled) {
-    return setAutoHandleInterruptions(enabled);
-  }
+
 
   /// Opts the plugin into handling system audio interruptions
   /// (calls, navigation prompts, other apps grabbing audio).

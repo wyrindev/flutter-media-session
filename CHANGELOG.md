@@ -1,3 +1,9 @@
+## 3.0.0-pre.1
+* **API Modernization & Clean Up**:
+  * Removed all deprecated legacy manual sync APIs from the public `FlutterMediaSession` class (`updateMetadata`, `updatePlaybackState`, `updateAvailableActions`, `onMediaAction`, and `requestNotificationPermission`).
+  * Removed deprecated `setHandlesInterruptions` full-stack across the Dart layers; use `setAutoHandleInterruptions` instead.
+  * Updated player adapters (`JustAudioMediaSessionAdapter` and `MediaKitMediaSessionAdapter`) to synchronize metadata and playback state directly using `FlutterMediaSessionPlatform.instance`.
+
 ## 2.2.0
 * **Professional Adapter Architecture**: Introduced `MediaSessionAdapter` interface to completely decouple player implementations from system-level media session controls.
 * **Copy-Ready Player Adapters**: Provided standalone, copy-ready adapter classes for `just_audio` and `media_kit` in `doc/adapters/` and the official wiki documentation, keeping the core package completely free of third-party player dependencies.

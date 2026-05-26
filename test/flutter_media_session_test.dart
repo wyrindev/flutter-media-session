@@ -26,8 +26,7 @@ class MockFlutterMediaSessionPlatform
   @override
   Future<bool> requestNotificationPermission() => Future.value(true);
 
-  @override
-  Future<void> setHandlesInterruptions(bool enabled) => Future.value();
+
 
   @override
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
@@ -64,7 +63,7 @@ void main() {
         customLabel: 'Repeat',
         customIconResource: 'ic_repeat');
 
-    await flutterMediaSessionPlugin.updateAvailableActions({shuffle, repeat});
+    await FlutterMediaSessionPlatform.instance.updateAvailableActions({shuffle, repeat});
     // This just verifies it doesn't throw, as the mock is empty.
   });
 }

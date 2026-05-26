@@ -43,8 +43,7 @@ class FakePlatform with MockPlatformInterfaceMixin implements FlutterMediaSessio
   @override
   Future<bool> requestNotificationPermission() => Future.value(true);
 
-  @override
-  Future<void> setHandlesInterruptions(bool enabled) => Future.value();
+
 
   @override
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();

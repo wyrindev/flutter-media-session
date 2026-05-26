@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
 /// A production-ready adapter to bridge `just_audio` [AudioPlayer] and [FlutterMediaSession].
 class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
@@ -39,7 +40,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
     _subscriptions.add(player.speedStream.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.bufferedPositionStream.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.sequenceStateStream.listen((_) => _syncMetadata()));
-    _subscriptions.add(session.onMediaAction.listen(_handleMediaAction));
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen(_handleMediaAction));
 
     _syncMetadata();
     _syncPlaybackState();
@@ -124,7 +125,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
     }
 
     _isUpdating = true;
-    _session!.updateMetadata(metadata).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateMetadata(metadata).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update metadata: $e');
     }).whenComplete(() => _isUpdating = false);
   }
@@ -165,7 +166,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       shuffleModeEnabled: player.shuffleModeEnabled,
     );
 
-    _session!.updatePlaybackState(playbackState).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update playback state: $e');
     });
 
@@ -236,7 +237,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       ),
     };
 
-    _session!.updateAvailableActions(actions).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update available actions: $e');
     });
   }
