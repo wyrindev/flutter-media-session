@@ -54,14 +54,12 @@ class FakeFlutterMediaSessionPlatform
 }
 
 class TestCustomAdapter extends MediaSessionAdapter {
-  late FlutterMediaSession _session;
   bool isBound = false;
   final StreamController<String> playerEvents = StreamController<String>.broadcast();
   StreamSubscription? _actionSub;
 
   @override
   void bind(FlutterMediaSession session) {
-    _session = session;
     isBound = true;
 
     // Listen to mock system actions

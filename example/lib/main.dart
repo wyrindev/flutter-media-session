@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -883,8 +884,7 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
   @override
   void bind(FlutterMediaSession session) {
     _session = session;
-    // ignore: deprecated_member_use
-    _actionSubscription = _session!.onMediaAction.listen((action) {
+    _actionSubscription = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
           state._play();
@@ -925,8 +925,7 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
   void sync() {
     if (_session == null) return;
 
-    // ignore: deprecated_member_use
-    _session!.updateMetadata(
+    FlutterMediaSessionPlatform.instance.updateMetadata(
       MediaMetadata(
         title: state.current.title,
         artist: state.current.artist,
@@ -943,8 +942,7 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
       status = PlaybackStatus.idle;
     }
 
-    // ignore: deprecated_member_use
-    _session!.updatePlaybackState(
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(
       PlaybackState(
         status: status,
         position: state._position,
@@ -957,7 +955,6 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
   /// Synchronizes available system actions.
   void syncAvailableActions(Set<MediaAction>? actions) {
     if (_session == null) return;
-    // ignore: deprecated_member_use
-    _session!.updateAvailableActions(actions);
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
   }
 }

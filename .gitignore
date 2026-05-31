@@ -50,8 +50,6 @@ migrate_working_dir/
 **/ios/Config/Generated.xcconfig
 **/ios/ServiceDefinitions.json
 **/ios/Runner/project.xcworkspace
-**/ios/Runner/Base.lproj/Main.storyboard
-**/ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json
 
 # Windows related
 **/windows/flutter/generated_plugin_registrant.cc

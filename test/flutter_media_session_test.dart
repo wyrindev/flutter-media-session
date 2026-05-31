@@ -49,7 +49,6 @@ void main() {
   });
 
   test('updateAvailableActions handles shuffle and repeat', () async {
-    FlutterMediaSession flutterMediaSessionPlugin = FlutterMediaSession();
     MockFlutterMediaSessionPlatform fakePlatform =
         MockFlutterMediaSessionPlatform();
     FlutterMediaSessionPlatform.instance = fakePlatform;
