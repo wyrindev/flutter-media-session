@@ -35,8 +35,40 @@ jobs:
         run: flutter build ipa --no-codesign
         working-directory: example
 
+      - name: Create ExportOptions.plist
+        run: |
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+        working-directory: example
+
+      - name: Export IPA from xcarchive
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/ios/ipa \
+            -allowProvisioningUpdates \
+            CODE_SIGNING_ALLOWED=NO
+        working-directory: example
+        continue-on-error: true
+
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: example/build/ios/ipa/*.ipa
+          path: |
+            example/build/ios/ipa/*.ipa
+            example/build/ios/archive/Runner.xcarchive
+          if-no-files-found: warn
