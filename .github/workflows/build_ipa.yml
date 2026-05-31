@@ -1,0 +1,51 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build IPA (No Codesign)
+        run: flutter build ipa --no-codesign
+        working-directory: example
+
+      - name: Package IPA from xcarchive
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -r Runner.ipa Payload
+        working-directory: example
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: example/build/ios/ipa/Runner.ipa
+          if-no-files-found: error
