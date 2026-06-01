@@ -49,6 +49,10 @@ class FakeFlutterMediaSessionPlatform
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
 
   @override
+  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) =>
+      Future.value();
+
+  @override
   Stream<MediaAction> get onMediaAction => actionController.stream;
 
   @override
