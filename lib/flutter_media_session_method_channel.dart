@@ -71,10 +71,18 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
 
   @override
   Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) async {
-    await methodChannel.invokeMethod('setSkipIntervals', {
-      'forwardSeconds': forwardSeconds,
-      'backwardSeconds': backwardSeconds,
-    });
+    try {
+      await methodChannel.invokeMethod('setSkipIntervals', {
+        'forwardSeconds': forwardSeconds,
+        'backwardSeconds': backwardSeconds,
+      });
+    } on PlatformException catch (e) {
+      debugPrint('setSkipIntervals is not supported on this platform: $e');
+    } on MissingPluginException catch (e) {
+      debugPrint('setSkipIntervals is not supported on this platform: $e');
+    } catch (e) {
+      debugPrint('setSkipIntervals error: $e');
+    }
   }
 
   @override
