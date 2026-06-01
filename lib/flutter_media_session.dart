@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'src/models/media_metadata.dart';
+import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
 import 'src/adapters/media_session_adapter.dart';
 import 'flutter_media_session_platform_interface.dart';
@@ -62,8 +64,9 @@ class FlutterMediaSession {
     VoidCallback? onRepeat,
   }) {
     _actionHandlerSubscription?.cancel();
-    _actionHandlerSubscription =
-        FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+    
+    // ignore: deprecated_member_use
+    _actionHandlerSubscription = onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
           onPlay?.call();
@@ -107,6 +110,13 @@ class FlutterMediaSession {
     _actionHandlerSubscription = null;
   }
 
+  /// A stream of media actions triggered from the system media controls.
+  ///
+  /// Actions include 'play', 'pause', 'skipToNext', 'skipToPrevious', etc.
+  @Deprecated('Use the modern Adapter bind/unbind pattern or setActionHandler instead. Scheduled for removal in 3.0.0.')
+  Stream<MediaAction> get onMediaAction =>
+      FlutterMediaSessionPlatform.instance.onMediaAction;
+
   /// Activates the media session on the current platform.
   ///
   /// On Android, this starts the foreground media service and automatically
@@ -115,7 +125,7 @@ class FlutterMediaSession {
   Future<void> activate() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Unify lifecycle by automatically requesting permissions when activating on Android
-      await FlutterMediaSessionPlatform.instance.requestNotificationPermission();
+      await requestNotificationPermission();
     }
     return FlutterMediaSessionPlatform.instance.activate();
   }
@@ -124,6 +134,45 @@ class FlutterMediaSession {
   Future<void> deactivate() {
     clearActionHandler();
     return FlutterMediaSessionPlatform.instance.deactivate();
+  }
+
+  /// Updates the media metadata (title, artist, album, etc.) displayed in system controls.
+  @Deprecated('Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
+  Future<void> updateMetadata(MediaMetadata metadata) {
+    return FlutterMediaSessionPlatform.instance.updateMetadata(metadata);
+  }
+
+  /// Updates the playback state (status, position, speed) synchronized with system controls.
+  @Deprecated('Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
+  Future<void> updatePlaybackState(PlaybackState state) {
+    return FlutterMediaSessionPlatform.instance.updatePlaybackState(state);
+  }
+
+  /// Updates which media actions are available in system controls.
+  ///
+  /// Actions not in [actions] will be disabled in the notification.
+  /// Pass null to enable all actions (the default).
+  ///
+  /// Example — disable skip buttons:
+  /// ```dart
+  /// await _mediaSession.updateAvailableActions({
+  ///   MediaAction.play,
+  ///   MediaAction.pause,
+  ///   MediaAction.seekTo,
+  ///   MediaAction.stop,
+  /// });
+  /// ```
+  @Deprecated('Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
+  Future<void> updateAvailableActions(Set<MediaAction>? actions) {
+    return FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
+  }
+
+  /// Requests the POST_NOTIFICATIONS permission on Android (33+).
+  ///
+  /// Returns true if granted or if not needed (e.g., older Android version).
+  @Deprecated('No longer needed as activate() automatically requests notification permission on Android. Scheduled for removal in 3.0.0.')
+  Future<bool> requestNotificationPermission() {
+    return FlutterMediaSessionPlatform.instance.requestNotificationPermission();
   }
 
   /// Sets the AppUserModelID for the current process on Windows.
@@ -166,6 +215,12 @@ class FlutterMediaSession {
   /// for it and silently pause each other. Turn it on for players
   /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
   Future<void> setAutoHandleInterruptions(bool enabled) {
-    return FlutterMediaSessionPlatform.instance.setAutoHandleInterruptions(enabled);
+    return FlutterMediaSessionPlatform.instance.setHandlesInterruptions(enabled);
+  }
+
+  /// Deprecated. Use [setAutoHandleInterruptions] instead.
+  @Deprecated('Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
+  Future<void> setHandlesInterruptions(bool enabled) {
+    return setAutoHandleInterruptions(enabled);
   }
 }
