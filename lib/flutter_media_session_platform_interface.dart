@@ -106,6 +106,13 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'setAutoHandleInterruptions() has not been implemented.');
   }
 
+  /// Opts the session into a background keep-alive (wake + Wi-Fi locks /
+  /// prevent-sleep) for off-device playback such as casting. Defaults to a
+  /// no-op so platforms (and any that do not override it) are safe.
+  Future<void> setBackgroundKeepAlive(bool enabled) {
+    return Future.value();
+  }
+
   /// A stream of media actions emitted by the current platform.
   Stream<MediaAction> get onMediaAction {
     throw UnimplementedError('onMediaAction has not been implemented.');

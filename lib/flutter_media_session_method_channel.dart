@@ -91,6 +91,11 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<void> setBackgroundKeepAlive(bool enabled) async {
+    await methodChannel.invokeMethod('setBackgroundKeepAlive', enabled);
+  }
+
+  @override
   Stream<MediaAction> get onMediaAction {
     return eventChannel.receiveBroadcastStream().map((event) {
       if (event is Map) {
