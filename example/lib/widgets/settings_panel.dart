@@ -11,6 +11,8 @@ class SettingsPanel extends StatelessWidget {
   final MediaAction repeatAction;
   final bool handlesInterruptions;
   final void Function(bool) onHandleInterruptionsChanged;
+  final bool backgroundKeepAlive;
+  final void Function(bool) onBackgroundKeepAliveChanged;
 
   const SettingsPanel({
     super.key,
@@ -23,6 +25,8 @@ class SettingsPanel extends StatelessWidget {
     required this.repeatAction,
     required this.handlesInterruptions,
     required this.onHandleInterruptionsChanged,
+    required this.backgroundKeepAlive,
+    required this.onBackgroundKeepAliveChanged,
   });
 
   @override
@@ -120,6 +124,15 @@ class SettingsPanel extends StatelessWidget {
                           "Opt-in to Android audio focus management (pauses for calls/other apps)"),
                       value: handlesInterruptions,
                       onChanged: onHandleInterruptionsChanged,
+                    ),
+                    SwitchListTile(
+                      title: const Text("Background Keep-Alive"),
+                      subtitle: const Text(
+                          "Opt-in to hold CPU/Wi-Fi (Android), prevent sleep "
+                          "(macOS/Windows) for the session — for off-device "
+                          "playback such as casting. iOS: no-op."),
+                      value: backgroundKeepAlive,
+                      onChanged: onBackgroundKeepAliveChanged,
                     ),
                   ],
                 )
