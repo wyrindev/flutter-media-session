@@ -4,12 +4,42 @@ import AVFoundation
 import UIKit
 #elseif os(macOS)
 import AppKit
+import IOKit.pwr_mgt
 #endif
 
 class MediaSessionManager: NSObject {
     private let sendEvent: (Any) -> Void
     private var commandTargets: [Any] = []
     private var durationMs: Int64?
+
+    #if os(macOS)
+    /// Power assertion id held while background keep-alive is enabled, to stop
+    /// the Mac going to idle system sleep (which would suspend a cast control
+    /// socket). 0 == not held.
+    private var keepAliveAssertionID: IOPMAssertionID = 0
+    #endif
+
+    /// Opt-in background keep-alive. On macOS this prevents idle system sleep
+    /// for as long as it is enabled; on iOS there is no equivalent runtime
+    /// primitive (background survival depends on the `audio` UIBackgroundMode),
+    /// so it is a no-op.
+    func setBackgroundKeepAlive(_ enabled: Bool) {
+        #if os(macOS)
+        if enabled {
+            guard keepAliveAssertionID == 0 else { return }
+            IOPMAssertionCreateWithName(
+                kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
+                IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                "flutter_media_session background keep-alive" as CFString,
+                &keepAliveAssertionID
+            )
+        } else if keepAliveAssertionID != 0 {
+            IOPMAssertionRelease(keepAliveAssertionID)
+            keepAliveAssertionID = 0
+        }
+        #endif
+        // iOS: intentionally a no-op (no public wake/Wi-Fi-lock API).
+    }
 
     init(eventSink: @escaping (Any) -> Void) {
         self.sendEvent = eventSink
@@ -56,6 +86,9 @@ class MediaSessionManager: NSObject {
     #endif
 
     func deactivate() {
+        // Always drop the keep-alive assertion when the session is torn down.
+        setBackgroundKeepAlive(false)
+
         let center = MPRemoteCommandCenter.shared()
 
         for target in commandTargets {

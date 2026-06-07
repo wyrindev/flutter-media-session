@@ -68,6 +68,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   PlaybackStatus _status = PlaybackStatus.idle;
   bool _isBuffering = false;
   bool _handlesInterruptions = false;
+  bool _backgroundKeepAlive = false;
   bool _hasError = false;
   bool _isSwitchingTrack = false;
   int _currentIndex = 0;
@@ -260,6 +261,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _deactivate() async {
     _seekDebounce?.cancel();
     _positionSyncTimer?.cancel();
+    await _plugin.setBackgroundKeepAlive(false);
     _plugin.unbind();
     await _plugin.deactivate();
     await _audioPlayer.stop();
@@ -270,6 +272,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _position = Duration.zero;
       _isSwitchingTrack = false;
       _handlesInterruptions = false;
+      _backgroundKeepAlive = false;
       _loadedUrl = null;
     });
   }
@@ -601,6 +604,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 setState(() => _handlesInterruptions = val);
                                 _plugin.setAutoHandleInterruptions(val);
                               },
+                              backgroundKeepAlive: _backgroundKeepAlive,
+                              onBackgroundKeepAliveChanged: (val) {
+                                setState(() => _backgroundKeepAlive = val);
+                                _plugin.setBackgroundKeepAlive(val);
+                              },
                             ),
                           ],
                         ),
@@ -656,6 +664,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                       onHandleInterruptionsChanged: (val) {
                         setState(() => _handlesInterruptions = val);
                         _plugin.setAutoHandleInterruptions(val);
+                      },
+                      backgroundKeepAlive: _backgroundKeepAlive,
+                      onBackgroundKeepAliveChanged: (val) {
+                        setState(() => _backgroundKeepAlive = val);
+                        _plugin.setBackgroundKeepAlive(val);
                       },
                     ),
                   ],

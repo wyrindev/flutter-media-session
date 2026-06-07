@@ -45,6 +45,16 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
     var handlesInterruptions: Boolean = false
         private set
 
+    /**
+     * When true, the service holds a partial wake lock + high-perf Wi-Fi lock
+     * for the lifetime of the session so a backgrounded off-device session
+     * (e.g. casting) is not reaped by Doze. Mirrors the user-facing
+     * `setBackgroundKeepAlive` API; defaults to false. Persisted across service
+     * restarts so the setting survives a service recreate.
+     */
+    var backgroundKeepAlive: Boolean = false
+        private set
+
     companion object {
         private const val REQUEST_NOTIFICATION_PERMISSION = 1101
         
@@ -153,6 +163,12 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                 FlutterMediaSessionService.instance?.onHandlesInterruptionsChanged(enabled)
                 result.success(null)
             }
+            "setBackgroundKeepAlive" -> {
+                val enabled = call.arguments as? Boolean ?: false
+                backgroundKeepAlive = enabled
+                FlutterMediaSessionService.instance?.applyBackgroundKeepAlive(enabled)
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -232,6 +248,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
     fun onServiceCreated() {
         pendingActivateResult?.success(null)
         pendingActivateResult = null
+        // Re-apply the keep-alive setting in case the service was recreated
+        // while it was enabled.
+        if (backgroundKeepAlive) {
+            FlutterMediaSessionService.instance?.applyBackgroundKeepAlive(true)
+        }
     }
 
     /**

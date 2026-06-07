@@ -626,6 +626,21 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
   } else if (method_name == "setHandlesInterruptions" || method_name == "setAutoHandleInterruptions") {
       // No-op on Windows: SMTC manages session focus implicitly.
       result->Success();
+  } else if (method_name == "setBackgroundKeepAlive") {
+      // Desktop processes are not suspended on minimize, so the relevant risk
+      // is the system going to sleep (which would suspend an off-device cast
+      // control socket). While enabled, request that the system stay awake;
+      // ES_CONTINUOUS makes the request persist until it is cleared.
+      bool enabled = false;
+      if (const auto* enabled_ptr = std::get_if<bool>(method_call.arguments())) {
+          enabled = *enabled_ptr;
+      }
+      if (enabled) {
+          SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+      } else {
+          SetThreadExecutionState(ES_CONTINUOUS);
+      }
+      result->Success();
   } else {
       result->NotImplemented();
   }
