@@ -567,8 +567,12 @@ To automatically handle interruptions (like phone calls or other apps starting a
 ```dart
 await session.setAutoHandleInterruptions(true);
 ```
-> [!NOTE]
-> Leave this **disabled** if your underlying media player (like `just_audio`) already manages audio focus to prevent them from fighting each other.
+> [!WARNING]
+> Keep this **disabled** (default is `false`) if your underlying media player (such as `audioplayers`, `just_audio`, or `media_kit`) already manages audio focus automatically.
+> 
+> Because `flutter_media_session` acts as a metadata/command shim, enabling this option will cause the plugin to request audio focus when playback starts. This will strip audio focus from your actual audio player within the same app, causing the actual player to immediately pause or go silent while the system media widget remains stuck in a "playing" state.
+> 
+> Only turn this **on** if your player does *not* request focus itself (e.g. using `video_player` with the `fvp`/`mdk` backend).
 
 ### Windows AppUserModelID Setup
 On Windows, call `setWindowsAppUserModelId` to show the correct app icon and name in SMTC:
