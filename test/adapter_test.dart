@@ -43,6 +43,9 @@ class FakeFlutterMediaSessionPlatform
   Future<void> setHandlesInterruptions(bool enabled) => Future.value();
 
   @override
+  Future<void> setBackgroundKeepAlive(bool enabled) => Future.value();
+
+  @override
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
 
   @override
