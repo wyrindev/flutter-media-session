@@ -3,9 +3,7 @@ version = "1.0-SNAPSHOT"
 
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
 }
-
 
 android {
     namespace = "dev.wyrin.flutter_media_session"
@@ -15,10 +13,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     sourceSets {
@@ -48,6 +42,12 @@ android {
                 }
             }
         }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
