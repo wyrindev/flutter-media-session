@@ -76,22 +76,20 @@ jobs:
               return `\n### ${title}\n${items.join("\n")}\n`;
             }
 
-            const body = `# flutter_media_session v${version}
-            
-            ## What's changed
+            const body = `## What's changed
             ${section("✨ Features", buckets.feature)}
             ${section("⚙️ Improvements", buckets.improvement)}
             ${section("🐛 Fixes", buckets.fix)}
             ${section("📦 Other Changes", buckets.other)}
             
             ## 🔗 Full Changelog
-            https://github.com{context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`;
+            https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`;
 
             await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
-              name: `Version ${version}`,
+              name: `flutter_media_session v${version}`,
               body: body,
               draft: false,
               prerelease: false
