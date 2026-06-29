@@ -39,7 +39,8 @@ class FakeFlutterMediaSessionPlatform
   @override
   Future<bool> requestNotificationPermission() => Future.value(true);
 
-
+  @override
+  Future<void> setBackgroundKeepAlive(bool enabled) => Future.value();
 
   @override
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();

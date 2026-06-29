@@ -5,8 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -52,6 +54,76 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
     private var audioFocusRequest: AudioFocusRequest? = null
     private var hasAudioFocus = false
+
+    // ---------------------------------------------------------------------------
+    // Background keep-alive (CPU + Wi-Fi) — opt-in
+    //
+    // A backgrounded session whose audio is rendered off-device — most notably a
+    // Chromecast/DLNA control socket living on the local Wi-Fi network — is reaped
+    // by Doze / app-standby a few minutes after the app is paused: the CPU sleeps
+    // and the Wi-Fi radio is parked, so the socket dies ("Broken pipe"). The
+    // foreground media service alone does not prevent this on many OEMs.
+    //
+    // Opt-in via [applyBackgroundKeepAlive] (the `setBackgroundKeepAlive` API):
+    // while enabled we hold a partial wake lock (CPU) and a high-perf Wi-Fi lock
+    // (radio) for the whole session, released when disabled or on service
+    // destroy. Off by default so normal on-device playback pays no battery cost.
+    // ---------------------------------------------------------------------------
+    private val powerManager: PowerManager by lazy {
+        getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private val wifiManager: WifiManager by lazy {
+        applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    }
+    private var wifiLock: WifiManager.WifiLock? = null
+
+    private fun acquirePlaybackLocks() {
+        try {
+            val wl = wakeLock ?: powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "flutter_media_session:playback"
+            ).also {
+                it.setReferenceCounted(false)
+                wakeLock = it
+            }
+            if (!wl.isHeld) wl.acquire()
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "acquire wake lock failed", e)
+        }
+        try {
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            } else {
+                @Suppress("DEPRECATION")
+                WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            }
+            val lock = wifiLock ?: wifiManager.createWifiLock(
+                mode,
+                "flutter_media_session:playback"
+            ).also {
+                it.setReferenceCounted(false)
+                wifiLock = it
+            }
+            if (!lock.isHeld) lock.acquire()
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "acquire wifi lock failed", e)
+        }
+    }
+
+    private fun releasePlaybackLocks() {
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "release wake lock failed", e)
+        }
+        try {
+            wifiLock?.let { if (it.isHeld) it.release() }
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "release wifi lock failed", e)
+        }
+    }
     /**
      * Set when we lose focus transiently (e.g. an incoming call) while playing,
      * so we can ask the Flutter side to resume once focus returns. Permanent
@@ -209,6 +281,7 @@ class FlutterMediaSessionService : MediaSessionService() {
             isReceiverRegistered = false
         }
         abandonAudioFocus()
+        releasePlaybackLocks()
         mediaSession?.let {
             removeSession(it)
             player.release()
@@ -230,6 +303,16 @@ class FlutterMediaSessionService : MediaSessionService() {
      */
     fun updatePlaybackState(status: String, positionMs: Long, speed: Float, bufferedPositionMs: Long, repeatMode: Int, shuffleModeEnabled: Boolean) {
         player.updatePlaybackState(status, positionMs, speed, bufferedPositionMs, repeatMode, shuffleModeEnabled)
+    }
+
+    /**
+     * Toggle the background keep-alive locks (partial wake lock + high-perf
+     * Wi-Fi lock). Driven by the opt-in `setBackgroundKeepAlive` API. The locks
+     * are held for the whole enabled window — NOT gated on play/pause — because
+     * a paused cast still needs its control socket on the LAN kept alive.
+     */
+    fun applyBackgroundKeepAlive(enabled: Boolean) {
+        if (enabled) acquirePlaybackLocks() else releasePlaybackLocks()
     }
 
     /**

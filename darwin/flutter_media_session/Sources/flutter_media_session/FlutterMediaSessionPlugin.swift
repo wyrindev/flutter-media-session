@@ -107,6 +107,11 @@ public class FlutterMediaSessionPlugin: NSObject, FlutterPlugin {
             result(true)
             #endif
 
+        case "setBackgroundKeepAlive":
+            let enabled = call.arguments as? Bool ?? false
+            manager?.setBackgroundKeepAlive(enabled)
+            result(nil)
+
         default:
             result(FlutterMethodNotImplemented)
         }
