@@ -1,4 +1,4 @@
-## Unreleased
+## 2.4.0
 * **Opt-in background keep-alive (`setBackgroundKeepAlive`)**: New API that keeps
   a backgrounded session alive whose audio is rendered **off-device** — most
   importantly a Chromecast/DLNA control socket on the local network, which the OS
@@ -18,6 +18,8 @@
   * **iOS**: no-op — the OS exposes no wake/Wi-Fi-lock primitive; background
     survival there depends on the `audio` background mode.
 * Example app gains a "Background Keep-Alive" toggle demonstrating the API.
+* **Android Build Modernization**: Dynamically adapt Kotlin configuration to support both older KGP versions and modern Built-in Kotlin mechanism in AGP 9.0+, safeguarding JVM targets and resolving compile/deprecation warnings.
+* **Darwin Enhancements**: Improved thread safety, resource management, and error handling in Apple's `MediaSessionManager`.
 
 ## 2.3.0
 * **Perfect iOS Media Controls**:
