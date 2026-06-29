@@ -1,35 +1,29 @@
-## Unreleased
-* **Opt-in background keep-alive (`setBackgroundKeepAlive`)**: New API that keeps
-  a backgrounded session alive whose audio is rendered **off-device** — most
-  importantly a Chromecast/DLNA control socket on the local network, which the OS
-  otherwise tears down ("Broken pipe") a few minutes after the app is
-  backgrounded. Off by default; enable it only for that case (e.g. while casting)
-  and disable it when the session ends. Implemented with the best primitive each
-  platform offers:
-  * **Android**: partial wake lock (CPU) + high-perf Wi-Fi lock (radio), held for
-    the enabled window; the service is also declared
-    `mediaPlayback|connectedDevice` with the matching
-    `FOREGROUND_SERVICE_CONNECTED_DEVICE` / `WAKE_LOCK` / `ACCESS_WIFI_STATE`
-    permissions for Android 14+ casting.
-  * **macOS**: an `IOPMAssertion` that prevents idle system sleep.
-  * **Windows**: `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`.
-  * **Web**: best-effort Screen Wake Lock (screen-only; background tabs are still
-    throttled).
-  * **iOS**: no-op — the OS exposes no wake/Wi-Fi-lock primitive; background
-    survival there depends on the `audio` background mode.
-* Example app gains a "Background Keep-Alive" toggle demonstrating the API.
+## 3.0.0
 
-## 3.0.0-pre.2
-* **Merge 2.3.0 Features**:
-  * Integrated perfected iOS media controls, native repeat/shuffle synchronization, and customizable skip intervals (`setSkipIntervals`).
-  * Integrated Android shuffle state sync using Media3's player state.
-  * Fixed reload bug in example app.
+This major release consolidates the modern **Adapter Pattern** API architecture, introduces off-device casting background keep-alive capabilities, resolves platform compiler warnings, and fully removes deprecated legacy direct-sync APIs from the main class interface.
 
-## 3.0.0-pre.1
-* **API Modernization & Clean Up**:
-  * Removed all deprecated legacy manual sync APIs from the public `FlutterMediaSession` class (`updateMetadata`, `updatePlaybackState`, `updateAvailableActions`, `onMediaAction`, and `requestNotificationPermission`).
-  * Removed deprecated `setHandlesInterruptions` full-stack across the Dart layers; use `setAutoHandleInterruptions` instead.
-  * Updated player adapters (`JustAudioMediaSessionAdapter` and `MediaKitMediaSessionAdapter`) to synchronize metadata and playback state directly using `FlutterMediaSessionPlatform.instance`.
+### New Features & Improvements
+* **Background Keep-Alive (`setBackgroundKeepAlive`)**: A new opt-in API that keeps backgrounded sessions alive whose audio is rendered **off-device** (e.g., Chromecast/DLNA control socket on the local network) to prevent the OS from tearing down connections. Off by default; uses the best primitive each platform offers:
+  * **Android**: Partial wake lock (CPU) + high-performance Wi-Fi lock (radio), declaring `mediaPlayback|connectedDevice` with corresponding permissions.
+  * **macOS**: `IOPMAssertion` to prevent idle system sleep.
+  * **Windows**: `SetThreadExecutionState` to request system active state.
+  * **Web**: Best-effort Screen Wake Lock.
+  * **iOS**: No-op (depends on native audio playback).
+  * Example app includes a toggle to demonstrate this feature.
+* **Android Build Modernization**: Dynamically detects the Android Gradle Plugin (AGP) version to support both older KGP versions and the new Built-in Kotlin mechanism in AGP 9.0+, preventing compile errors and safeguarding JVM target configurations.
+* **Darwin Enhancements**: Improved thread safety, resource management, and error handling in Apple's `MediaSessionManager`.
+* **Integrated 2.3.0 Features**:
+  * Perfected iOS/macOS media controls with native repeat/shuffle synchronization (`changeShuffleModeCommand` / `changeRepeatModeCommand`).
+  * Added customizable skip intervals (`setSkipIntervals`).
+  * Synchronized `shuffleModeEnabled` with Media3's `SimpleBasePlayer` state on Android.
+
+### Breaking Changes & API Cleanup
+* **API Modernization**: Fully removed deprecated legacy direct-sync APIs from the public `FlutterMediaSession` class (`updateMetadata`, `updatePlaybackState`, `updateAvailableActions`, `onMediaAction`, and `requestNotificationPermission`). If direct manual updates are required, access them via `FlutterMediaSessionPlatform.instance`.
+* **Audio Focus Clarification**: Removed deprecated `setHandlesInterruptions` full-stack across Dart/native layers in favor of `setAutoHandleInterruptions`.
+* **Player Adapters**: Refactored the `JustAudioMediaSessionAdapter` and `MediaKitMediaSessionAdapter` to synchronize metadata and playback state directly using `FlutterMediaSessionPlatform.instance`.
+
+### Bug Fixes
+* Fixed reload bug in example app by resetting the loaded URL when deactivating the media session.
 
 ## 2.3.0
 * **Perfect iOS Media Controls**:

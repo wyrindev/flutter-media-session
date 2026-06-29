@@ -21,8 +21,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
-/// A production-ready adapter to bridge [AudioPlayer] and [FlutterMediaSession].
+/// A production-ready adapter to bridge `just_audio` [AudioPlayer] and [FlutterMediaSession].
 class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
   final AudioPlayer player;
   final MediaMetadata Function(AudioPlayer player)? metadataMapper;
@@ -58,7 +59,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
     _subscriptions.add(player.speedStream.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.bufferedPositionStream.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.sequenceStateStream.listen((_) => _syncMetadata()));
-    _subscriptions.add(session.onMediaAction.listen(_handleMediaAction));
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen(_handleMediaAction));
 
     _syncMetadata();
     _syncPlaybackState();
@@ -95,18 +96,46 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       String? artworkUri;
 
       if (tag != null) {
-        try {
-          title = (tag as dynamic).title?.toString();
-          artist = (tag as dynamic).artist?.toString();
-          album = (tag as dynamic).album?.toString();
-          artworkUri = (tag as dynamic).artworkUri?.toString();
-        } catch (_) {
-          title = tag.toString();
+        if (tag is Map) {
+          title = tag['title']?.toString();
+          artist = tag['artist']?.toString();
+          album = tag['album']?.toString();
+          artworkUri = tag['artworkUri']?.toString() ?? tag['artwork']?.toString();
+        } else if (tag is String) {
+          title = tag;
+        } else {
+          try {
+            title = (tag as dynamic).title?.toString();
+          } catch (_) {}
+          try {
+            artist = (tag as dynamic).artist?.toString();
+          } catch (_) {}
+          try {
+            album = (tag as dynamic).album?.toString();
+          } catch (_) {}
+          try {
+            artworkUri = (tag as dynamic).artworkUri?.toString() ?? (tag as dynamic).artwork?.toString();
+          } catch (_) {}
         }
       }
 
+      // Try to parse filename from URI if title is still unresolved
+      if (title == null || title.isEmpty) {
+        try {
+          final uriStr = (currentItem as dynamic).uri?.toString() ?? (currentItem as dynamic).url?.toString();
+          if (uriStr != null) {
+            title = Uri.decodeFull(uriStr.split('/').last.split('?').first);
+          }
+        } catch (_) {}
+      }
+
+      // Final fallback to string representation of tag
+      if (title == null || title.isEmpty) {
+        title = tag?.toString() ?? 'Unknown Title';
+      }
+
       metadata = MediaMetadata(
-        title: title ?? 'Unknown Title',
+        title: title,
         artist: artist ?? 'Unknown Artist',
         album: album,
         artworkUri: artworkUri,
@@ -115,7 +144,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
     }
 
     _isUpdating = true;
-    _session!.updateMetadata(metadata).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateMetadata(metadata).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update metadata: $e');
     }).whenComplete(() => _isUpdating = false);
   }
@@ -139,16 +168,28 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       status = PlaybackStatus.paused;
     }
 
+    // Set 3-way Repeat mode corresponding to just_audio's loopMode
+    MediaRepeatMode repeatMode = MediaRepeatMode.none;
+    if (player.loopMode == LoopMode.one) {
+      repeatMode = MediaRepeatMode.one;
+    } else if (player.loopMode == LoopMode.all) {
+      repeatMode = MediaRepeatMode.all;
+    }
+
     final playbackState = PlaybackState(
       status: status,
       position: player.position,
       speed: player.speed,
       bufferedPosition: player.bufferedPosition,
+      repeatMode: repeatMode,
+      shuffleModeEnabled: player.shuffleModeEnabled,
     );
 
-    _session!.updatePlaybackState(playbackState).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update playback state: $e');
     });
+
+    _syncAvailableActions();
   }
 
   void _handleMediaAction(MediaAction action) async {
@@ -215,7 +256,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       ),
     };
 
-    _session!.updateAvailableActions(actions).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update available actions: $e');
     });
   }
@@ -242,6 +283,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
 /// A production-ready adapter to bridge `media_kit` [Player] and [FlutterMediaSession].
 class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
@@ -279,7 +321,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
     _subscriptions.add(player.stream.rate.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.stream.buffer.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.stream.playlist.listen((_) => _syncMetadata()));
-    _subscriptions.add(session.onMediaAction.listen(_handleMediaAction));
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen(_handleMediaAction));
 
     _syncMetadata();
     _syncPlaybackState();
@@ -319,12 +361,30 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       String? artworkUri;
 
       if (currentMedia != null) {
-        title = currentMedia.title;
-        artist = currentMedia.artist;
-        album = currentMedia.album;
+        try {
+          title = (currentMedia as dynamic).title?.toString();
+        } catch (_) {}
+        try {
+          artist = (currentMedia as dynamic).artist?.toString();
+        } catch (_) {}
+        try {
+          album = (currentMedia as dynamic).album?.toString();
+        } catch (_) {}
+
+        title ??= currentMedia.extras?['title']?.toString();
+        artist ??= currentMedia.extras?['artist']?.toString();
+        album ??= currentMedia.extras?['album']?.toString();
         artworkUri = currentMedia.extras?['artworkUri']?.toString() ??
             currentMedia.extras?['cover']?.toString() ??
             currentMedia.extras?['picture']?.toString();
+
+        // Try to parse filename from URI if title is still unresolved
+        if (title == null || title.isEmpty) {
+          try {
+            final uriStr = currentMedia.uri;
+            title = Uri.decodeFull(uriStr.split('/').last.split('?').first);
+          } catch (_) {}
+        }
       }
 
       metadata = MediaMetadata(
@@ -337,7 +397,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
     }
 
     _isUpdating = true;
-    _session!.updateMetadata(metadata).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateMetadata(metadata).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update metadata: $e');
     }).whenComplete(() => _isUpdating = false);
   }
@@ -358,16 +418,28 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       status = PlaybackStatus.paused;
     }
 
+    // Set 3-way Repeat mode corresponding to media_kit's playlistMode
+    MediaRepeatMode repeatMode = MediaRepeatMode.none;
+    if (state.playlistMode == PlaylistMode.single) {
+      repeatMode = MediaRepeatMode.one;
+    } else if (state.playlistMode == PlaylistMode.loop) {
+      repeatMode = MediaRepeatMode.all;
+    }
+
     final playbackState = PlaybackState(
       status: status,
       position: state.position,
       speed: state.rate,
       bufferedPosition: state.buffer,
+      repeatMode: repeatMode,
+      shuffleModeEnabled: false, // update as needed for media_kit shuffle
     );
 
-    _session!.updatePlaybackState(playbackState).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update playback state: $e');
     });
+
+    _syncAvailableActions();
   }
 
   void _handleMediaAction(MediaAction action) async {
@@ -429,7 +501,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       ),
     };
 
-    _session!.updateAvailableActions(actions).catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update available actions: $e');
     });
   }
@@ -456,6 +528,7 @@ Here is an example for a generic player:
 ```dart
 import 'dart:async';
 import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
 class CustomPlayerAdapter implements MediaSessionAdapter {
   final MyPlayer player;
@@ -470,7 +543,7 @@ class CustomPlayerAdapter implements MediaSessionAdapter {
 
     // A. Sync metadata changes
     _subscriptions.add(player.trackStream.listen((track) {
-      _session?.updateMetadata(MediaMetadata(
+      FlutterMediaSessionPlatform.instance.updateMetadata(MediaMetadata(
         title: track.title,
         artist: track.artist,
         album: track.album,
@@ -481,7 +554,7 @@ class CustomPlayerAdapter implements MediaSessionAdapter {
 
     // B. Sync playback status and progress
     _subscriptions.add(player.statusStream.listen((status) {
-      _session?.updatePlaybackState(PlaybackState(
+      FlutterMediaSessionPlatform.instance.updatePlaybackState(PlaybackState(
         status: status == MyStatus.playing ? PlaybackStatus.playing : PlaybackStatus.paused,
         position: player.currentPosition,
         speed: player.speed,
@@ -489,7 +562,7 @@ class CustomPlayerAdapter implements MediaSessionAdapter {
     }));
 
     // C. Forward system controls to player
-    _subscriptions.add(session.onMediaAction.listen((action) {
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
           player.resume();
@@ -546,16 +619,15 @@ graph TD
 
 ---
 
-## 4. Legacy API & Deprecations
+## 4. Removed Legacy APIs
 
-> [!WARNING]
-> The direct manual synchronization APIs are deprecated and **scheduled for removal in 3.0.0**. If your project still relies on them, we highly recommend migrating to the **Adapter Pattern** shown in Section 1.
+Legacy direct synchronization APIs on `FlutterMediaSession` have been removed in version **3.0.0**.
 
-The following direct APIs are marked as deprecated:
-- `session.onMediaAction`
-- `session.updateMetadata(...)`
-- `session.updatePlaybackState(...)`
-- `session.updateAvailableActions(...)`
+If you need to manually update state or handle actions without using an adapter, access them directly on the platform interface:
+- `FlutterMediaSessionPlatform.instance.updateMetadata(...)`
+- `FlutterMediaSessionPlatform.instance.updatePlaybackState(...)`
+- `FlutterMediaSessionPlatform.instance.updateAvailableActions(...)`
+- `FlutterMediaSessionPlatform.instance.onMediaAction`
 
 ---
 
@@ -573,6 +645,22 @@ await session.setAutoHandleInterruptions(true);
 > Because `flutter_media_session` acts as a metadata/command shim, enabling this option will cause the plugin to request audio focus when playback starts. This will strip audio focus from your actual audio player within the same app, causing the actual player to immediately pause or go silent while the system media widget remains stuck in a "playing" state.
 > 
 > Only turn this **on** if your player does *not* request focus itself (e.g. using `video_player` with the `fvp`/`mdk` backend).
+
+### Background Keep-Alive (Off-Device Casting)
+To keep a backgrounded session alive when audio is rendered **off-device** (e.g. casting to Chromecast or a DLNA device on the local network), use `setBackgroundKeepAlive`:
+
+```dart
+await session.setBackgroundKeepAlive(true);
+```
+
+While enabled, the platform holds the best keep-alive primitive it has to prevent the connection from being torn down:
+- **Android**: A partial wake lock (CPU) + high-performance Wi-Fi lock (radio), declaring `mediaPlayback|connectedDevice` foreground service types.
+- **macOS**: An `IOPMAssertion` preventing idle system sleep.
+- **Windows**: `SetThreadExecutionState` to request the system stay active.
+- **Web**: Best-effort Screen Wake Lock.
+- **iOS**: No-op (background survival depends on native audio playback).
+
+Enable it only during active cast/off-device sessions and disable it when done to avoid unnecessary battery drain.
 
 ### Windows AppUserModelID Setup
 On Windows, call `setWindowsAppUserModelId` to show the correct app icon and name in SMTC:
