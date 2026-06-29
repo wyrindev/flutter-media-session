@@ -163,6 +163,35 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
     // events, and the page is typically the only audio source.
   }
 
+  JSObject? _wakeLockSentinel;
+
+  @override
+  Future<void> setBackgroundKeepAlive(bool enabled) async {
+    // Best-effort only: the Screen Wake Lock API keeps the screen awake while
+    // the page is visible — it does NOT keep a backgrounded tab's CPU/network
+    // alive (background tabs are throttled regardless). There is no real
+    // background keep-alive primitive on the web platform.
+    try {
+      final navigator = web.window.navigator as JSObject;
+      final wakeLock = navigator.getProperty<JSObject?>('wakeLock'.toJS);
+      if (wakeLock == null) return; // Unsupported browser.
+      if (enabled) {
+        if (_wakeLockSentinel != null) return;
+        final promise =
+            wakeLock.callMethod<JSPromise>('request'.toJS, 'screen'.toJS);
+        _wakeLockSentinel = (await promise.toDart) as JSObject?;
+      } else {
+        final sentinel = _wakeLockSentinel;
+        _wakeLockSentinel = null;
+        if (sentinel != null) {
+          await sentinel.callMethod<JSPromise>('release'.toJS).toDart;
+        }
+      }
+    } catch (e) {
+      // Wake Lock unavailable or rejected (e.g. requires user activation). Ignore.
+    }
+  }
+
   /// Internal helper to register a media action handler with the browser's media session.
   void _registerAction(
       web.MediaSession session, String actionName, MediaAction actionToEmit) {

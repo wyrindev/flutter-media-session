@@ -47,7 +47,14 @@ class FakePlatform with MockPlatformInterfaceMixin implements FlutterMediaSessio
   Future<void> setHandlesInterruptions(bool enabled) => Future.value();
 
   @override
+  Future<void> setBackgroundKeepAlive(bool enabled) => Future.value();
+
+  @override
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
+
+  @override
+  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) =>
+      Future.value();
 
   @override
   Stream<MediaAction> get onMediaAction => actionController.stream;

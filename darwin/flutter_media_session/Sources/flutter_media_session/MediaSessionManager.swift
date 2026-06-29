@@ -4,16 +4,52 @@ import AVFoundation
 import UIKit
 #elseif os(macOS)
 import AppKit
+import IOKit.pwr_mgt
 #endif
 
 class MediaSessionManager: NSObject {
     private let sendEvent: (Any) -> Void
     private var commandTargets: [Any] = []
     private var durationMs: Int64?
+    private var currentArtworkUri: String?
+    private var artworkDownloadTask: URLSessionDataTask?
+
+    #if os(macOS)
+    /// Power assertion id held while background keep-alive is enabled, to stop
+    /// the Mac going to idle system sleep (which would suspend a cast control
+    /// socket). 0 == not held.
+    private var keepAliveAssertionID: IOPMAssertionID = 0
+    #endif
+
+    /// Opt-in background keep-alive. On macOS this prevents idle system sleep
+    /// for as long as it is enabled; on iOS there is no equivalent runtime
+    /// primitive (background survival depends on the `audio` UIBackgroundMode),
+    /// so it is a no-op.
+    func setBackgroundKeepAlive(_ enabled: Bool) {
+        #if os(macOS)
+        if enabled {
+            guard keepAliveAssertionID == 0 else { return }
+            IOPMAssertionCreateWithName(
+                kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
+                IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                "flutter_media_session background keep-alive" as CFString,
+                &keepAliveAssertionID
+            )
+        } else if keepAliveAssertionID != 0 {
+            IOPMAssertionRelease(keepAliveAssertionID)
+            keepAliveAssertionID = 0
+        }
+        #endif
+        // iOS: intentionally a no-op (no public wake/Wi-Fi-lock API).
+    }
 
     init(eventSink: @escaping (Any) -> Void) {
         self.sendEvent = eventSink
         super.init()
+    }
+
+    deinit {
+        deactivate()
     }
 
     // MARK: - Activate / Deactivate
@@ -50,12 +86,21 @@ class MediaSessionManager: NSObject {
             try session.setActive(true)
             return true
         } catch {
+            print("FlutterMediaSession: Failed to configure AVAudioSession: \(error)")
             return false
         }
     }
     #endif
 
     func deactivate() {
+        // Always drop the keep-alive assertion when the session is torn down.
+        setBackgroundKeepAlive(false)
+
+        // Cancel and clean up artwork download task synchronously to prevent task leak during deinit
+        artworkDownloadTask?.cancel()
+        artworkDownloadTask = nil
+        currentArtworkUri = nil
+
         let center = MPRemoteCommandCenter.shared()
 
         for target in commandTargets {
@@ -72,7 +117,9 @@ class MediaSessionManager: NSObject {
         }
         commandTargets.removeAll()
 
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        DispatchQueue.main.async {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
 
         #if os(iOS)
         unregisterRouteChangeObserver()
@@ -88,23 +135,35 @@ class MediaSessionManager: NSObject {
     // MARK: - Metadata
 
     func updateMetadata(title: String?, artist: String?, album: String?, artworkUri: String?, durationMs: Int64?) {
-        self.durationMs = durationMs
+        let artworkUriCopy = artworkUri
 
-        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.durationMs = durationMs
+            var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
 
-        info[MPMediaItemPropertyTitle] = title
-        info[MPMediaItemPropertyArtist] = artist
-        info[MPMediaItemPropertyAlbumTitle] = album
-        info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
+            info[MPMediaItemPropertyTitle] = title
+            info[MPMediaItemPropertyArtist] = artist
+            info[MPMediaItemPropertyAlbumTitle] = album
+            info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
 
-        if let durationMs = durationMs, durationMs > 0 {
-            info[MPMediaItemPropertyPlaybackDuration] = Double(durationMs) / 1000.0
-        }
+            if let durationMs = durationMs, durationMs > 0 {
+                info[MPMediaItemPropertyPlaybackDuration] = Double(durationMs) / 1000.0
+            }
 
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
 
-        if let artworkUri = artworkUri {
-            loadArtwork(from: artworkUri)
+            self.currentArtworkUri = artworkUriCopy
+            if let artworkUri = artworkUriCopy {
+                self.loadArtwork(from: artworkUri)
+            } else {
+                self.artworkDownloadTask?.cancel()
+                self.artworkDownloadTask = nil
+                
+                var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
+                currentInfo.removeValue(forKey: MPMediaItemPropertyArtwork)
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
+            }
         }
     }
 
@@ -115,31 +174,37 @@ class MediaSessionManager: NSObject {
         if status == "playing" {
             // Re-assert the audio session: it may be deactivated between
             // activate() and first playback by other plugins or the system.
-            try? AVAudioSession.sharedInstance().setActive(true)
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("FlutterMediaSession: Failed to set AVAudioSession active: \(error)")
+            }
         }
         #endif
 
-        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
+        DispatchQueue.main.async {
+            var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
 
-        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000.0
-        info[MPNowPlayingInfoPropertyPlaybackRate] = status == "playing" ? speed : 0.0
-        info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = speed
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000.0
+            info[MPNowPlayingInfoPropertyPlaybackRate] = status == "playing" ? speed : 0.0
+            info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = speed
 
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
 
-        let center = MPRemoteCommandCenter.shared()
-        center.changeShuffleModeCommand.currentShuffleType = shuffleModeEnabled ? .items : .off
+            let center = MPRemoteCommandCenter.shared()
+            center.changeShuffleModeCommand.currentShuffleType = shuffleModeEnabled ? .items : .off
 
-        let repeatType: MPRepeatType
-        switch repeatMode {
-        case 1:
-            repeatType = .all
-        case 2:
-            repeatType = .one
-        default:
-            repeatType = .off
+            let repeatType: MPRepeatType
+            switch repeatMode {
+            case 1:
+                repeatType = .all
+            case 2:
+                repeatType = .one
+            default:
+                repeatType = .off
+            }
+            center.changeRepeatModeCommand.currentRepeatType = repeatType
         }
-        center.changeRepeatModeCommand.currentRepeatType = repeatType
     }
 
     // MARK: - Available Actions
@@ -178,7 +243,9 @@ class MediaSessionManager: NSObject {
     private func registerCommand(_ command: MPRemoteCommand, action: String) {
         command.isEnabled = true
         let target = command.addTarget { [weak self] _ in
-            self?.sendEvent(action)
+            DispatchQueue.main.async {
+                self?.sendEvent(action)
+            }
             return .success
         }
         commandTargets.append(target)
@@ -191,10 +258,12 @@ class MediaSessionManager: NSObject {
                 return .commandFailed
             }
             let positionMs = Int64(positionEvent.positionTime * 1000)
-            self?.sendEvent([
-                "action": "seekTo",
-                "args": positionMs
-            ])
+            DispatchQueue.main.async {
+                self?.sendEvent([
+                    "action": "seekTo",
+                    "args": positionMs
+                ])
+            }
             return .success
         }
         commandTargets.append(target)
@@ -203,18 +272,38 @@ class MediaSessionManager: NSObject {
     // MARK: - Artwork
 
     private func loadArtwork(from uri: String) {
+        // Cancel previous download task if any
+        artworkDownloadTask?.cancel()
+        artworkDownloadTask = nil
+
         if uri.hasPrefix("http://") || uri.hasPrefix("https://") {
             guard let url = URL(string: uri) else { return }
-            URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-                guard let data = data, error == nil else { return }
-                self?.setArtworkFromData(data)
-            }.resume()
+            let task = URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    // Check if the URI has changed since we started loading
+                    guard self.currentArtworkUri == uri else { return }
+                    self.artworkDownloadTask = nil
+                    
+                    guard let data = data, error == nil else { return }
+                    self.setArtworkFromData(data)
+                }
+            }
+            artworkDownloadTask = task
+            task.resume()
         } else {
             // Local file path
-            let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
-            let url = URL(fileURLWithPath: path)
-            guard let data = try? Data(contentsOf: url) else { return }
-            setArtworkFromData(data)
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
+                let url = URL(fileURLWithPath: path)
+                guard let data = try? Data(contentsOf: url) else { return }
+                
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    guard self.currentArtworkUri == uri else { return }
+                    self.setArtworkFromData(data)
+                }
+            }
         }
     }
 
@@ -227,11 +316,9 @@ class MediaSessionManager: NSObject {
         let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         #endif
 
-        DispatchQueue.main.async {
-            var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
-            info[MPMediaItemPropertyArtwork] = artwork
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        }
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
+        info[MPMediaItemPropertyArtwork] = artwork
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     // MARK: - Route Change (iOS only)
@@ -262,7 +349,9 @@ class MediaSessionManager: NSObject {
         }
 
         if reason == .oldDeviceUnavailable {
-            sendEvent("pause")
+            DispatchQueue.main.async { [weak self] in
+                self?.sendEvent("pause")
+            }
         }
     }
     #endif
