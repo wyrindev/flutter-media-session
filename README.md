@@ -8,150 +8,26 @@ A powerful Flutter plugin for integrating your app with system-level media contr
 
 This plugin allows your app to display media metadata (title, artist, artwork) in the system's media center and respond to system actions like Play, Pause, Skip, and Seek.
 
-<h2>Platform Support</h2>
+## Platform Support
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Platform</th>
-      <th align="left">Support</th>
-      <th align="left">Underlying API</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>
-        <img src="doc/img/platform/head.svg" alt="Android" width="18" style="vertical-align: middle;">
-        <span style="vertical-align: middle;">Android</span>
-      </td>
-      <td>
-        <span style="
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 8px;
-          background: #C4EED0;
-          color: #0F5223;
-          font-size: 13px;
-          font-weight: 500;
-        ">
-          Available
-        </span>
-      </td>
-      <td>
-        <a href="https://developer.android.com/media/media3/session/control-playback">
-          Media3 MediaSessionService
-        </a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;">
-        <span style="vertical-align: middle;">iOS / macOS</span>
-      </td>
-      <td>
-        <span style="
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 8px;
-          background: #C4EED0;
-          color: #0F5223;
-          font-size: 13px;
-          font-weight: 500;
-        ">
-          Available
-        </span>
-      </td>
-      <td>
-        <a href="https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter">
-          MPNowPlayingInfoCenter
-        </a>
-        /
-        <a href="https://developer.apple.com/documentation/mediaplayer/mpremotecommandcenter">
-          MPRemoteCommandCenter
-        </a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <img src="doc/img/platform/windows.svg" alt="Windows" width="18" style="vertical-align: middle;">
-        <span style="vertical-align: middle;">Windows</span>
-      </td>
-      <td>
-        <span style="
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 8px;
-          background: #C4EED0;
-          color: #0F5223;
-          font-size: 13px;
-          font-weight: 500;
-        ">
-          Available
-        </span>
-      </td>
-      <td>
-        <a href="https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/system-media-transport-controls">
-          SystemMediaTransportControls (SMTC)
-        </a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <img src="doc/img/platform/tux.svg" alt="Linux" width="18" style="vertical-align: middle;">
-        <span style="vertical-align: middle;">Linux</span>
-      </td>
-      <td>
-        <span style="
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 8px;
-          background: #E9EEF6;
-          color: #444746;
-          font-size: 13px;
-          font-weight: 500;
-        ">
-          Planned
-        </span>
-      </td>
-      <td>
-        <a href="https://specifications.freedesktop.org/mpris-spec/">
-          MPRIS
-        </a>
-      </td>
-    </tr>
-    <tr>
-      <td>Web</td>
-      <td>
-        <span style="
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 8px;
-          background: #C4EED0;
-          color: #0F5223;
-          font-size: 13px;
-          font-weight: 500;
-        ">
-          Available
-        </span>
-      </td>
-      <td>
-        <a href="https://developer.mozilla.org/en-US/docs/Web/API/Media_Session_API">
-          Media Session API
-        </a>
-      </td>
-    </tr>
-  </tbody>
-</table>
+| Platform | Support | Underlying API |
+| :--- | :--- | :--- |
+| <img src="doc/img/platform/head.svg" alt="Android" width="18" style="vertical-align: middle;"> Android | Available | [Media3 MediaSessionService](https://developer.android.com/media/media3/session/control-playback) |
+| <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;"> iOS / macOS | Available | [MPNowPlayingInfoCenter](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter) / [MPRemoteCommandCenter](https://developer.apple.com/documentation/mediaplayer/mpremotecommandcenter) |
+| <img src="doc/img/platform/windows.svg" alt="Windows" width="18" style="vertical-align: middle;"> Windows | Available | [SystemMediaTransportControls (SMTC)](https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/system-media-transport-controls) |
+| <img src="doc/img/platform/tux.svg" alt="Linux" width="18" style="vertical-align: middle;"> Linux | Planned | [MPRIS](https://specifications.freedesktop.org/mpris-spec/) |
+| Web | Available | [Media Session API](https://developer.mozilla.org/en-US/docs/Web/API/Media_Session_API) |
 
 ## Features
 
-- 🎵 **Metadata Synchronization**: Display title, artist, album, and artwork in the lock screen or system media center.
-- ⏯️ **Playback State Control**: Sync playing/paused status and current playback position.
-- 📡 **Native Media Actions**: Receive events from system controls (Play, Pause, Skip, Seek, etc.) and handle them in your Dart code.
-- 🎨 **Custom Actions (Android)**: Add completely custom buttons (like "Like", "Shuffle") with custom icons and labels to the notification.
-- 🔈 **Audio Focus (Android)**: Optional automatic handling of audio interruptions (calls, navigation prompts).
-- 🪟 **Windows Identity**: Dynamic AUMID and Start Menu shortcut registration to avoid "Unknown Application" label.
-- 🎧 **Android Background Support**: Automatically handles foreground service requirements for media playback on Android.
+- 🧩 **Professional Adapter Architecture**: Decouple player implementations from system controls. Easily bind players using a unified `MediaSessionAdapter` interface without bloating the core package with third-party dependencies.
+- 🎵 **Rich Metadata & Artwork Synchronization**: Display titles, artists, album names, and artwork on system lock screens and media centers across all platforms.
+- ⏯️ **Precise Playback & Timeline Tracking**: Synchronize playing/paused states, playback speed, and current elapsed position across all supported platforms.
+- 📡 **Bi-directional System Media Commands**: Respond to standard system-level media controls, including **Play, Pause, Stop, Seek, Skip Forward/Backward, Shuffle, and Repeat**.
+- 📶 **Smart Background Keep-Alive**: Maintain connection stability for off-device playback when the app is backgrounded using native platform keep-alive primitives.
+- 🔈 **Audio Focus Management (Optional)**: Built-in handling of audio focus interruptions for players that do not manage focus natively.
+- 🎨 **Custom Notification Actions (Android)**: Go beyond standard controls by adding custom actions with custom icons and labels directly inside the notification.
+- 🎧 **Out-of-the-Box Background Support (Android)**: Automatically manages foreground service requirements, notification lifecycles, and system notification permissions.
 
 ## Installation
 
@@ -164,15 +40,9 @@ dependencies:
 
 ## Setup
 
-### Android
+### Android, macOS & Web
 
-1.  **Foreground Service Permission**: Ensure your `android/app/src/main/AndroidManifest.xml` includes the necessary permissions (usually added by the plugin automatically, but worth verifying):
-    ```xml
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    ```
-
-2.  **Service Declaration**: The plugin handles the service declaration internally via its manifest merger.
+No configuration required.
 
 ### iOS
 
@@ -183,21 +53,13 @@ dependencies:
         <string>audio</string>
     </array>
     ```
-    This allows the Now Playing controls to work when the app is backgrounded.
-
-### macOS
-
-No specific configuration is required. The plugin uses `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter` directly.
+    This allows system-level controls to interact with your app in the background.
 
 ### Windows
 
-For proper application identification (avoiding "Unknown Application" in the system media center), please refer to the:
+For proper application identification (avoiding the "Unknown Application" label in system controls), please refer to the:
 
 **[Windows Setup Guide](doc/windows_setup.md)**
-
-### Web
-
-No specific configuration is required. The plugin uses standard JS interop on Web.
 
 ## Usage
 
