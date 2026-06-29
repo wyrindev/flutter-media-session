@@ -80,7 +80,9 @@ tasks.configureEach {
                 val kotlinOptions = property("kotlinOptions")
                 val setJvmTarget = kotlinOptions?.javaClass?.getMethod("setJvmTarget", String::class.java)
                 setJvmTarget?.invoke(kotlinOptions, "17")
-            } catch (ignored: Exception) {}
+            } catch (ignored: Exception) {
+                logger.warn("Failed to set Kotlin JVM target to 17 for task ${name}: ${ignored.message}")
+            }
         }
     }
 }
