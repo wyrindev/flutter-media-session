@@ -40,6 +40,7 @@ When you're ready to contribute code, follow these steps:
 
 ### 1. Pre-requisites
 - **Fork** the repository and create your branch from `main`.
+- For changes targeting the `v2` line, open your PR against the `dev/v2` branch.
 - Ensure your code follows the `flutter_lints` rules.
 - **Discuss First**: Unless it's a minor fix (typos, small bug fixes), there should be an associated issue discussed beforehand.
 
