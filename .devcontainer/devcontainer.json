@@ -1,5 +1,18 @@
 {
-  "name": "Flutter Dev",
+  "name": "Flutter Dev Workspace",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-  "postCreateCommand": "git clone https://github.com/flutter/flutter.git -b stable /opt/flutter && echo 'export PATH=/opt/flutter/bin:$PATH' >> ~/.bashrc"
+  "remoteEnv": {
+    "PATH": "/home/vscode/flutter/bin:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xz-utils unzip && if [ ! -d /home/vscode/flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 /home/vscode/flutter && /home/vscode/flutter/bin/flutter doctor; fi",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dart-code.flutter",
+        "dart-code.dart-code"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode"
 }
