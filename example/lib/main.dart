@@ -120,8 +120,8 @@ class _PlayerHomeState extends State<PlayerHome> {
     return Track(
       title: 'SoundHelix Song $id',
       artist: 'SoundHelix',
-      artwork: 'https://static.wyrin.dev/Artwork-$id.jpg',
-      url: 'https://static.wyrin.dev/SoundHelix-Song-$id.mp3',
+      artwork: 'https://picsum.photos/400/400?seed=$id',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-$id.mp3',
     );
   });
 
