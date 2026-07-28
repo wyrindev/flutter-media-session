@@ -1,3 +1,9 @@
+## 3.0.1
+
+### Bug Fixes
+* **Example Application**: Added `<uses-permission android:name="android.permission.INTERNET" />` and `android:usesCleartextTraffic="true"` to `example/android/app/src/main/AndroidManifest.xml`.
+* **Example Audio Sources**: Restored reliable public sample audio URLs (`soundhelix.com`) and cover images in `example/lib/main.dart`.
+
 ## 3.0.0
 
 This major release consolidates the modern **Adapter Pattern** API architecture, introduces off-device casting background keep-alive capabilities, resolves platform compiler warnings, and fully removes deprecated legacy direct-sync APIs from the main class interface.
