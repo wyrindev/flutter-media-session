@@ -1,24 +1,23 @@
+## 2.4.1
+
+### Bug Fixes
+* **Example Application**: Added `<uses-permission android:name="android.permission.INTERNET" />` and `android:usesCleartextTraffic="true"` to `example/android/app/src/main/AndroidManifest.xml`.
+* **Example Audio Sources**: Restored reliable public sample audio URLs (`soundhelix.com`) and cover images in `example/lib/main.dart`.
+
 ## 2.4.0
-* **Opt-in background keep-alive (`setBackgroundKeepAlive`)**: New API that keeps
-  a backgrounded session alive whose audio is rendered **off-device** — most
-  importantly a Chromecast/DLNA control socket on the local network, which the OS
-  otherwise tears down ("Broken pipe") a few minutes after the app is
-  backgrounded. Off by default; enable it only for that case (e.g. while casting)
-  and disable it when the session ends. Implemented with the best primitive each
-  platform offers:
-  * **Android**: partial wake lock (CPU) + high-perf Wi-Fi lock (radio), held for
-    the enabled window; the service is also declared
-    `mediaPlayback|connectedDevice` with the matching
-    `FOREGROUND_SERVICE_CONNECTED_DEVICE` / `WAKE_LOCK` / `ACCESS_WIFI_STATE`
-    permissions for Android 14+ casting.
-  * **macOS**: an `IOPMAssertion` that prevents idle system sleep.
-  * **Windows**: `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`.
-  * **Web**: best-effort Screen Wake Lock (screen-only; background tabs are still
-    throttled).
-  * **iOS**: no-op — the OS exposes no wake/Wi-Fi-lock primitive; background
-    survival there depends on the `audio` background mode.
-* Example app gains a "Background Keep-Alive" toggle demonstrating the API.
-* **Android Build Modernization**: Dynamically adapt Kotlin configuration to support both older KGP versions and modern Built-in Kotlin mechanism in AGP 9.0+, safeguarding JVM targets and resolving compile/deprecation warnings.
+
+This major release consolidates the modern **Adapter Pattern** API architecture, introduces off-device casting background keep-alive capabilities, resolves platform compiler warnings, and fully removes deprecated legacy direct-sync APIs from the main class interface.
+
+### New Features & Improvements
+* **Background Keep-Alive (`setBackgroundKeepAlive`)**: A new opt-in API that keeps backgrounded sessions alive whose audio is rendered **off-device** (e.g., Chromecast/DLNA control socket on the local network) to prevent the OS from tearing down connections. Off by default; uses the best primitive each platform offers:
+  * **Android**: Partial wake lock (CPU) + high-performance Wi-Fi lock (radio), declaring `mediaPlayback|connectedDevice` with corresponding permissions.
+  * **macOS**: `IOPMAssertion` to prevent idle system sleep.
+  * **Windows**: `SetThreadExecutionState` to request system active state.
+  * **Web**: Best-effort Screen Wake Lock.
+  * **iOS**: No-op (depends on native audio playback).
+  * Example app includes a toggle to demonstrate this feature.
+* **Android Build Modernization**: Dynamically detects the Android Gradle Plugin (AGP) version to support both older KGP versions and the new Built-in Kotlin mechanism in AGP 9.0+, preventing compile errors and safeguarding JVM target configurations.
+>>>>>>> 327f3a3 (fix(example): restore working sample URLs and add INTERNET permission (#32))
 * **Darwin Enhancements**: Improved thread safety, resource management, and error handling in Apple's `MediaSessionManager`.
 
 ## 2.3.0
