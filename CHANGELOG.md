@@ -17,7 +17,6 @@ This major release consolidates the modern **Adapter Pattern** API architecture,
   * **iOS**: No-op (depends on native audio playback).
   * Example app includes a toggle to demonstrate this feature.
 * **Android Build Modernization**: Dynamically detects the Android Gradle Plugin (AGP) version to support both older KGP versions and the new Built-in Kotlin mechanism in AGP 9.0+, preventing compile errors and safeguarding JVM target configurations.
->>>>>>> 327f3a3 (fix(example): restore working sample URLs and add INTERNET permission (#32))
 * **Darwin Enhancements**: Improved thread safety, resource management, and error handling in Apple's `MediaSessionManager`.
 
 ## 2.3.0
