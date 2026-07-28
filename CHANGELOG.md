@@ -1,3 +1,10 @@
+## 2.4.2
+
+### Bug Fixes
+* **Example Application**: Added `<uses-permission android:name="android.permission.INTERNET" />` and `android:usesCleartextTraffic="true"` to `example/android/app/src/main/AndroidManifest.xml`.
+* **Example Audio Sources**: Restored reliable public sample audio URLs (`soundhelix.com`) and cover images in `example/lib/main.dart`.
+* **Changelog Cleanup**: Removed leftover merge conflict marker from documentation.
+
 ## 2.4.1
 
 ### Bug Fixes
