@@ -1,13 +1,9 @@
-## 3.0.4-pre.2
-
-### Bug Fixes
-* **Android Hardware Media Buttons**: Directly intercepted and dispatched `ACTION_DOWN` media button events (play, pause, next, previous, stop) to Flutter in `onMediaButtonEvent` (#38).
-* **Android Cleanup on Detach**: Automatically deactivated and released media session resources when the Flutter engine detaches.
-
-## 3.0.4-pre.1
+## 3.0.4
 
 ### Bug Fixes
 * **Android Media Session Lifecycle**: Fixed lingering notifications and zombie media controls on deactivation, and ensured state recovery upon re-activation.
+* **Android Hardware Media Buttons**: Directly intercepted and dispatched `ACTION_DOWN` media button events (play, pause, next, previous, stop) to Flutter in `onMediaButtonEvent`.
+* **Android Cleanup on Detach**: Automatically deactivated and released media session resources when the Flutter engine detaches.
 * **Example Application**: Re-bound adapter on activation and auto-resumed playback after seekTo.
 
 ## 3.0.3
