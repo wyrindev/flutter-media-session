@@ -1,16 +1,6 @@
 # Flutter Media Session Example
 
-A Material Design 3 music player that demonstrates how to integrate the `flutter_media_session` plugin with a real audio player (`audioplayers`).
-
-## Features
-
-- 📱 **Native Control Center Integration**: See what's playing in the system's media center (Android, Windows, Web).
-- 🖼️ **Dynamic Metadata**: Real-time updates for song titles, artists, and high-quality artwork from network URLs.
-- ⏯️ **Remote Control**: Respond to Play, Pause, Skip Next, and Skip Previous commands from your headphones, lock screen, or system media panel.
-- 🚀 **Material 3 Interface**: A clean, modern UI featuring:
-    - Animated song transitions.
-    - Progress synchronization with system controls.
-    - Adaptive color schemes.
+A music player that demonstrates how to integrate the `flutter_media_session` plugin with a real audio player (`audioplayers`).
 
 ## Getting Started
 

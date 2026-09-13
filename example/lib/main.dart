@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'models/track.dart';
@@ -126,11 +127,13 @@ class _PlayerHomeState extends State<PlayerHome> {
 
   Track get current => _playlist[_currentIndex];
 
+  String _appVersion = '';
   late final _ExamplePlayerAdapter _adapter;
 
   @override
   void initState() {
     super.initState();
+    _loadAppVersion();
     _adapter = _ExamplePlayerAdapter(this);
     _availableActions = {
       MediaAction.play,
@@ -147,6 +150,19 @@ class _PlayerHomeState extends State<PlayerHome> {
     _listenMediaSessionActions();
     _listenAudioPlayerEvents();
     _activate();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted && info.version.isNotEmpty) {
+        setState(() {
+          _appVersion = 'v${info.version}';
+        });
+      }
+    } catch (_) {
+      // Fallback or ignore in test / unsupported environments
+    }
   }
 
   void _listenMediaSessionActions() {
@@ -220,7 +236,10 @@ class _PlayerHomeState extends State<PlayerHome> {
     await _plugin.activate();
     await _plugin.setSkipIntervals(forwardSeconds: 10, backwardSeconds: 10);
     if (!mounted) return;
-    setState(() => _active = true);
+    setState(() {
+      _active = true;
+      _status = PlaybackStatus.paused;
+    });
     await Future.wait([
       _updateAvailableActions(),
       _updateAll(),
@@ -537,7 +556,9 @@ class _PlayerHomeState extends State<PlayerHome> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("MD3 Player"),
+        title: Text(_appVersion.isEmpty
+            ? "Example Player"
+            : "Example Player $_appVersion"),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -830,7 +851,9 @@ class _PlayerHomeState extends State<PlayerHome> {
               isOn: _repeatMode != 0,
               enabled: _active,
               onTap: _toggleRepeat,
-              icon: _repeatMode == 2 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+              icon: _repeatMode == 2
+                  ? Icons.repeat_one_rounded
+                  : Icons.repeat_rounded,
               normalWidth: 40,
               pressedWidth: 50,
               colorScheme: colorScheme,
@@ -906,7 +929,8 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
   @override
   void bind(FlutterMediaSession session) {
     _session = session;
-    _actionSubscription = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+    _actionSubscription =
+        FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
           state._play();
@@ -922,11 +946,14 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
           break;
         case 'rewind':
           final newPos = state._position - const Duration(seconds: 10);
-          state.handleSeekAction(newPos < Duration.zero ? Duration.zero : newPos);
+          state.handleSeekAction(
+              newPos < Duration.zero ? Duration.zero : newPos);
           break;
         case 'fastForward':
           final newPos = state._position + const Duration(seconds: 10);
-          state.handleSeekAction(newPos > state._currentDuration ? state._currentDuration : newPos);
+          state.handleSeekAction(newPos > state._currentDuration
+              ? state._currentDuration
+              : newPos);
           break;
         case 'seekTo':
           if (action.seekPosition != null) {

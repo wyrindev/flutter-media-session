@@ -101,9 +101,10 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                         }
                     }
                     try {
+                        ContextCompat.startForegroundService(context, intent)
                         context.bindService(intent, serviceConnection!!, Context.BIND_AUTO_CREATE)
                     } catch (e: Exception) {
-                        pendingActivateResult?.error("SERVICE_ERROR", "Failed to bind service: ${e.message}", null)
+                        pendingActivateResult?.error("SERVICE_ERROR", "Failed to start or bind service: ${e.message}", null)
                         pendingActivateResult = null
                     }
                 }
@@ -254,6 +255,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
      * Called when the MediaSessionService has finished creating and is ready.
      */
     fun onServiceCreated() {
+        syncPendingData()
         pendingActivateResult?.success(null)
         pendingActivateResult = null
         // Re-apply the keep-alive setting in case the service was recreated

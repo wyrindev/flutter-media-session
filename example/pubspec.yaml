@@ -1,5 +1,6 @@
 name: flutter_media_session_example
 description: "Demonstrates how to use the flutter_media_session plugin."
+version: 3.0.4
 
 publish_to: 'none'
 
@@ -16,6 +17,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   audioplayers: ^6.6.0
   window_manager: ^0.4.3
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   integration_test:
