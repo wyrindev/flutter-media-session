@@ -250,6 +250,17 @@ class FlutterMediaSessionService : MediaSessionService() {
             player.updateAvailableActions(initialActionNames)
         }
 
+        // Set up explicit MediaButtonReceiver PendingIntent for media buttons
+        val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+            setClass(this@FlutterMediaSessionService, androidx.media3.session.MediaButtonReceiver::class.java)
+        }
+        val mediaButtonPendingIntent = PendingIntent.getBroadcast(
+            this,
+            0,
+            mediaButtonIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         // Build the session
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
@@ -259,6 +270,19 @@ class FlutterMediaSessionService : MediaSessionService() {
             
         // setMediaNotificationProvider(FlutterMediaNotificationProvider(this))
         super.onCreate()
+
+        // Set media button receiver on the legacy SessionCompat for pre-Media3 / AVRCP hardware keys
+        try {
+            val getSessionCompatMethod = mediaSession?.javaClass?.getDeclaredMethod("getSessionCompat")
+            getSessionCompatMethod?.isAccessible = true
+            val sessionCompat = getSessionCompatMethod?.invoke(mediaSession)
+            if (sessionCompat != null) {
+                val setReceiverMethod = sessionCompat.javaClass.getMethod("setMediaButtonReceiver", PendingIntent::class.java)
+                setReceiverMethod.invoke(sessionCompat, mediaButtonPendingIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "Failed to setMediaButtonReceiver on sessionCompat", e)
+        }
 
         // Register the session with the service so Media3's
         // MediaNotificationManager creates its internal MediaController
@@ -647,7 +671,7 @@ class FlutterMediaSessionService : MediaSessionService() {
      */
     inner class ForwardingPlayer : androidx.media3.common.SimpleBasePlayer(mainLooper) {
         private var currentMetadata: MediaMetadata = MediaMetadata.EMPTY
-        private var playbackStatus: String = "buffering"
+        private var playbackStatus: String = "paused"
 
         /** Outer-class accessor — `playbackStatus` is private to this inner
          *  class so [FlutterMediaSessionService.onHandlesInterruptionsChanged]

@@ -1,3 +1,12 @@
+## Unreleased
+
+### Bug Fixes
+* **Android Hardware Media Buttons**: Registered explicit `MediaButtonReceiver` `PendingIntent` onto legacy `SessionCompat` to ensure media buttons are routed to the session.
+* **Android Service Lifecycle**: Started `FlutterMediaSessionService` via `ContextCompat.startForegroundService` to keep background media controls reliable.
+
+### Improvements
+* **Example Application**: Display application version in the AppBar using `package_info_plus`.
+
 ## 3.0.4
 
 ### Bug Fixes
