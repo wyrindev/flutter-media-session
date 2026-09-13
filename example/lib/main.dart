@@ -385,6 +385,19 @@ class _PlayerHomeState extends State<PlayerHome> {
     } catch (_) {}
   }
 
+  Future<void> _stop() async {
+    _seekDebounce?.cancel();
+    await _pause();
+    if (mounted) {
+      setState(() {
+        _position = Duration.zero;
+        _status = PlaybackStatus.paused;
+      });
+    }
+    await _audioPlayer.seek(Duration.zero);
+    _updatePlayback();
+  }
+
   Future<void> _next() async {
     int nextIndex;
     if (_isShuffle && _playlist.length > 1) {
@@ -937,6 +950,9 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
           break;
         case 'pause':
           state._pause();
+          break;
+        case 'stop':
+          state._stop();
           break;
         case 'skipToNext':
           state._next();

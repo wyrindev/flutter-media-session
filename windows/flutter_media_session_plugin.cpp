@@ -45,6 +45,9 @@ enum MediaActionId {
   SeekTo,
   Shuffle,
   Repeat,
+  Stop,
+  FastForward,
+  Rewind,
 };
 
 // static
@@ -161,6 +164,9 @@ void FlutterMediaSessionPlugin::InitSmtc() {
                 case SystemMediaTransportControlsButton::Pause: action_id = MediaActionId::Pause; break;
                 case SystemMediaTransportControlsButton::Next: action_id = MediaActionId::SkipToNext; break;
                 case SystemMediaTransportControlsButton::Previous: action_id = MediaActionId::SkipToPrevious; break;
+                case SystemMediaTransportControlsButton::Stop: action_id = MediaActionId::Stop; break;
+                case SystemMediaTransportControlsButton::FastForward: action_id = MediaActionId::FastForward; break;
+                case SystemMediaTransportControlsButton::Rewind: action_id = MediaActionId::Rewind; break;
                 default: break;
             }
 
@@ -241,6 +247,9 @@ std::optional<LRESULT> FlutterMediaSessionPlugin::HandleWindowProc(HWND hwnd, UI
             case MediaActionId::SeekTo: actionStr = "seekTo"; break;
             case MediaActionId::Shuffle: actionStr = "shuffle"; break;
             case MediaActionId::Repeat: actionStr = "repeat"; break;
+            case MediaActionId::Stop: actionStr = "stop"; break;
+            case MediaActionId::FastForward: actionStr = "fastForward"; break;
+            case MediaActionId::Rewind: actionStr = "rewind"; break;
             default: break;
         }
 
@@ -328,7 +337,19 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
           int64_t pos_ms = position_ms_;
           bool seek_to = has_seek_to_;
 
-          auto update_task = [smtc = smtc_, titleStr, hasTitle, artistStr, hasArtist, albumStr, hasAlbum, artworkStr, hasArtwork, dur_ms, pos_ms, seek_to]() -> winrt::fire_and_forget {
+          auto update_task = [](
+              winrt::Windows::Media::SystemMediaTransportControls smtc,
+              std::string titleStr,
+              bool hasTitle,
+              std::string artistStr,
+              bool hasArtist,
+              std::string albumStr,
+              bool hasAlbum,
+              std::string artworkStr,
+              bool hasArtwork,
+              int64_t dur_ms,
+              int64_t pos_ms,
+              bool seek_to) -> winrt::fire_and_forget {
               try {
                   auto updater = smtc.DisplayUpdater();
                   updater.Type(MediaPlaybackType::Music);
@@ -378,7 +399,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   OutputDebugStringA("Failed to update SMTC metadata.\n");
               }
           };
-          update_task();
+          update_task(smtc_, titleStr, hasTitle, artistStr, hasArtist, albumStr, hasAlbum, artworkStr, hasArtwork, dur_ms, pos_ms, seek_to);
       }
       result->Success();
   } else if (method_name == "updatePlaybackState") {
