@@ -81,9 +81,30 @@ jobs:
 
                   const linkedIssues = result?.repository?.pullRequest?.closingIssuesReferences?.nodes || [];
                   if (linkedIssues.length > 0) {
-                    const fixesPart = linkedIssues.map(issue => {
-                      return issue.author?.login ? `#${issue.number} @${issue.author.login}` : `#${issue.number}`;
-                    }).join(", ");
+                    const authorMap = new Map();
+                    for (const issue of linkedIssues) {
+                      const author = issue.author?.login || null;
+                      if (!authorMap.has(author)) {
+                        authorMap.set(author, []);
+                      }
+                      authorMap.get(author).push(`#${issue.number}`);
+                    }
+
+                    const authorParts = [];
+                    for (const [author, issueNumbers] of authorMap.entries()) {
+                      const issuesStr = issueNumbers.join(" ");
+                      authorParts.push(author ? `${issuesStr} @${author}` : issuesStr);
+                    }
+
+                    let fixesPart = "";
+                    if (authorParts.length === 1) {
+                      fixesPart = authorParts[0];
+                    } else if (authorParts.length === 2) {
+                      fixesPart = `${authorParts[0]} and ${authorParts[1]}`;
+                    } else {
+                      fixesPart = `${authorParts.slice(0, -1).join(", ")}, and ${authorParts[authorParts.length - 1]}`;
+                    }
+
                     fixesSuffix = `, fixes ${fixesPart}`;
                   }
                 } catch (gqlErr) {

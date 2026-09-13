@@ -1,11 +1,17 @@
-## Unreleased
+## 3.0.5
 
 ### Bug Fixes
-* **Android Hardware Media Buttons**: Registered explicit `MediaButtonReceiver` `PendingIntent` onto legacy `SessionCompat` to ensure media buttons are routed to the session.
-* **Android Service Lifecycle**: Started `FlutterMediaSessionService` via `ContextCompat.startForegroundService` to keep background media controls reliable.
+* **Android**:
+  * Registered explicit `MediaButtonReceiver` `PendingIntent` onto legacy `SessionCompat` to ensure hardware media buttons are routed to the session.
+  * Started `FlutterMediaSessionService` via `ContextCompat.startForegroundService` to keep background media controls reliable.
+* **Windows**:
+  * Fixed an Access Violation crash (`0xc0000005`) in `updateMetadata` when using local artwork paths with `seekTo` enabled by passing variables as by-value coroutine parameters.
+  * Handled `Stop`, `FastForward`, and `Rewind` button events in SMTC `ButtonPressed` callbacks.
 
 ### Improvements
-* **Example Application**: Display application version in the AppBar using `package_info_plus`.
+* **Example Application**:
+  * Displayed application version in the AppBar using `package_info_plus`.
+  * Added `stop` action handling and simplified platform-specific settings.
 
 ## 3.0.4
 

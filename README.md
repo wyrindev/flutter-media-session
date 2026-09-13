@@ -35,7 +35,7 @@ Add `flutter_media_session` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_media_session: ^3.0.4
+  flutter_media_session: ^3.0.5
 ```
 
 ## Setup

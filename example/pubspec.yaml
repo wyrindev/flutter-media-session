@@ -1,6 +1,6 @@
 name: flutter_media_session_example
 description: "Demonstrates how to use the flutter_media_session plugin."
-version: 3.0.4
+version: 3.0.5
 
 publish_to: 'none'
 
