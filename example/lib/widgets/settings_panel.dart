@@ -151,7 +151,8 @@ class SettingsPanel extends StatelessWidget {
   }
 
   Widget _singleActionChip(MediaAction action) {
-    final isSelected = availableActions?.any((a) => a.name == action.name) ?? false;
+    final isSelected =
+        availableActions?.any((a) => a.name == action.name) ?? false;
 
     return FilterChip(
       label: Text(action.name),

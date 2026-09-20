@@ -9,11 +9,14 @@ import '../doc/adapters/just_audio_adapter.dart';
 import '../doc/adapters/media_kit_adapter.dart';
 
 // Fake platform implementation to capture method calls
-class FakePlatform with MockPlatformInterfaceMixin implements FlutterMediaSessionPlatform {
+class FakePlatform
+    with MockPlatformInterfaceMixin
+    implements FlutterMediaSessionPlatform {
   final List<MediaMetadata> metadataUpdates = [];
   final List<PlaybackState> playbackStateUpdates = [];
   final List<Set<MediaAction>?> availableActionsUpdates = [];
-  final StreamController<MediaAction> actionController = StreamController<MediaAction>.broadcast();
+  final StreamController<MediaAction> actionController =
+      StreamController<MediaAction>.broadcast();
 
   @override
   Future<void> activate() => Future.value();
@@ -49,14 +52,16 @@ class FakePlatform with MockPlatformInterfaceMixin implements FlutterMediaSessio
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
 
   @override
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) =>
+  Future<void> setSkipIntervals(
+          {int forwardSeconds = 10, int backwardSeconds = 10}) =>
       Future.value();
 
   @override
   Stream<MediaAction> get onMediaAction => actionController.stream;
 
   @override
-  Future<void> setWindowsAppUserModelId(String id, {String? displayName, String? iconPath}) =>
+  Future<void> setWindowsAppUserModelId(String id,
+          {String? displayName, String? iconPath}) =>
       Future.value();
 }
 
@@ -119,9 +124,11 @@ class FakeAudioPlayer extends Fake implements AudioPlayer {
   @override
   Stream<double> get speedStream => _speedController.stream;
   @override
-  Stream<Duration> get bufferedPositionStream => _bufferedPositionController.stream;
+  Stream<Duration> get bufferedPositionStream =>
+      _bufferedPositionController.stream;
   @override
-  Stream<SequenceState?> get sequenceStateStream => _sequenceStateController.stream;
+  Stream<SequenceState?> get sequenceStateStream =>
+      _sequenceStateController.stream;
 
   @override
   PlayerState get playerState => _state;
@@ -141,7 +148,8 @@ class FakeAudioPlayer extends Fake implements AudioPlayer {
   SequenceState? get sequenceState => _seq;
 
   @override
-  bool get hasNext => _seq != null && _seq!.currentIndex < _seq!.sequence.length - 1;
+  bool get hasNext =>
+      _seq != null && _seq!.currentIndex < _seq!.sequence.length - 1;
   @override
   bool get hasPrevious => _seq != null && _seq!.currentIndex > 0;
 
@@ -387,11 +395,14 @@ void main() {
       // Verify initial updates
       expect(fakePlatform.metadataUpdates.isNotEmpty, true);
       expect(fakePlatform.metadataUpdates.last.title, 'Unknown Title');
-      expect(fakePlatform.metadataUpdates.last.duration, const Duration(seconds: 180));
+      expect(fakePlatform.metadataUpdates.last.duration,
+          const Duration(seconds: 180));
 
       expect(fakePlatform.playbackStateUpdates.isNotEmpty, true);
-      expect(fakePlatform.playbackStateUpdates.last.status, PlaybackStatus.playing);
-      expect(fakePlatform.playbackStateUpdates.last.position, const Duration(seconds: 10));
+      expect(fakePlatform.playbackStateUpdates.last.status,
+          PlaybackStatus.playing);
+      expect(fakePlatform.playbackStateUpdates.last.position,
+          const Duration(seconds: 10));
     });
 
     test('Propagates stream changes dynamically', () async {
@@ -399,11 +410,13 @@ void main() {
 
       player.setPosition(const Duration(seconds: 45));
       await Future.delayed(Duration.zero);
-      expect(fakePlatform.playbackStateUpdates.last.position, const Duration(seconds: 45));
+      expect(fakePlatform.playbackStateUpdates.last.position,
+          const Duration(seconds: 45));
 
       player.setPlayerState(false, ProcessingState.ready);
       await Future.delayed(Duration.zero);
-      expect(fakePlatform.playbackStateUpdates.last.status, PlaybackStatus.paused);
+      expect(
+          fakePlatform.playbackStateUpdates.last.status, PlaybackStatus.paused);
     });
 
     test('Handles incoming system media actions correctly', () async {
@@ -420,7 +433,8 @@ void main() {
       expect(player.calls.contains('pause'), true);
 
       // Seek action
-      fakePlatform.actionController.add(const MediaAction('seekTo', seekPosition: Duration(seconds: 90)));
+      fakePlatform.actionController.add(
+          const MediaAction('seekTo', seekPosition: Duration(seconds: 90)));
       await Future.delayed(Duration.zero);
       expect(player.calls.contains('seek_90000'), true);
     });
@@ -451,8 +465,10 @@ void main() {
       expect(fakePlatform.metadataUpdates.last.title, 'Unknown Title');
 
       expect(fakePlatform.playbackStateUpdates.isNotEmpty, true);
-      expect(fakePlatform.playbackStateUpdates.last.status, PlaybackStatus.playing);
-      expect(fakePlatform.playbackStateUpdates.last.position, const Duration(seconds: 15));
+      expect(fakePlatform.playbackStateUpdates.last.status,
+          PlaybackStatus.playing);
+      expect(fakePlatform.playbackStateUpdates.last.position,
+          const Duration(seconds: 15));
     });
 
     test('Propagates stream changes dynamically', () async {
@@ -460,11 +476,13 @@ void main() {
 
       player.setPosition(const Duration(seconds: 60));
       await Future.delayed(Duration.zero);
-      expect(fakePlatform.playbackStateUpdates.last.position, const Duration(seconds: 60));
+      expect(fakePlatform.playbackStateUpdates.last.position,
+          const Duration(seconds: 60));
 
       player.setPlaying(false);
       await Future.delayed(Duration.zero);
-      expect(fakePlatform.playbackStateUpdates.last.status, PlaybackStatus.paused);
+      expect(
+          fakePlatform.playbackStateUpdates.last.status, PlaybackStatus.paused);
     });
 
     test('Handles incoming system media actions correctly', () async {
@@ -481,7 +499,8 @@ void main() {
       expect(player.calls.contains('pause'), true);
 
       // Seek action
-      fakePlatform.actionController.add(const MediaAction('seekTo', seekPosition: Duration(seconds: 120)));
+      fakePlatform.actionController.add(
+          const MediaAction('seekTo', seekPosition: Duration(seconds: 120)));
       await Future.delayed(Duration.zero);
       expect(player.calls.contains('seek_120000'), true);
     });

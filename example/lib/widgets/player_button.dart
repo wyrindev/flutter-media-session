@@ -99,7 +99,8 @@ class _PlayerActionButtonState extends State<PlayerActionButton> {
     final dur = (_pressed || widget.squeezed)
         ? const Duration(milliseconds: 80)
         : const Duration(milliseconds: 600);
-    final crv = (_pressed || widget.squeezed) ? Curves.easeOut : Curves.elasticOut;
+    final crv =
+        (_pressed || widget.squeezed) ? Curves.easeOut : Curves.elasticOut;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(end: targetW),
@@ -163,7 +164,9 @@ class _PlayerToggleButtonState extends State<PlayerToggleButton> {
     final bg = isOn ? cs.secondaryContainer : Colors.transparent;
     final fg = isOn
         ? cs.secondary
-        : (widget.enabled ? cs.onSurfaceVariant : cs.onSurface.withValues(alpha: 0.38));
+        : (widget.enabled
+            ? cs.onSurfaceVariant
+            : cs.onSurface.withValues(alpha: 0.38));
     final border = isOn
         ? BorderSide.none
         : BorderSide(
@@ -172,7 +175,8 @@ class _PlayerToggleButtonState extends State<PlayerToggleButton> {
           );
 
     final content = MouseRegion(
-      cursor: widget.enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor:
+          widget.enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _isMouseInside = true),
       onExit: (_) => setState(() => _isMouseInside = false),
       child: Listener(
@@ -201,7 +205,9 @@ class _PlayerToggleButtonState extends State<PlayerToggleButton> {
       tween: Tween(
         end: _pressed ? widget.pressedWidth : widget.normalWidth,
       ),
-      duration: _pressed ? const Duration(milliseconds: 80) : const Duration(milliseconds: 600),
+      duration: _pressed
+          ? const Duration(milliseconds: 80)
+          : const Duration(milliseconds: 600),
       curve: _pressed ? Curves.easeOut : Curves.elasticOut,
       builder: (context, w, child) => SizedBox(width: w, child: child),
       child: content,

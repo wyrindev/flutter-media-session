@@ -116,7 +116,8 @@ class FlutterMediaSession {
   Future<void> activate() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Unify lifecycle by automatically requesting permissions when activating on Android
-      await FlutterMediaSessionPlatform.instance.requestNotificationPermission();
+      await FlutterMediaSessionPlatform.instance
+          .requestNotificationPermission();
     }
     return FlutterMediaSessionPlatform.instance.activate();
   }
@@ -147,7 +148,8 @@ class FlutterMediaSession {
   /// Sets the preferred skip intervals for rewind (backward) and fast-forward (forward) commands.
   ///
   /// This is currently supported on iOS and macOS.
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) {
+  Future<void> setSkipIntervals(
+      {int forwardSeconds = 10, int backwardSeconds = 10}) {
     return FlutterMediaSessionPlatform.instance.setSkipIntervals(
       forwardSeconds: forwardSeconds,
       backwardSeconds: backwardSeconds,
@@ -167,7 +169,8 @@ class FlutterMediaSession {
   /// for it and silently pause each other. Turn it on for players
   /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
   Future<void> setAutoHandleInterruptions(bool enabled) {
-    return FlutterMediaSessionPlatform.instance.setAutoHandleInterruptions(enabled);
+    return FlutterMediaSessionPlatform.instance
+        .setAutoHandleInterruptions(enabled);
   }
 
   /// Opts the session into a background keep-alive. Defaults to `false`.

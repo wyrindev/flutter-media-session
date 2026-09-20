@@ -1,0 +1,53 @@
+name: Feature Request
+description: Suggest an idea or enhancement for flutter_media_session
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature! Please provide as much detail as possible to help us evaluate and design the feature.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature request related to a problem or limitation? Please describe it.
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / API Design
+      description: Describe the solution you would like, including any draft Dart API or behavior.
+    validations:
+      required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Target Platforms
+      description: Which platform(s) would benefit from this feature?
+      multiple: true
+      options:
+        - Android
+        - iOS
+        - macOS
+        - Windows
+        - Web
+        - All Platforms
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered.
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or native API references (e.g., Apple MediaPlayer, Android Media3).
+    validations:
+      required: false

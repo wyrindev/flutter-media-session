@@ -9,7 +9,8 @@ class FakeFlutterMediaSessionPlatform
   final List<MediaMetadata> metadataUpdates = [];
   final List<PlaybackState> playbackStateUpdates = [];
   final List<Set<MediaAction>?> availableActionsUpdates = [];
-  final StreamController<MediaAction> actionController = StreamController<MediaAction>.broadcast();
+  final StreamController<MediaAction> actionController =
+      StreamController<MediaAction>.broadcast();
 
   @override
   Future<void> activate() => Future.value();
@@ -45,7 +46,8 @@ class FakeFlutterMediaSessionPlatform
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
 
   @override
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) =>
+  Future<void> setSkipIntervals(
+          {int forwardSeconds = 10, int backwardSeconds = 10}) =>
       Future.value();
 
   @override
@@ -59,7 +61,8 @@ class FakeFlutterMediaSessionPlatform
 
 class TestCustomAdapter extends MediaSessionAdapter {
   bool isBound = false;
-  final StreamController<String> playerEvents = StreamController<String>.broadcast();
+  final StreamController<String> playerEvents =
+      StreamController<String>.broadcast();
   StreamSubscription? _actionSub;
 
   @override
@@ -67,7 +70,8 @@ class TestCustomAdapter extends MediaSessionAdapter {
     isBound = true;
 
     // Listen to mock system actions
-    _actionSub = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+    _actionSub =
+        FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       playerEvents.add('action_${action.name}');
     });
   }
@@ -79,11 +83,13 @@ class TestCustomAdapter extends MediaSessionAdapter {
   }
 
   void simulateMetadataChange(String title, String artist) {
-    FlutterMediaSessionPlatform.instance.updateMetadata(MediaMetadata(title: title, artist: artist));
+    FlutterMediaSessionPlatform.instance
+        .updateMetadata(MediaMetadata(title: title, artist: artist));
   }
 
   void simulateStateChange(PlaybackStatus status, Duration position) {
-    FlutterMediaSessionPlatform.instance.updatePlaybackState(PlaybackState(status: status, position: position));
+    FlutterMediaSessionPlatform.instance
+        .updatePlaybackState(PlaybackState(status: status, position: position));
   }
 }
 
@@ -117,10 +123,13 @@ void main() {
     expect(fakePlatform.metadataUpdates.first.title, 'Test Title');
     expect(fakePlatform.metadataUpdates.first.artist, 'Test Artist');
 
-    adapter.simulateStateChange(PlaybackStatus.playing, const Duration(seconds: 15));
+    adapter.simulateStateChange(
+        PlaybackStatus.playing, const Duration(seconds: 15));
     expect(fakePlatform.playbackStateUpdates.length, 1);
-    expect(fakePlatform.playbackStateUpdates.first.status, PlaybackStatus.playing);
-    expect(fakePlatform.playbackStateUpdates.first.position, const Duration(seconds: 15));
+    expect(
+        fakePlatform.playbackStateUpdates.first.status, PlaybackStatus.playing);
+    expect(fakePlatform.playbackStateUpdates.first.position,
+        const Duration(seconds: 15));
 
     session.unbind();
   });

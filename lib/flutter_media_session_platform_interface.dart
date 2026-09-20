@@ -85,7 +85,8 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   /// Sets the preferred skip intervals for rewind (backward) and fast-forward (forward) commands.
   ///
   /// This is currently supported on iOS and macOS.
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) {
+  Future<void> setSkipIntervals(
+      {int forwardSeconds = 10, int backwardSeconds = 10}) {
     throw UnimplementedError('setSkipIntervals() has not been implemented.');
   }
 

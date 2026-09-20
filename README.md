@@ -4,30 +4,36 @@
 
 # flutter_media_session
 
-A powerful Flutter plugin for integrating your app with system-level media controls (lock screen, notification, media center) across Android, iOS, macOS, Windows, and Web.
+[![pub package](https://img.shields.io/pub/v/flutter_media_session.svg)](https://pub.dev/packages/flutter_media_session)
+[![pub points](https://img.shields.io/pub/points/flutter_media_session)](https://pub.dev/packages/flutter_media_session/score)
+[![CI](https://github.com/wyrindev/flutter-media-session/actions/workflows/ci.yml/badge.svg)](https://github.com/wyrindev/flutter-media-session/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Web-blue.svg)](https://pub.dev/packages/flutter_media_session)
 
-This plugin allows your app to display media metadata (title, artist, artwork) in the system's media center and respond to system actions like Play, Pause, Skip, and Seek.
+A Flutter plugin for integrating media playback controls and metadata with system-level interfaces (lock screen, notification center, and control centers) across Android, iOS, macOS, Windows, and Web.
+
+This plugin displays media metadata (title, artist, artwork) in system media hubs and handles standard media actions such as Play, Pause, Skip, and Seek.
 
 ## Platform Support
 
-| Platform | Support | Underlying API |
-| :--- | :--- | :--- |
-| <img src="doc/img/platform/head.svg" alt="Android" width="18" style="vertical-align: middle;"> Android | Available | [Media3 MediaSessionService](https://developer.android.com/media/media3/session/control-playback) |
-| <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;"> iOS / macOS | Available | [MPNowPlayingInfoCenter](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter) / [MPRemoteCommandCenter](https://developer.apple.com/documentation/mediaplayer/mpremotecommandcenter) |
-| <img src="doc/img/platform/windows.svg" alt="Windows" width="18" style="vertical-align: middle;"> Windows | Available | [SystemMediaTransportControls (SMTC)](https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/system-media-transport-controls) |
-| <img src="doc/img/platform/tux.svg" alt="Linux" width="18" style="vertical-align: middle;"> Linux | Planned | [MPRIS](https://specifications.freedesktop.org/mpris-spec/) |
-| Web | Available | [Media Session API](https://developer.mozilla.org/en-US/docs/Web/API/Media_Session_API) |
+| Platform | Minimum Version |
+| :--- | :--- |
+| <img src="doc/img/platform/head.svg" alt="Android" width="18" style="vertical-align: middle;"> Android | Android 7.0+ (API 24+) |
+| <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;"> iOS | iOS 12.0+ |
+| <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;"> macOS | macOS 10.15+ |
+| <img src="doc/img/platform/windows.svg" alt="Windows" width="18" style="vertical-align: middle;"> Windows | Windows 10 1809+ (Build 17763+) |
+| Web | Modern Browsers |
+| <img src="doc/img/platform/tux.svg" alt="Linux" width="18" style="vertical-align: middle;"> Linux | Planned |
 
 ## Features
 
-- 🧩 **Professional Adapter Architecture**: Decouple player implementations from system controls. Easily bind players using a unified `MediaSessionAdapter` interface without bloating the core package with third-party dependencies.
-- 🎵 **Rich Metadata & Artwork Synchronization**: Display titles, artists, album names, and artwork on system lock screens and media centers across all platforms.
-- ⏯️ **Precise Playback & Timeline Tracking**: Synchronize playing/paused states, playback speed, and current elapsed position across all supported platforms.
-- 📡 **Bi-directional System Media Commands**: Respond to standard system-level media controls, including **Play, Pause, Stop, Seek, Skip Forward/Backward, Shuffle, and Repeat**.
-- 📶 **Smart Background Keep-Alive**: Maintain connection stability for off-device playback when the app is backgrounded using native platform keep-alive primitives.
-- 🔈 **Audio Focus Management (Optional)**: Built-in handling of audio focus interruptions for players that do not manage focus natively.
-- 🎨 **Custom Notification Actions (Android)**: Go beyond standard controls by adding custom actions with custom icons and labels directly inside the notification.
-- 🎧 **Out-of-the-Box Background Support (Android)**: Automatically manages foreground service requirements, notification lifecycles, and system notification permissions.
+- 🧩 **Decoupled Adapter Architecture**: Connect any player engine (e.g. `just_audio`, `media_kit`, `audioplayers`) via a unified `MediaSessionAdapter` interface without bundling unnecessary third-party audio packages.
+- 🎵 **Metadata & Artwork Synchronization**: Display titles, artists, album names, and artwork across system lock screens and media centers.
+- ⏯️ **Playback & Timeline Tracking**: Synchronize playing/paused states, playback speed, and current elapsed position.
+- 📡 **Bi-directional Media Commands**: Receive and respond to system controls, including Play, Pause, Stop, Seek, Skip, Shuffle, and Repeat.
+- 📶 **Background Keep-Alive**: Maintain playback state and connection stability when the application is backgrounded.
+- 🔈 **Audio Focus Handling**: Manage audio focus interruptions and pauses automatically or cooperatively.
+- 🎨 **Custom Notification Actions (Android)**: Add custom actions with dedicated icons and keys directly inside system media notifications.
 
 ## Installation
 
@@ -38,11 +44,13 @@ dependencies:
   flutter_media_session: ^3.0.5
 ```
 
+> **Note**: Version 3.x is a complete architectural overhaul. If you are upgrading from 1.x or 2.x, refer to the [Migration and Usage Guide](doc/usage.md).
+
 ## Setup
 
-### Android, macOS & Web
+### Android, Windows, macOS & Web
 
-No configuration required.
+No configuration required. (For optional Windows branding customization, see the [Usage Guide](doc/usage.md).)
 
 ### iOS
 
@@ -55,18 +63,48 @@ No configuration required.
     ```
     This allows system-level controls to interact with your app in the background.
 
-### Windows
+## Quick Start
 
-For proper application identification (avoiding the "Unknown Application" label in system controls), please refer to the:
+```dart
+import 'package:flutter_media_session/flutter_media_session.dart';
 
-**[Windows Setup Guide](doc/windows_setup.md)**
+final mediaSession = FlutterMediaSession();
 
-## Usage
+// 1. Activate session
+await mediaSession.activate();
 
-For detailed instructions and examples on how to initialize the plugin, manage media metadata, respond to system media events, and customize available media controls layout dynamically, please refer to our full breakdown:
+// 2. Update metadata
+await mediaSession.setMetadata(
+  const MediaMetadata(
+    title: 'Song Title',
+    artist: 'Artist Name',
+    album: 'Album Title',
+    duration: Duration(minutes: 3, seconds: 30),
+  ),
+);
 
-**[Detailed Usage Guide](doc/usage.md)**
+// 3. Update playback state
+await mediaSession.setPlaybackState(
+  const PlaybackState(
+    state: MediaPlaybackState.playing,
+    position: Duration(seconds: 45),
+  ),
+);
 
-## License
+// 4. Listen to system actions
+FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+  if (action == MediaAction.play) {
+    // Resume playback
+  } else if (action == MediaAction.pause) {
+    // Pause playback
+  }
+});
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+> **Using with existing players?** Check out the ready-to-use adapter implementations for `just_audio`, `media_kit`, and `audioplayers` in the [Usage Guide](doc/usage.md).
+
+## Documentation
+
+- **[Usage Guide](doc/usage.md)**: Detailed API references, Windows AUMID setup, and production player adapters (`just_audio`, `media_kit`, `audioplayers`).
+- **[Architecture & Design Decisions](doc/architecture.md)**: Deep dive into the federated structure, adapter rationale, lifecycle management, and platform internals.
+- **[Release Guide](doc/release.md)**: Checklist and procedures for dry-run verification, version tagging, and publishing.
