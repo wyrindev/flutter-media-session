@@ -101,7 +101,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                         }
                     }
                     try {
-                        ContextCompat.startForegroundService(context, intent)
+                        try {
+                            context.startService(intent)
+                        } catch (e: Exception) {
+                            android.util.Log.w("FlutterMediaSession", "startService failed, falling back to bindService only", e)
+                        }
                         context.bindService(intent, serviceConnection!!, Context.BIND_AUTO_CREATE)
                     } catch (e: Exception) {
                         pendingActivateResult?.error("SERVICE_ERROR", "Failed to start or bind service: ${e.message}", null)
@@ -207,21 +211,95 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
         return false
     }
 
+    private var originalWindowCallback: android.view.Window.Callback? = null
+
+    private fun attachWindowCallback(act: Activity) {
+        val window = act.window ?: return
+        val currentCallback = window.callback
+        if (currentCallback is MediaWindowCallback) return
+        originalWindowCallback = currentCallback
+        window.callback = MediaWindowCallback(currentCallback)
+    }
+
+    private fun detachWindowCallback(act: Activity?) {
+        val window = act?.window ?: return
+        if (window.callback is MediaWindowCallback) {
+            window.callback = originalWindowCallback
+        }
+        originalWindowCallback = null
+    }
+
+    private inner class MediaWindowCallback(
+        private val localOriginalCallback: android.view.Window.Callback?
+    ) : android.view.Window.Callback by (localOriginalCallback ?: DummyWindowCallback()) {
+        override fun dispatchKeyEvent(event: android.view.KeyEvent?): Boolean {
+            if (event != null) {
+                when (event.keyCode) {
+                    android.view.KeyEvent.KEYCODE_MEDIA_PLAY,
+                    android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
+                    android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    android.view.KeyEvent.KEYCODE_HEADSETHOOK,
+                    android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
+                    android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                    android.view.KeyEvent.KEYCODE_MEDIA_STOP,
+                    android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                    android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                        val handled = FlutterMediaSessionService.instance?.handleMediaKeyEvent(event) ?: false
+                        if (handled) {
+                            return true
+                        }
+                    }
+                }
+            }
+            return localOriginalCallback?.dispatchKeyEvent(event) ?: false
+        }
+    }
+
+    private class DummyWindowCallback : android.view.Window.Callback {
+        override fun dispatchKeyEvent(event: android.view.KeyEvent?): Boolean = false
+        override fun dispatchKeyShortcutEvent(event: android.view.KeyEvent?): Boolean = false
+        override fun dispatchTouchEvent(event: android.view.MotionEvent?): Boolean = false
+        override fun dispatchTrackballEvent(event: android.view.MotionEvent?): Boolean = false
+        override fun dispatchGenericMotionEvent(event: android.view.MotionEvent?): Boolean = false
+        override fun dispatchPopulateAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?): Boolean = false
+        override fun onCreatePanelView(featureId: Int): android.view.View? = null
+        override fun onCreatePanelMenu(featureId: Int, menu: android.view.Menu): Boolean = false
+        override fun onPreparePanel(featureId: Int, view: android.view.View?, menu: android.view.Menu): Boolean = false
+        override fun onMenuOpened(featureId: Int, menu: android.view.Menu): Boolean = false
+        override fun onMenuItemSelected(featureId: Int, item: android.view.MenuItem): Boolean = false
+        override fun onWindowAttributesChanged(attrs: android.view.WindowManager.LayoutParams?) {}
+        override fun onContentChanged() {}
+        override fun onWindowFocusChanged(hasFocus: Boolean) {}
+        override fun onAttachedToWindow() {}
+        override fun onDetachedFromWindow() {}
+        override fun onPanelClosed(featureId: Int, menu: android.view.Menu) {}
+        override fun onSearchRequested(): Boolean = false
+        override fun onSearchRequested(searchEvent: android.view.SearchEvent?): Boolean = false
+        override fun onWindowStartingActionMode(callback: android.view.ActionMode.Callback?): android.view.ActionMode? = null
+        override fun onWindowStartingActionMode(callback: android.view.ActionMode.Callback?, type: Int): android.view.ActionMode? = null
+        override fun onActionModeStarted(mode: android.view.ActionMode?) {}
+        override fun onActionModeFinished(mode: android.view.ActionMode?) {}
+    }
+
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
         binding.addRequestPermissionsResultListener(this)
+        attachWindowCallback(binding.activity)
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
+        detachWindowCallback(activity)
         activity = null
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
         binding.addRequestPermissionsResultListener(this)
+        attachWindowCallback(binding.activity)
     }
 
     override fun onDetachedFromActivity() {
+        detachWindowCallback(activity)
         activity = null
     }
 
@@ -242,6 +320,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
      * @param args Optional arguments for the action (e.g., seek position).
      */
     fun sendAction(action: String, args: Any? = null) {
+        android.util.Log.i("FlutterMediaSession", "sendAction: action=$action, args=$args, eventSink=${eventSink != null}")
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             if (args != null) {
                 eventSink?.success(mapOf("action" to action, "args" to args))

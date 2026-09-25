@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="dev.wyrin.flutter_media_session">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
@@ -27,7 +26,7 @@
             </intent-filter>
         </service>
 
-        <receiver android:name="androidx.media3.session.MediaButtonReceiver"
+        <receiver android:name=".MediaButtonReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />

@@ -250,17 +250,6 @@ class FlutterMediaSessionService : MediaSessionService() {
             player.updateAvailableActions(initialActionNames)
         }
 
-        // Set up explicit MediaButtonReceiver PendingIntent for media buttons
-        val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
-            setClass(this@FlutterMediaSessionService, androidx.media3.session.MediaButtonReceiver::class.java)
-        }
-        val mediaButtonPendingIntent = PendingIntent.getBroadcast(
-            this,
-            0,
-            mediaButtonIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         // Build the session
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
@@ -271,19 +260,6 @@ class FlutterMediaSessionService : MediaSessionService() {
         // setMediaNotificationProvider(FlutterMediaNotificationProvider(this))
         super.onCreate()
 
-        // Set media button receiver on the legacy SessionCompat for pre-Media3 / AVRCP hardware keys
-        try {
-            val getSessionCompatMethod = mediaSession?.javaClass?.getDeclaredMethod("getSessionCompat")
-            getSessionCompatMethod?.isAccessible = true
-            val sessionCompat = getSessionCompatMethod?.invoke(mediaSession)
-            if (sessionCompat != null) {
-                val setReceiverMethod = sessionCompat.javaClass.getMethod("setMediaButtonReceiver", PendingIntent::class.java)
-                setReceiverMethod.invoke(sessionCompat, mediaButtonPendingIntent)
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("FlutterMediaSession", "Failed to setMediaButtonReceiver on sessionCompat", e)
-        }
-
         // Register the session with the service so Media3's
         // MediaNotificationManager creates its internal MediaController
         // and starts the notification pipeline.
@@ -292,6 +268,22 @@ class FlutterMediaSessionService : MediaSessionService() {
         // Sync any data that was sent to the plugin before the service was ready
         FlutterMediaSessionPlugin.instance?.syncPendingData()
         FlutterMediaSessionPlugin.instance?.onServiceCreated()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent != null && Intent.ACTION_MEDIA_BUTTON == intent.action) {
+            val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? android.view.KeyEvent
+            }
+            if (keyEvent != null) {
+                android.util.Log.i("FlutterMediaSession", "onStartCommand MEDIA_BUTTON: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
+                handleMediaKeyEvent(keyEvent)
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -615,55 +607,63 @@ class FlutterMediaSessionService : MediaSessionService() {
                 intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? android.view.KeyEvent
             }
             if (keyEvent != null) {
-                android.util.Log.d("FlutterMediaSession", "onMediaButtonEvent: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
-                if (keyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
-                    when (keyEvent.keyCode) {
-                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                            FlutterMediaSessionPlugin.instance?.sendAction("play")
-                            return true
-                        }
-                        android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                            FlutterMediaSessionPlugin.instance?.sendAction("pause")
-                            return true
-                        }
-                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                        android.view.KeyEvent.KEYCODE_HEADSETHOOK -> {
-                            val action = if (player.isCurrentlyPlaying()) "pause" else "play"
-                            FlutterMediaSessionPlugin.instance?.sendAction(action)
-                            return true
-                        }
-                        android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
-                        android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                            FlutterMediaSessionPlugin.instance?.sendAction("skipToNext")
-                            return true
-                        }
-                        android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                        android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                            FlutterMediaSessionPlugin.instance?.sendAction("skipToPrevious")
-                            return true
-                        }
-                        android.view.KeyEvent.KEYCODE_MEDIA_STOP -> {
-                            FlutterMediaSessionPlugin.instance?.sendAction("stop")
-                            return true
-                        }
-                    }
-                } else if (keyEvent.action == android.view.KeyEvent.ACTION_UP) {
-                    // Consume ACTION_UP for handled keys so default media receivers don't double trigger
-                    when (keyEvent.keyCode) {
-                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY,
-                        android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
-                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                        android.view.KeyEvent.KEYCODE_HEADSETHOOK,
-                        android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
-                        android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-                        android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                        android.view.KeyEvent.KEYCODE_MEDIA_REWIND,
-                        android.view.KeyEvent.KEYCODE_MEDIA_STOP -> return true
-                    }
+                android.util.Log.i("FlutterMediaSession", "onMediaButtonEvent: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
+                if (handleMediaKeyEvent(keyEvent)) {
+                    return true
                 }
             }
             return super.onMediaButtonEvent(session, controllerInfo, intent)
         }
+    }
+
+    internal fun handleMediaKeyEvent(keyEvent: android.view.KeyEvent): Boolean {
+        android.util.Log.i("FlutterMediaSession", "handleMediaKeyEvent: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
+        if (keyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+            when (keyEvent.keyCode) {
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("play")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("pause")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                android.view.KeyEvent.KEYCODE_HEADSETHOOK -> {
+                    val action = if (player.isCurrentlyPlaying()) "pause" else "play"
+                    FlutterMediaSessionPlugin.instance?.sendAction(action)
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
+                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("skipToNext")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("skipToPrevious")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_STOP -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("stop")
+                    return true
+                }
+            }
+        } else if (keyEvent.action == android.view.KeyEvent.ACTION_UP) {
+            // Consume ACTION_UP for handled keys so default media receivers don't double trigger
+            when (keyEvent.keyCode) {
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY,
+                android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                android.view.KeyEvent.KEYCODE_HEADSETHOOK,
+                android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
+                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                android.view.KeyEvent.KEYCODE_MEDIA_REWIND,
+                android.view.KeyEvent.KEYCODE_MEDIA_STOP -> return true
+            }
+        }
+        return false
     }
 
     /**
@@ -807,6 +807,12 @@ class FlutterMediaSessionService : MediaSessionService() {
                 .setRepeatMode(repeatMode)
                 .setShuffleModeEnabled(shuffleModeEnabled)
                 .setCurrentMediaItemIndex(0)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build()
+                )
                 .setPlaylist(listOf(
                     MediaItemData.Builder("channel_0")
                         .setMediaItem(MediaItem.Builder().setMediaId("channel_0").setMediaMetadata(currentMetadata).build())
