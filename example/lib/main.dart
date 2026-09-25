@@ -174,7 +174,8 @@ class _PlayerHomeState extends State<PlayerHome> {
       final prefs = await SharedPreferences.getInstance();
       final savedSource = prefs.getString('preferred_audio_source');
       if (savedSource != null && mounted) {
-        final matched = AudioSourceType.values.where((e) => e.name == savedSource);
+        final matched =
+            AudioSourceType.values.where((e) => e.name == savedSource);
         if (matched.isNotEmpty && matched.first != _audioSource) {
           setState(() {
             _audioSource = matched.first;
