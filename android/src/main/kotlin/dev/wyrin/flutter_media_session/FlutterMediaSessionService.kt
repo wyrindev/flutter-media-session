@@ -268,10 +268,19 @@ class FlutterMediaSessionService : MediaSessionService() {
         // Sync any data that was sent to the plugin before the service was ready
         FlutterMediaSessionPlugin.instance?.syncPendingData()
         FlutterMediaSessionPlugin.instance?.onServiceCreated()
+
+        // On Android 11 (API 30) and older, route media buttons using compatibility helper
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            MediaButtonRoutingCompat.setupLegacyRouting(this, mediaSession)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent != null && Intent.ACTION_MEDIA_BUTTON == intent.action) {
+            // Satisfy the 5-second foreground requirement for MediaButtonReceiver on API <= 30
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+                ensureForegroundServiceLegacy()
+            }
             val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)
             } else {
@@ -279,11 +288,33 @@ class FlutterMediaSessionService : MediaSessionService() {
                 intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? android.view.KeyEvent
             }
             if (keyEvent != null) {
-                android.util.Log.i("FlutterMediaSession", "onStartCommand MEDIA_BUTTON: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
                 handleMediaKeyEvent(keyEvent)
             }
         }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    /**
+     * Posts a minimal foreground notification on API <= 30 when started by MediaButtonReceiver
+     * to fulfill the Android framework requirement.
+     */
+    private fun ensureForegroundServiceLegacy() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val channelId = "default"
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (nm.getNotificationChannel(channelId) == null) {
+                nm.createNotificationChannel(
+                    android.app.NotificationChannel(channelId, "Media playback", android.app.NotificationManager.IMPORTANCE_LOW)
+                )
+            }
+            val notification = android.app.Notification.Builder(this, channelId)
+                .setSmallIcon(applicationInfo.icon)
+                .build()
+            startForeground(1001, notification)
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "ensureForegroundServiceLegacy failed: ${e.message}")
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -311,6 +342,9 @@ class FlutterMediaSessionService : MediaSessionService() {
             player.release()
             it.release()
             mediaSession = null
+        }
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            MediaButtonRoutingCompat.onSessionDestroy()
         }
         super.onDestroy()
     }
@@ -593,6 +627,21 @@ class FlutterMediaSessionService : MediaSessionService() {
                 return Futures.immediateFuture(androidx.media3.session.SessionResult(androidx.media3.session.SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
+        }
+
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            android.util.Log.i("FlutterMediaSession", "onPlaybackResumption called from ${controller.packageName}")
+            FlutterMediaSessionPlugin.instance?.sendAction("play")
+            val mediaItem = mediaSession.player.currentMediaItem ?: MediaItem.Builder().setMediaId("resumption").build()
+            val result = MediaSession.MediaItemsWithStartPosition(
+                listOf(mediaItem),
+                mediaSession.player.currentMediaItemIndex,
+                mediaSession.player.currentPosition
+            )
+            return Futures.immediateFuture(result)
         }
 
         override fun onMediaButtonEvent(

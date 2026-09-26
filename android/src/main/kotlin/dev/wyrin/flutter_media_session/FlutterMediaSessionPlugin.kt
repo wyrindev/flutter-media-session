@@ -177,6 +177,9 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                 FlutterMediaSessionService.instance?.applyBackgroundKeepAlive(enabled)
                 result.success(null)
             }
+            "setSkipIntervals" -> {
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -283,6 +286,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        binding.activity.volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         binding.addRequestPermissionsResultListener(this)
         attachWindowCallback(binding.activity)
     }
