@@ -1,0 +1,4 @@
+-keep class androidx.media3.session.** { *; }
+-keep interface androidx.media3.session.** { *; }
+-keep class android.support.v4.media.session.** { *; }
+-keep interface android.support.v4.media.session.** { *; }
