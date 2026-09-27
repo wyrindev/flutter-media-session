@@ -1,3 +1,9 @@
+## 3.0.7
+
+### Bug Fixes
+* **Android**:
+  * Cleaned up legacy media button routing and explicitly canceled notifications on deactivation to ensure complete dismissal.
+
 ## 3.0.6
 
 ### Bug Fixes

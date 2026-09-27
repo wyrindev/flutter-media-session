@@ -370,6 +370,14 @@ class FlutterMediaSessionService : MediaSessionService() {
         }
         abandonAudioFocus()
         releasePlaybackLocks()
+
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            MediaButtonRoutingCompat.teardownLegacyRouting(mediaSession)
+        }
+        try {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager)?.cancelAll()
+        } catch (_: Exception) {}
+
         mediaSession?.let {
             removeSession(it)
             player.release()
@@ -627,21 +635,6 @@ class FlutterMediaSessionService : MediaSessionService() {
                 return Futures.immediateFuture(androidx.media3.session.SessionResult(androidx.media3.session.SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
-        }
-
-        override fun onPlaybackResumption(
-            mediaSession: MediaSession,
-            controller: MediaSession.ControllerInfo
-        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            android.util.Log.i("FlutterMediaSession", "onPlaybackResumption called from ${controller.packageName}")
-            FlutterMediaSessionPlugin.instance?.sendAction("play")
-            val mediaItem = mediaSession.player.currentMediaItem ?: MediaItem.Builder().setMediaId("resumption").build()
-            val result = MediaSession.MediaItemsWithStartPosition(
-                listOf(mediaItem),
-                mediaSession.player.currentMediaItemIndex,
-                mediaSession.player.currentPosition
-            )
-            return Futures.immediateFuture(result)
         }
 
         override fun onMediaButtonEvent(

@@ -30,6 +30,47 @@ internal object MediaButtonRoutingCompat {
 
     private var persistentSilentTrack: android.media.AudioTrack? = null
 
+    fun teardownLegacyRouting(mediaSession: MediaSession?) {
+        if (mediaSession != null) {
+            try {
+                val sessionCompat = findSessionCompat(mediaSession)
+                if (sessionCompat != null) {
+                    invokeMethod(sessionCompat, "setActive", arrayOf(Boolean::class.javaPrimitiveType ?: java.lang.Boolean.TYPE), arrayOf(false))
+                    invokeMethod(sessionCompat, "setMediaButtonReceiver", arrayOf(android.app.PendingIntent::class.java), arrayOf<Any?>(null))
+
+                    var c: Class<*>? = sessionCompat.javaClass
+                    var impl: Any? = null
+                    while (c != null && c != Any::class.java) {
+                        try {
+                            val f = c.getDeclaredField("mImpl").apply { isAccessible = true }
+                            impl = f.get(sessionCompat)
+                            break
+                        } catch (_: NoSuchFieldException) {}
+                        c = c.superclass
+                    }
+                    if (impl != null) {
+                        var implClass: Class<*>? = impl.javaClass
+                        while (implClass != null && implClass != Any::class.java) {
+                            try {
+                                val f = implClass.getDeclaredField("mSessionFwk").apply { isAccessible = true }
+                                val sessionFwk = f.get(impl) as? android.media.session.MediaSession
+                                if (sessionFwk != null) {
+                                    sessionFwk.isActive = false
+                                    sessionFwk.setMediaButtonReceiver(null)
+                                }
+                                break
+                            } catch (_: NoSuchFieldException) {}
+                            implClass = implClass.superclass
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MediaButtonRoutingCompat: Error during teardown: ${e.message}")
+            }
+        }
+        onSessionDestroy()
+    }
+
     fun onSessionDestroy() {
         try {
             persistentSilentTrack?.stop()
