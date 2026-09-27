@@ -1,3 +1,11 @@
+## 3.0.6
+
+### Bug Fixes
+* **Android**:
+  * Implemented `MediaButtonRoutingCompat` audio track hook to ensure OS hardware media button dispatch routes accurately to the active session UID.
+  * Enhanced `MediaButtonReceiver` and `FlutterMediaSessionService` foreground lifecycle and media button event routing.
+  * Added consumer ProGuard rules (`consumer-rules.pro`) for Android media button compatibility classes.
+
 ## 3.0.5
 
 ### Bug Fixes
