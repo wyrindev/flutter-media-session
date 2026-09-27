@@ -3,6 +3,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 
+enum AudioSourceType {
+  soundHelix('Official', 'https://www.soundhelix.com/examples/mp3'),
+  wyrin('CDN', 'https://static.wyrin.dev');
+
+  final String label;
+  final String baseUrl;
+  const AudioSourceType(this.label, this.baseUrl);
+}
+
 class SettingsPanel extends StatelessWidget {
   final bool active;
   final VoidCallback onActivate;
@@ -15,6 +24,8 @@ class SettingsPanel extends StatelessWidget {
   final void Function(bool) onHandleInterruptionsChanged;
   final bool backgroundKeepAlive;
   final void Function(bool) onBackgroundKeepAliveChanged;
+  final AudioSourceType audioSource;
+  final ValueChanged<AudioSourceType> onAudioSourceChanged;
 
   const SettingsPanel({
     super.key,
@@ -29,6 +40,8 @@ class SettingsPanel extends StatelessWidget {
     required this.onHandleInterruptionsChanged,
     required this.backgroundKeepAlive,
     required this.onBackgroundKeepAliveChanged,
+    required this.audioSource,
+    required this.onAudioSourceChanged,
   });
 
   @override
@@ -145,6 +158,29 @@ class SettingsPanel extends StatelessWidget {
                   ],
                 )
               : const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text("Audio Source"),
+          trailing: SegmentedButton<AudioSourceType>(
+            segments: const [
+              ButtonSegment(
+                value: AudioSourceType.soundHelix,
+                label: Text('Official'),
+              ),
+              ButtonSegment(
+                value: AudioSourceType.wyrin,
+                label: Text('CDN'),
+              ),
+            ],
+            selected: {audioSource},
+            onSelectionChanged: (set) {
+              onAudioSourceChanged(set.first);
+            },
+          ),
         ),
       ],
     );

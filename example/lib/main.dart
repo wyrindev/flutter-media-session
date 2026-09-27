@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'models/track.dart';
@@ -115,15 +116,17 @@ class _PlayerHomeState extends State<PlayerHome> {
   final List<StreamSubscription> _audioSubscriptions = [];
   Timer? _positionSyncTimer;
 
-  final List<Track> _playlist = List.generate(17, (index) {
-    final id = index + 1;
-    return Track(
-      title: 'SoundHelix Song $id',
-      artist: 'SoundHelix',
-      artwork: 'https://picsum.photos/400/400?seed=$id',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-$id.mp3',
-    );
-  });
+  AudioSourceType _audioSource = AudioSourceType.soundHelix;
+
+  List<Track> get _playlist => List.generate(17, (index) {
+        final id = index + 1;
+        return Track(
+          title: 'SoundHelix Song $id',
+          artist: 'SoundHelix',
+          artwork: 'https://picsum.photos/400/400?seed=$id',
+          url: '${_audioSource.baseUrl}/SoundHelix-Song-$id.mp3',
+        );
+      });
 
   Track get current => _playlist[_currentIndex];
 
@@ -134,6 +137,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   void initState() {
     super.initState();
     _loadAppVersion();
+    _loadSavedAudioSource();
     _adapter = _ExamplePlayerAdapter(this);
     _availableActions = {
       MediaAction.play,
@@ -163,6 +167,22 @@ class _PlayerHomeState extends State<PlayerHome> {
     } catch (_) {
       // Fallback or ignore in test / unsupported environments
     }
+  }
+
+  Future<void> _loadSavedAudioSource() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedSource = prefs.getString('preferred_audio_source');
+      if (savedSource != null && mounted) {
+        final matched =
+            AudioSourceType.values.where((e) => e.name == savedSource);
+        if (matched.isNotEmpty && matched.first != _audioSource) {
+          setState(() {
+            _audioSource = matched.first;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _listenMediaSessionActions() {
@@ -446,6 +466,36 @@ class _PlayerHomeState extends State<PlayerHome> {
     _updatePlayback();
   }
 
+  void _changeAudioSource(AudioSourceType newSource) async {
+    if (_audioSource == newSource) return;
+    setState(() {
+      _audioSource = newSource;
+    });
+
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('preferred_audio_source', newSource.name);
+    }).catchError((_) {});
+
+    // If currently playing or loaded, reload track from new source preserving position if possible
+    if (_status == PlaybackStatus.playing) {
+      final currentPos = _position;
+      _loadedUrl = null;
+      setState(() {
+        _isBuffering = true;
+      });
+      _updatePlayback();
+      try {
+        await _audioPlayer.stop();
+        _loadedUrl = current.url;
+        await _audioPlayer.play(UrlSource(current.url), position: currentPos);
+      } catch (e) {
+        _handleError();
+      }
+    } else {
+      _loadedUrl = null;
+    }
+  }
+
   void _playIndex(int newIndex, {bool pushHistory = true}) async {
     if (pushHistory) {
       _history.add(_currentIndex);
@@ -650,6 +700,8 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 setState(() => _backgroundKeepAlive = val);
                                 _plugin.setBackgroundKeepAlive(val);
                               },
+                              audioSource: _audioSource,
+                              onAudioSourceChanged: _changeAudioSource,
                             ),
                           ],
                         ),
@@ -711,6 +763,8 @@ class _PlayerHomeState extends State<PlayerHome> {
                         setState(() => _backgroundKeepAlive = val);
                         _plugin.setBackgroundKeepAlive(val);
                       },
+                      audioSource: _audioSource,
+                      onAudioSourceChanged: _changeAudioSource,
                     ),
                   ],
                 ),
