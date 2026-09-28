@@ -43,6 +43,7 @@ jobs:
 
   build_android:
     name: Build Android (APK)
+    needs: analyze_and_test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -73,6 +74,7 @@ jobs:
 
   build_ios:
     name: Build iOS
+    needs: analyze_and_test
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -97,6 +99,7 @@ jobs:
 
   build_macos:
     name: Build macOS
+    needs: analyze_and_test
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -121,6 +124,7 @@ jobs:
 
   build_windows:
     name: Build Windows
+    needs: analyze_and_test
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -145,6 +149,7 @@ jobs:
 
   build_web:
     name: Build Web
+    needs: analyze_and_test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

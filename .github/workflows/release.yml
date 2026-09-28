@@ -25,12 +25,41 @@ jobs:
 
             const version = tag.startsWith("v") ? tag.slice(1) : tag;
 
-            const { data: releases } = await github.rest.repos.listReleases({
+            const semverCompare = (a, b) => {
+              const pa = a.replace(/^v/, '').split('-')[0].split('.').map(Number);
+              const pb = b.replace(/^v/, '').split('-')[0].split('.').map(Number);
+              for (let i = 0; i < 3; i++) {
+                const diff = (pa[i] || 0) - (pb[i] || 0);
+                if (diff !== 0) return diff;
+              }
+              return 0;
+            };
+
+            const formatUser = (user) => {
+              if (!user) return "";
+              const login = user.login || "";
+              if (user.type === "Bot" || login.endsWith("[bot]")) {
+                const appSlug = login.replace(/\[bot\]$/, "");
+                return `[@${login}](https://github.com/apps/${appSlug})`;
+              }
+              return `@${login}`;
+            };
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
 
-            const previousTag = releases.length > 0 ? releases[0].tag_name : null;
+            // Find all semantic versions smaller than the current tag
+            const previousReleases = releases
+              .filter(r => !r.prerelease && !r.draft && semverCompare(r.tag_name, tag) < 0)
+              .sort((a, b) => semverCompare(b.tag_name, a.tag_name));
+
+            const previousTag = previousReleases.length > 0 ? previousReleases[0].tag_name : null;
+
+            // Only mark as latest if there are no existing releases with a higher semver
+            const hasHigherRelease = releases.some(r => !r.prerelease && !r.draft && semverCompare(r.tag_name, tag) > 0);
+            const makeLatest = hasHigherRelease ? "false" : "true";
 
             const compare = await github.rest.repos.compareCommits({
               owner: context.repo.owner,
@@ -66,6 +95,7 @@ jobs:
                               number
                               author {
                                 login
+                                __typename
                               }
                             }
                           }
@@ -83,7 +113,7 @@ jobs:
                   if (linkedIssues.length > 0) {
                     const authorMap = new Map();
                     for (const issue of linkedIssues) {
-                      const author = issue.author?.login || null;
+                      const author = issue.author ? formatUser(issue.author) : null;
                       if (!authorMap.has(author)) {
                         authorMap.set(author, []);
                       }
@@ -93,7 +123,7 @@ jobs:
                     const authorParts = [];
                     for (const [author, issueNumbers] of authorMap.entries()) {
                       const issuesStr = issueNumbers.join(" ");
-                      authorParts.push(author ? `${issuesStr} @${author}` : issuesStr);
+                      authorParts.push(author ? `${issuesStr} ${author}` : issuesStr);
                     }
 
                     let fixesPart = "";
@@ -111,7 +141,7 @@ jobs:
                   console.log(`Error querying linked issues for PR #${prNumber}: ${gqlErr.message}`);
                 }
 
-                entries.push(`* ${pr.title} (#${pr.number} @${pr.user.login}${fixesSuffix})`);
+                entries.push(`* ${pr.title} ([#${pr.number}](${pr.html_url}) ${formatUser(pr.user)}${fixesSuffix})`);
               } catch (e) {
                 console.log(`Error fetching PR #${prNumber}: ${e.message}`);
               }
@@ -133,5 +163,6 @@ jobs:
               name: `flutter_media_session v${version}`,
               body: body,
               draft: false,
-              prerelease: false
+              prerelease: false,
+              make_latest: makeLatest
             });
