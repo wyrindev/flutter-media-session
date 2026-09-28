@@ -1,3 +1,9 @@
+## 2.5.0
+
+### Improvements & Backports
+* **v3 Improvements Backport**: Synchronized platform-level fixes and enhancements from v3 into the v2 support line, including Android Media3 button routing fixes for Android 12+, Windows SMTC async memory management refinements, and CI pipeline updates.
+* **API Compatibility**: Retained all legacy v2 APIs in a deprecated state to maintain complete backward compatibility for existing v2 users.
+
 ## 2.4.2
 
 ### Bug Fixes
