@@ -1,5 +1,16 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
+
+enum AudioSourceType {
+  soundHelix('Official', 'https://www.soundhelix.com/examples/mp3'),
+  wyrin('CDN', 'https://static.wyrin.dev');
+
+  final String label;
+  final String baseUrl;
+  const AudioSourceType(this.label, this.baseUrl);
+}
 
 class SettingsPanel extends StatelessWidget {
   final bool active;
@@ -13,6 +24,8 @@ class SettingsPanel extends StatelessWidget {
   final void Function(bool) onHandleInterruptionsChanged;
   final bool backgroundKeepAlive;
   final void Function(bool) onBackgroundKeepAliveChanged;
+  final AudioSourceType audioSource;
+  final ValueChanged<AudioSourceType> onAudioSourceChanged;
 
   const SettingsPanel({
     super.key,
@@ -27,6 +40,8 @@ class SettingsPanel extends StatelessWidget {
     required this.onHandleInterruptionsChanged,
     required this.backgroundKeepAlive,
     required this.onBackgroundKeepAliveChanged,
+    required this.audioSource,
+    required this.onAudioSourceChanged,
   });
 
   @override
@@ -114,36 +129,66 @@ class SettingsPanel extends StatelessWidget {
                           _singleActionChip(action),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      title: const Text("Handle Audio Focus"),
-                      subtitle: const Text(
-                          "Opt-in to Android audio focus management (pauses for calls/other apps)"),
-                      value: handlesInterruptions,
-                      onChanged: onHandleInterruptionsChanged,
-                    ),
-                    SwitchListTile(
-                      title: const Text("Background Keep-Alive"),
-                      subtitle: const Text(
-                          "Opt-in to hold CPU/Wi-Fi (Android), prevent sleep "
-                          "(macOS/Windows) for the session — for off-device "
-                          "playback such as casting. iOS: no-op."),
-                      value: backgroundKeepAlive,
-                      onChanged: onBackgroundKeepAliveChanged,
-                    ),
+                    if (!kIsWeb && Platform.isAndroid) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: const Text("Handle Audio Focus"),
+                        subtitle: const Text(
+                            "Automatically pause during phone calls or when other apps play audio"),
+                        value: handlesInterruptions,
+                        onChanged: onHandleInterruptionsChanged,
+                      ),
+                    ],
+                    if (!kIsWeb && !Platform.isIOS) ...[
+                      if (kIsWeb || !Platform.isAndroid) ...[
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                      ],
+                      SwitchListTile(
+                        title: const Text("Background Keep-Alive"),
+                        subtitle: const Text(
+                            "Keep device awake during off-device playback (such as casting)"),
+                        value: backgroundKeepAlive,
+                        onChanged: onBackgroundKeepAliveChanged,
+                      ),
+                    ],
                   ],
                 )
               : const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text("Audio Source"),
+          trailing: SegmentedButton<AudioSourceType>(
+            segments: const [
+              ButtonSegment(
+                value: AudioSourceType.soundHelix,
+                label: Text('Official'),
+              ),
+              ButtonSegment(
+                value: AudioSourceType.wyrin,
+                label: Text('CDN'),
+              ),
+            ],
+            selected: {audioSource},
+            onSelectionChanged: (set) {
+              onAudioSourceChanged(set.first);
+            },
+          ),
         ),
       ],
     );
   }
 
   Widget _singleActionChip(MediaAction action) {
-    final isSelected = availableActions?.any((a) => a.name == action.name) ?? false;
+    final isSelected =
+        availableActions?.any((a) => a.name == action.name) ?? false;
 
     return FilterChip(
       label: Text(action.name),

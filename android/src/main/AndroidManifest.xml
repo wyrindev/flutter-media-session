@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="dev.wyrin.flutter_media_session">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
@@ -10,7 +9,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Keep the CPU and Wi-Fi radio awake while playing so a backgrounded
          session (especially a cast control socket on the LAN) is not reaped by
-         Doze / app-standby. Held only while status == "playing". -->
+         Doze / app-standby. Held for the whole keep-alive window. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
@@ -23,10 +22,11 @@
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </service>
 
-        <receiver android:name="androidx.media.session.MediaButtonReceiver"
+        <receiver android:name="androidx.media3.session.MediaButtonReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />

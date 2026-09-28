@@ -1,9 +1,20 @@
+# media_kit Adapter Guide
+
+This guide provides a ready-to-use adapter to connect [`media_kit`](https://pub.dev/packages/media_kit) with `flutter_media_session`.
+
+---
+
+## 1. Adapter Implementation
+
+Create a file named `media_kit_media_session_adapter.dart` in your project and add the following implementation:
+
+```dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 
-/// A production-ready adapter to bridge `media_kit` [Player] and [FlutterMediaSession].
+/// An adapter bridging `media_kit` [Player] with [FlutterMediaSession].
 class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
   final Player player;
   final MediaMetadata Function(Player player)? metadataMapper;
@@ -30,20 +41,16 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       });
     }
 
-    _subscriptions
-        .add(player.stream.playing.listen((_) => _syncPlaybackState()));
-    _subscriptions
-        .add(player.stream.position.listen((_) => _syncPlaybackState()));
+    _subscriptions.add(player.stream.playing.listen((_) => _syncPlaybackState()));
+    _subscriptions.add(player.stream.position.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.stream.duration.listen((_) {
       _syncMetadata();
       _syncPlaybackState();
     }));
     _subscriptions.add(player.stream.rate.listen((_) => _syncPlaybackState()));
-    _subscriptions
-        .add(player.stream.buffer.listen((_) => _syncPlaybackState()));
+    _subscriptions.add(player.stream.buffer.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.stream.playlist.listen((_) => _syncMetadata()));
-    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction
-        .listen(_handleMediaAction));
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen(_handleMediaAction));
 
     _syncMetadata();
     _syncPlaybackState();
@@ -100,7 +107,6 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
             currentMedia.extras?['cover']?.toString() ??
             currentMedia.extras?['picture']?.toString();
 
-        // Try to parse filename from URI if title is still unresolved
         if (title == null || title.isEmpty) {
           try {
             final uriStr = currentMedia.uri;
@@ -119,9 +125,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
     }
 
     _isUpdating = true;
-    FlutterMediaSessionPlatform.instance
-        .updateMetadata(metadata)
-        .catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateMetadata(metadata).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update metadata: $e');
     }).whenComplete(() => _isUpdating = false);
   }
@@ -142,7 +146,6 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       status = PlaybackStatus.paused;
     }
 
-    // Set 3-way Repeat mode corresponding to media_kit's playlistMode
     MediaRepeatMode repeatMode = MediaRepeatMode.none;
     if (state.playlistMode == PlaylistMode.single) {
       repeatMode = MediaRepeatMode.one;
@@ -156,12 +159,10 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       speed: state.rate,
       bufferedPosition: state.buffer,
       repeatMode: repeatMode,
-      shuffleModeEnabled: false, // update as needed for media_kit shuffle
+      shuffleModeEnabled: false,
     );
 
-    FlutterMediaSessionPlatform.instance
-        .updatePlaybackState(playbackState)
-        .catchError((e) {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update playback state: $e');
     });
 
@@ -194,9 +195,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
         case 'repeat':
           PlaylistMode nextMode = player.state.playlistMode == PlaylistMode.none
               ? PlaylistMode.loop
-              : (player.state.playlistMode == PlaylistMode.loop
-                  ? PlaylistMode.single
-                  : PlaylistMode.none);
+              : (player.state.playlistMode == PlaylistMode.loop ? PlaylistMode.single : PlaylistMode.none);
           await player.setPlaylistMode(nextMode);
           _syncAvailableActions();
           break;
@@ -225,16 +224,25 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
         customLabel: 'Repeat',
         customIconResource: player.state.playlistMode == PlaylistMode.single
             ? 'ic_repeat_one'
-            : (player.state.playlistMode == PlaylistMode.loop
-                ? 'ic_repeat_on'
-                : 'ic_repeat_off'),
+            : (player.state.playlistMode == PlaylistMode.loop ? 'ic_repeat_on' : 'ic_repeat_off'),
       ),
     };
 
-    FlutterMediaSessionPlatform.instance
-        .updateAvailableActions(actions)
-        .catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions).catchError((e) {
       debugPrint('MediaKitAdapter: Failed to update available actions: $e');
     });
   }
 }
+```
+
+---
+
+## 2. Binding to Your Session
+
+```dart
+final session = FlutterMediaSession();
+await session.activate();
+
+final player = Player();
+session.bind(MediaKitMediaSessionAdapter(player));
+```

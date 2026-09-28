@@ -153,7 +153,8 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
   }
 
   @override
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) async {
+  Future<void> setSkipIntervals(
+      {int forwardSeconds = 10, int backwardSeconds = 10}) async {
     // No-op on web
   }
 

@@ -1,0 +1,89 @@
+name: Bug Report
+description: File a bug report to help improve flutter_media_session
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please fill out the sections below as accurately as possible.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: What happened?
+    validations:
+      required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Affected Platforms
+      description: Select the platform(s) where this issue occurs.
+      multiple: true
+      options:
+        - Android
+        - iOS
+        - macOS
+        - Windows
+        - Web
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin Version
+      description: What version of flutter_media_session are you using?
+      placeholder: "e.g., ^3.0.5 or git commit hash"
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS / Device Details
+      description: Specific OS version or hardware device (e.g. Android 14, iOS 17.4, Windows 11 23H2).
+      placeholder: "e.g., Android 14 (Google Pixel 7)"
+    validations:
+      required: false
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Initialize `FlutterMediaSession`
+        2. Call `setMetadata(...)` with ...
+        3. Lock the screen
+        4. See error / unexpected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: flutter-doctor
+    attributes:
+      label: Flutter Doctor Output
+      description: Paste the output of `flutter doctor -v` here.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Stacktraces
+      description: Paste any crash logs or console output.
+      render: shell
+    validations:
+      required: false

@@ -1,9 +1,20 @@
+# just_audio Adapter Guide
+
+This guide provides a ready-to-use adapter to connect [`just_audio`](https://pub.dev/packages/just_audio) with `flutter_media_session`.
+
+---
+
+## 1. Adapter Implementation
+
+Create a file named `just_audio_media_session_adapter.dart` in your project and add the following implementation:
+
+```dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 
-/// A production-ready adapter to bridge `just_audio` [AudioPlayer] and [FlutterMediaSession].
+/// An adapter bridging `just_audio` [AudioPlayer] with [FlutterMediaSession].
 class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
   final AudioPlayer player;
   final MediaMetadata Function(AudioPlayer player)? metadataMapper;
@@ -30,21 +41,16 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       });
     }
 
-    _subscriptions
-        .add(player.playerStateStream.listen((_) => _syncPlaybackState()));
-    _subscriptions
-        .add(player.positionStream.listen((_) => _syncPlaybackState()));
+    _subscriptions.add(player.playerStateStream.listen((_) => _syncPlaybackState()));
+    _subscriptions.add(player.positionStream.listen((_) => _syncPlaybackState()));
     _subscriptions.add(player.durationStream.listen((_) {
       _syncMetadata();
       _syncPlaybackState();
     }));
     _subscriptions.add(player.speedStream.listen((_) => _syncPlaybackState()));
-    _subscriptions
-        .add(player.bufferedPositionStream.listen((_) => _syncPlaybackState()));
-    _subscriptions
-        .add(player.sequenceStateStream.listen((_) => _syncMetadata()));
-    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction
-        .listen(_handleMediaAction));
+    _subscriptions.add(player.bufferedPositionStream.listen((_) => _syncPlaybackState()));
+    _subscriptions.add(player.sequenceStateStream.listen((_) => _syncMetadata()));
+    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen(_handleMediaAction));
 
     _syncMetadata();
     _syncPlaybackState();
@@ -85,8 +91,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
           title = tag['title']?.toString();
           artist = tag['artist']?.toString();
           album = tag['album']?.toString();
-          artworkUri =
-              tag['artworkUri']?.toString() ?? tag['artwork']?.toString();
+          artworkUri = tag['artworkUri']?.toString() ?? tag['artwork']?.toString();
         } else if (tag is String) {
           title = tag;
         } else {
@@ -100,24 +105,20 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
             album = (tag as dynamic).album?.toString();
           } catch (_) {}
           try {
-            artworkUri = (tag as dynamic).artworkUri?.toString() ??
-                (tag as dynamic).artwork?.toString();
+            artworkUri = (tag as dynamic).artworkUri?.toString() ?? (tag as dynamic).artwork?.toString();
           } catch (_) {}
         }
       }
 
-      // Try to parse filename from URI if title is still unresolved
       if (title == null || title.isEmpty) {
         try {
-          final uriStr = (currentItem as dynamic).uri?.toString() ??
-              (currentItem as dynamic).url?.toString();
+          final uriStr = (currentItem as dynamic).uri?.toString() ?? (currentItem as dynamic).url?.toString();
           if (uriStr != null) {
             title = Uri.decodeFull(uriStr.split('/').last.split('?').first);
           }
         } catch (_) {}
       }
 
-      // Final fallback to string representation of tag
       if (title == null || title.isEmpty) {
         title = tag?.toString() ?? 'Unknown Title';
       }
@@ -132,9 +133,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
     }
 
     _isUpdating = true;
-    FlutterMediaSessionPlatform.instance
-        .updateMetadata(metadata)
-        .catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateMetadata(metadata).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update metadata: $e');
     }).whenComplete(() => _isUpdating = false);
   }
@@ -158,7 +157,6 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       status = PlaybackStatus.paused;
     }
 
-    // Set 3-way Repeat mode corresponding to just_audio's loopMode
     MediaRepeatMode repeatMode = MediaRepeatMode.none;
     if (player.loopMode == LoopMode.one) {
       repeatMode = MediaRepeatMode.one;
@@ -175,9 +173,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       shuffleModeEnabled: player.shuffleModeEnabled,
     );
 
-    FlutterMediaSessionPlatform.instance
-        .updatePlaybackState(playbackState)
-        .catchError((e) {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update playback state: $e');
     });
 
@@ -237,24 +233,32 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
       MediaAction.custom(
         name: 'shuffle',
         customLabel: 'Shuffle',
-        customIconResource:
-            player.shuffleModeEnabled ? 'ic_shuffle_on' : 'ic_shuffle_off',
+        customIconResource: player.shuffleModeEnabled ? 'ic_shuffle_on' : 'ic_shuffle_off',
       ),
       MediaAction.custom(
         name: 'repeat',
         customLabel: 'Repeat',
         customIconResource: player.loopMode == LoopMode.one
             ? 'ic_repeat_one'
-            : (player.loopMode == LoopMode.all
-                ? 'ic_repeat_on'
-                : 'ic_repeat_off'),
+            : (player.loopMode == LoopMode.all ? 'ic_repeat_on' : 'ic_repeat_off'),
       ),
     };
 
-    FlutterMediaSessionPlatform.instance
-        .updateAvailableActions(actions)
-        .catchError((e) {
+    FlutterMediaSessionPlatform.instance.updateAvailableActions(actions).catchError((e) {
       debugPrint('JustAudioAdapter: Failed to update available actions: $e');
     });
   }
 }
+```
+
+---
+
+## 2. Binding to Your Session
+
+```dart
+final session = FlutterMediaSession();
+await session.activate();
+
+final player = AudioPlayer();
+session.bind(JustAudioMediaSessionAdapter(player));
+```

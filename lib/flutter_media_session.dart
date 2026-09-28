@@ -10,6 +10,7 @@ export 'src/models/media_metadata.dart';
 export 'src/models/playback_state.dart';
 export 'src/models/media_action.dart';
 export 'src/adapters/media_session_adapter.dart';
+export 'flutter_media_session_platform_interface.dart';
 
 /// The main entry point for the Flutter Media Session plugin.
 ///
@@ -125,6 +126,7 @@ class FlutterMediaSession {
   Future<void> activate() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Unify lifecycle by automatically requesting permissions when activating on Android
+      // ignore: deprecated_member_use_from_same_package
       await requestNotificationPermission();
     }
     return FlutterMediaSessionPlatform.instance.activate();
@@ -224,20 +226,21 @@ class FlutterMediaSession {
     return setAutoHandleInterruptions(enabled);
   }
 
-  /// Opts the session into an Android background keep-alive (Android only;
-  /// no-op elsewhere). Defaults to `false`.
+  /// Opts the session into a background keep-alive. Defaults to `false`.
   ///
-  /// While enabled, the Android foreground service holds a partial wake lock
-  /// (CPU) and a high-perf Wi-Fi lock (radio) for the lifetime of the session,
-  /// released as soon as it is disabled or the service is destroyed. This keeps
-  /// a backgrounded session alive whose audio is rendered **off-device** — most
-  /// importantly a Chromecast/DLNA control socket on the local Wi-Fi network,
-  /// which Doze / app-standby otherwise tears down ("Broken pipe") a few minutes
-  /// after the app is backgrounded.
+  /// While enabled the platform holds the best keep-alive primitive it has —
+  /// Android: a partial wake lock (CPU) + high-perf Wi-Fi lock (radio);
+  /// macOS: an idle-system-sleep assertion; Windows: a system-required
+  /// execution-state request; web: a best-effort screen wake lock; iOS: no-op —
+  /// for the lifetime of the session, released as soon as it is disabled.
   ///
-  /// Enable it only for that off-device case (e.g. while a cast session is
-  /// active) and disable it when the session ends — it is intentionally off by
-  /// default so normal on-device playback does not pay the battery cost.
+  /// Use this to keep a backgrounded session alive whose audio is rendered
+  /// **off-device** — most importantly a Chromecast/DLNA control socket on the
+  /// local network, which Doze / app-standby otherwise tears down ("Broken
+  /// pipe") a few minutes after the app is backgrounded. Enable it only for
+  /// that case (e.g. while a cast session is active) and disable it when the
+  /// session ends — it is off by default so normal on-device playback pays no
+  /// battery cost.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
   }

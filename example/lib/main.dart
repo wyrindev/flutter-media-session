@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
-import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'models/track.dart';
@@ -115,23 +116,28 @@ class _PlayerHomeState extends State<PlayerHome> {
   final List<StreamSubscription> _audioSubscriptions = [];
   Timer? _positionSyncTimer;
 
-  final List<Track> _playlist = List.generate(17, (index) {
-    final id = index + 1;
-    return Track(
-      title: 'SoundHelix Song $id',
-      artist: 'SoundHelix',
-      artwork: 'https://picsum.photos/400/400?seed=$id',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-$id.mp3',
-    );
-  });
+  AudioSourceType _audioSource = AudioSourceType.soundHelix;
+
+  List<Track> get _playlist => List.generate(17, (index) {
+        final id = index + 1;
+        return Track(
+          title: 'SoundHelix Song $id',
+          artist: 'SoundHelix',
+          artwork: 'https://picsum.photos/400/400?seed=$id',
+          url: '${_audioSource.baseUrl}/SoundHelix-Song-$id.mp3',
+        );
+      });
 
   Track get current => _playlist[_currentIndex];
 
+  String _appVersion = '';
   late final _ExamplePlayerAdapter _adapter;
 
   @override
   void initState() {
     super.initState();
+    _loadAppVersion();
+    _loadSavedAudioSource();
     _adapter = _ExamplePlayerAdapter(this);
     _availableActions = {
       MediaAction.play,
@@ -147,6 +153,36 @@ class _PlayerHomeState extends State<PlayerHome> {
     };
     _listenMediaSessionActions();
     _listenAudioPlayerEvents();
+    _activate();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted && info.version.isNotEmpty) {
+        setState(() {
+          _appVersion = 'v${info.version}';
+        });
+      }
+    } catch (_) {
+      // Fallback or ignore in test / unsupported environments
+    }
+  }
+
+  Future<void> _loadSavedAudioSource() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedSource = prefs.getString('preferred_audio_source');
+      if (savedSource != null && mounted) {
+        final matched =
+            AudioSourceType.values.where((e) => e.name == savedSource);
+        if (matched.isNotEmpty && matched.first != _audioSource) {
+          setState(() {
+            _audioSource = matched.first;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _listenMediaSessionActions() {
@@ -216,10 +252,14 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   Future<void> _activate() async {
+    _listenMediaSessionActions();
     await _plugin.activate();
     await _plugin.setSkipIntervals(forwardSeconds: 10, backwardSeconds: 10);
     if (!mounted) return;
-    setState(() => _active = true);
+    setState(() {
+      _active = true;
+      _status = PlaybackStatus.paused;
+    });
     await Future.wait([
       _updateAvailableActions(),
       _updateAll(),
@@ -278,6 +318,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   void handleSeekAction(Duration newPosition) {
+    final bool wasPlaying = _status == PlaybackStatus.playing;
     if (mounted) {
       setState(() {
         _position = newPosition;
@@ -286,9 +327,14 @@ class _PlayerHomeState extends State<PlayerHome> {
     }
     _updatePlayback();
     _seekDebounce?.cancel();
-    _seekDebounce = Timer(const Duration(milliseconds: 200), () {
+    _seekDebounce = Timer(const Duration(milliseconds: 200), () async {
       if (mounted) {
-        _audioPlayer.seek(newPosition).catchError((_) {});
+        try {
+          await _audioPlayer.seek(newPosition);
+          if (wasPlaying && _audioPlayer.state != PlayerState.playing) {
+            await _audioPlayer.resume();
+          }
+        } catch (_) {}
       }
     });
   }
@@ -359,6 +405,19 @@ class _PlayerHomeState extends State<PlayerHome> {
     } catch (_) {}
   }
 
+  Future<void> _stop() async {
+    _seekDebounce?.cancel();
+    await _pause();
+    if (mounted) {
+      setState(() {
+        _position = Duration.zero;
+        _status = PlaybackStatus.paused;
+      });
+    }
+    await _audioPlayer.seek(Duration.zero);
+    _updatePlayback();
+  }
+
   Future<void> _next() async {
     int nextIndex;
     if (_isShuffle && _playlist.length > 1) {
@@ -405,6 +464,36 @@ class _PlayerHomeState extends State<PlayerHome> {
     });
     _updateAvailableActions();
     _updatePlayback();
+  }
+
+  void _changeAudioSource(AudioSourceType newSource) async {
+    if (_audioSource == newSource) return;
+    setState(() {
+      _audioSource = newSource;
+    });
+
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('preferred_audio_source', newSource.name);
+    }).catchError((_) {});
+
+    // If currently playing or loaded, reload track from new source preserving position if possible
+    if (_status == PlaybackStatus.playing) {
+      final currentPos = _position;
+      _loadedUrl = null;
+      setState(() {
+        _isBuffering = true;
+      });
+      _updatePlayback();
+      try {
+        await _audioPlayer.stop();
+        _loadedUrl = current.url;
+        await _audioPlayer.play(UrlSource(current.url), position: currentPos);
+      } catch (e) {
+        _handleError();
+      }
+    } else {
+      _loadedUrl = null;
+    }
   }
 
   void _playIndex(int newIndex, {bool pushHistory = true}) async {
@@ -530,7 +619,9 @@ class _PlayerHomeState extends State<PlayerHome> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("MD3 Player"),
+        title: Text(_appVersion.isEmpty
+            ? "Example Player"
+            : "Example Player $_appVersion"),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -609,6 +700,8 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 setState(() => _backgroundKeepAlive = val);
                                 _plugin.setBackgroundKeepAlive(val);
                               },
+                              audioSource: _audioSource,
+                              onAudioSourceChanged: _changeAudioSource,
                             ),
                           ],
                         ),
@@ -670,6 +763,8 @@ class _PlayerHomeState extends State<PlayerHome> {
                         setState(() => _backgroundKeepAlive = val);
                         _plugin.setBackgroundKeepAlive(val);
                       },
+                      audioSource: _audioSource,
+                      onAudioSourceChanged: _changeAudioSource,
                     ),
                   ],
                 ),
@@ -823,7 +918,9 @@ class _PlayerHomeState extends State<PlayerHome> {
               isOn: _repeatMode != 0,
               enabled: _active,
               onTap: _toggleRepeat,
-              icon: _repeatMode == 2 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+              icon: _repeatMode == 2
+                  ? Icons.repeat_one_rounded
+                  : Icons.repeat_rounded,
               normalWidth: 40,
               pressedWidth: 50,
               colorScheme: colorScheme,
@@ -899,13 +996,17 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
   @override
   void bind(FlutterMediaSession session) {
     _session = session;
-    _actionSubscription = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+    _actionSubscription =
+        FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
           state._play();
           break;
         case 'pause':
           state._pause();
+          break;
+        case 'stop':
+          state._stop();
           break;
         case 'skipToNext':
           state._next();
@@ -915,11 +1016,14 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
           break;
         case 'rewind':
           final newPos = state._position - const Duration(seconds: 10);
-          state.handleSeekAction(newPos < Duration.zero ? Duration.zero : newPos);
+          state.handleSeekAction(
+              newPos < Duration.zero ? Duration.zero : newPos);
           break;
         case 'fastForward':
           final newPos = state._position + const Duration(seconds: 10);
-          state.handleSeekAction(newPos > state._currentDuration ? state._currentDuration : newPos);
+          state.handleSeekAction(newPos > state._currentDuration
+              ? state._currentDuration
+              : newPos);
           break;
         case 'seekTo':
           if (action.seekPosition != null) {

@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  issues: read
 
 jobs:
   release:
@@ -44,12 +45,7 @@ jobs:
               if (match) prNumbers.add(match[1]);
             }
 
-            const buckets = {
-              feature: [],
-              fix: [],
-              improvement: [],
-              other: []
-            };
+            const entries = [];
 
             for (const prNumber of prNumbers) {
               try {
@@ -59,31 +55,76 @@ jobs:
                   pull_number: prNumber,
                 });
 
-                const labels = pr.labels.map(l => l.name);
-                const entry = `* ${pr.title} (#${pr.number} @${pr.user.login})`;
+                let fixesSuffix = "";
+                try {
+                  const query = `
+                    query($owner: String!, $repo: String!, $number: Int!) {
+                      repository(owner: $owner, name: $repo) {
+                        pullRequest(number: $number) {
+                          closingIssuesReferences(first: 10) {
+                            nodes {
+                              number
+                              author {
+                                login
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  `;
+                  const result = await github.graphql(query, {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    number: pr.number,
+                  });
 
-                if (labels.includes("feature")) buckets.feature.push(entry);
-                else if (labels.includes("fix")) buckets.fix.push(entry);
-                else if (labels.includes("improvement")) buckets.improvement.push(entry);
-                else buckets.other.push(entry);
+                  const linkedIssues = result?.repository?.pullRequest?.closingIssuesReferences?.nodes || [];
+                  if (linkedIssues.length > 0) {
+                    const authorMap = new Map();
+                    for (const issue of linkedIssues) {
+                      const author = issue.author?.login || null;
+                      if (!authorMap.has(author)) {
+                        authorMap.set(author, []);
+                      }
+                      authorMap.get(author).push(`#${issue.number}`);
+                    }
+
+                    const authorParts = [];
+                    for (const [author, issueNumbers] of authorMap.entries()) {
+                      const issuesStr = issueNumbers.join(" ");
+                      authorParts.push(author ? `${issuesStr} @${author}` : issuesStr);
+                    }
+
+                    let fixesPart = "";
+                    if (authorParts.length === 1) {
+                      fixesPart = authorParts[0];
+                    } else if (authorParts.length === 2) {
+                      fixesPart = `${authorParts[0]} and ${authorParts[1]}`;
+                    } else {
+                      fixesPart = `${authorParts.slice(0, -1).join(", ")}, and ${authorParts[authorParts.length - 1]}`;
+                    }
+
+                    fixesSuffix = `, fixes ${fixesPart}`;
+                  }
+                } catch (gqlErr) {
+                  console.log(`Error querying linked issues for PR #${prNumber}: ${gqlErr.message}`);
+                }
+
+                entries.push(`* ${pr.title} (#${pr.number} @${pr.user.login}${fixesSuffix})`);
               } catch (e) {
                 console.log(`Error fetching PR #${prNumber}: ${e.message}`);
               }
             }
 
-            function section(title, items) {
-              if (!items.length) return "";
-              return `\n### ${title}\n${items.join("\n")}\n`;
-            }
-
-            const body = `## What's changed
-            ${section("✨ Features", buckets.feature)}
-            ${section("⚙️ Improvements", buckets.improvement)}
-            ${section("🐛 Fixes", buckets.fix)}
-            ${section("📦 Other Changes", buckets.other)}
-            
-            ## 🔗 Full Changelog
-            https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`;
+            const changesSection = entries.length > 0 ? entries.join('\n') : '* No pull requests recorded.';
+            const body = [
+              '### 📦 Changes',
+              changesSection,
+              '',
+              '### 🔗 Full Changelog',
+              `https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag || "v0.0.0"}...${tag}`
+            ].join('\n');
 
             await github.rest.repos.createRelease({
               owner: context.repo.owner,

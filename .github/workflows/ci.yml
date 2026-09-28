@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - release/v*
+      - dev/v*
+  pull_request:
+    branches:
+      - main
+      - release/v*
+      - dev/v*
+  workflow_dispatch:
+
+jobs:
+  analyze_and_test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Verify code formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Run static analysis
+        run: flutter analyze --fatal-infos
+
+      - name: Run unit tests
+        run: flutter test
+
+  build_android:
+    name: Build Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build Android APK
+        run: flutter build apk --debug
+        working-directory: example
+
+  build_ios:
+    name: Build iOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build iOS App (No Codesign)
+        run: flutter build ios --no-codesign --debug
+        working-directory: example
+
+  build_macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build macOS App
+        run: flutter build macos --debug
+        working-directory: example
+
+  build_windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build Windows App
+        run: flutter build windows --debug
+        working-directory: example
+
+  build_web:
+    name: Build Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build Web App
+        run: flutter build web
+        working-directory: example
