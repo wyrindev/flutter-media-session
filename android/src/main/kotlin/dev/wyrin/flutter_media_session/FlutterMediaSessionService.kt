@@ -243,13 +243,21 @@ class FlutterMediaSessionService : MediaSessionService() {
         val intent = packageManager.getLaunchIntentForPackage(packageName)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
-        // Build the session BEFORE super.onCreate() — Media3 may query
-        // onGetSession() during initialization.
+        // Parse any initial actions passed before service creation
+        val (initialCustomLayout, initialActionNames) = parseCustomLayout(FlutterMediaSessionPlugin.instance?.pendingAvailableActions)
+        customLayout = initialCustomLayout
+        if (initialActionNames.isNotEmpty()) {
+            player.updateAvailableActions(initialActionNames)
+        }
+
+        // Build the session
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .setCallback(CustomMediaSessionCallback())
+            // .setCustomLayout(initialCustomLayout)
             .build()
             
+        // setMediaNotificationProvider(FlutterMediaNotificationProvider(this))
         super.onCreate()
 
         // Register the session with the service so Media3's
@@ -260,6 +268,53 @@ class FlutterMediaSessionService : MediaSessionService() {
         // Sync any data that was sent to the plugin before the service was ready
         FlutterMediaSessionPlugin.instance?.syncPendingData()
         FlutterMediaSessionPlugin.instance?.onServiceCreated()
+
+        // On Android 11 (API 30) and older, route media buttons using compatibility helper
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            MediaButtonRoutingCompat.setupLegacyRouting(this, mediaSession)
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent != null && Intent.ACTION_MEDIA_BUTTON == intent.action) {
+            // Satisfy the 5-second foreground requirement for MediaButtonReceiver on API <= 30
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+                ensureForegroundServiceLegacy()
+            }
+            val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? android.view.KeyEvent
+            }
+            if (keyEvent != null) {
+                handleMediaKeyEvent(keyEvent)
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    /**
+     * Posts a minimal foreground notification on API <= 30 when started by MediaButtonReceiver
+     * to fulfill the Android framework requirement.
+     */
+    private fun ensureForegroundServiceLegacy() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val channelId = "default"
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (nm.getNotificationChannel(channelId) == null) {
+                nm.createNotificationChannel(
+                    android.app.NotificationChannel(channelId, "Media playback", android.app.NotificationManager.IMPORTANCE_LOW)
+                )
+            }
+            val notification = android.app.Notification.Builder(this, channelId)
+                .setSmallIcon(applicationInfo.icon)
+                .build()
+            startForeground(1001, notification)
+        } catch (e: Exception) {
+            android.util.Log.w("FlutterMediaSession", "ensureForegroundServiceLegacy failed: ${e.message}")
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -288,7 +343,49 @@ class FlutterMediaSessionService : MediaSessionService() {
             it.release()
             mediaSession = null
         }
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            MediaButtonRoutingCompat.onSessionDestroy()
+        }
         super.onDestroy()
+    }
+
+    /**
+     * Deactivates the media session service: stops foreground, removes notification,
+     * releases media session and player, and terminates the service.
+     */
+    fun deactivate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+        if (isReceiverRegistered) {
+            try {
+                unregisterReceiver(noisyReceiver)
+            } catch (e: Exception) {
+                android.util.Log.w("FlutterMediaSession", "Failed to unregister noisyReceiver", e)
+            }
+            isReceiverRegistered = false
+        }
+        abandonAudioFocus()
+        releasePlaybackLocks()
+
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            MediaButtonRoutingCompat.teardownLegacyRouting(mediaSession)
+        }
+        try {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager)?.cancelAll()
+        } catch (_: Exception) {}
+
+        mediaSession?.let {
+            removeSession(it)
+            player.release()
+            it.release()
+            mediaSession = null
+        }
+        instance = null
+        stopSelf()
     }
 
     /**
@@ -306,34 +403,88 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     /**
-     * Toggle the background keep-alive locks (partial wake lock + high-perf
-     * Wi-Fi lock). Driven by the opt-in `setBackgroundKeepAlive` API. The locks
-     * are held for the whole enabled window — NOT gated on play/pause — because
-     * a paused cast still needs its control socket on the LAN kept alive.
+     * Whether the opt-in background keep-alive window is active. While true the
+     * service must stay a *foreground* service even when playback is paused:
+     * on Android 12+ a cached (non-foreground) process is frozen by the
+     * cached-apps freezer regardless of held wake locks — the freezer disables
+     * a frozen app's wake locks, Dart timers stop, the cast heartbeat stops,
+     * and the receiver aborts the control socket (observed as
+     * "SocketException: Software caused connection abort, errno = 103" on
+     * resume). See [onUpdateNotification].
      */
-    fun applyBackgroundKeepAlive(enabled: Boolean) {
-        if (enabled) acquirePlaybackLocks() else releasePlaybackLocks()
+    private var backgroundKeepAliveEnabled = false
+
+    /**
+     * Media3 demotes the service from the foreground whenever the player is
+     * not actively playing (`startInForegroundRequired == false`, e.g. the
+     * user paused the cast from the TV remote). Forcing the flag while the
+     * keep-alive window is active keeps the process exempt from the
+     * cached-apps freezer, which is what actually keeps a paused cast's
+     * control socket alive — the wake/Wi-Fi locks alone cannot survive a
+     * process freeze.
+     */
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        super.onUpdateNotification(session, startInForegroundRequired || backgroundKeepAliveEnabled)
     }
 
     /**
-     * Updates the set of media actions available in the system controls.
+     * Media3's own criterion for "playback needs a foreground service":
+     * playing or about to play. Used to re-evaluate the foreground state when
+     * the keep-alive window toggles, so disabling keep-alive while paused
+     * demotes the service, but disabling it mid-playback does not.
      */
-    fun updateAvailableActions(actions: List<Any>?) {
+    private fun playbackRequiresForeground(): Boolean {
+        val p = mediaSession?.player ?: return false
+        return p.playWhenReady &&
+            (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
+    }
+
+    /**
+     * Toggle the background keep-alive window (opt-in `setBackgroundKeepAlive`
+     * API). While enabled we hold a partial wake lock + high-perf Wi-Fi lock
+     * AND pin the service in the foreground (see [onUpdateNotification]) for
+     * the whole window — NOT gated on play/pause — because a paused cast still
+     * needs its control socket on the LAN kept alive.
+     */
+    fun applyBackgroundKeepAlive(enabled: Boolean) {
+        backgroundKeepAliveEnabled = enabled
+        if (enabled) acquirePlaybackLocks() else releasePlaybackLocks()
+        // Re-evaluate the foreground state immediately: enabling while paused
+        // must promote before the freezer can act; disabling must demote
+        // unless playback itself still requires the foreground.
+        mediaSession?.let { session ->
+            try {
+                onUpdateNotification(session, playbackRequiresForeground())
+            } catch (e: Exception) {
+                // Promotion can fail if Android denies a background
+                // foreground-service (re)start; the locks are still held and
+                // the next playback state change retries via media3.
+                android.util.Log.w("FlutterMediaSession", "keep-alive foreground update failed", e)
+            }
+        }
+    }
+
+    /**
+     * Parses custom actions list into a list of Media3 CommandButton objects and action names.
+     */
+    fun parseCustomLayout(actions: List<Any>?): Pair<List<androidx.media3.session.CommandButton>, List<String>> {
         val newCustomLayout = mutableListOf<androidx.media3.session.CommandButton>()
-        val standardActions = mutableListOf<String>()
+        val allActionNames = mutableListOf<String>()
+        val seenActionNames = mutableSetOf<String>()
 
         if (actions != null) {
             for (action in actions) {
                 if (action is String) {
-                    standardActions.add(action)
+                    allActionNames.add(action)
                 } else if (action is Map<*, *>) {
                     val name = (action["name"] as? String)?.takeIf { it.isNotBlank() } ?: continue
+                    if (seenActionNames.contains(name)) continue
+                    seenActionNames.add(name)
+                    allActionNames.add(name)
                     val customLabel = (action["customLabel"] as? String)?.takeIf { it.isNotBlank() }
                     val customIconResource = (action["customIconResource"] as? String)?.takeIf { it.isNotBlank() }
                     
                     if (customLabel == null || customIconResource == null) {
-                        // If it's a map but missing custom visual fields, treat it as a standard action name
-                        standardActions.add(name)
                         continue
                     }
                     
@@ -369,7 +520,14 @@ class FlutterMediaSessionService : MediaSessionService() {
                         }
                     }
 
-                    val iconResId = resources.getIdentifier(customIconResource, "drawable", packageName)
+                    var iconResId = resources.getIdentifier(customIconResource, "drawable", packageName)
+                    if (iconResId == 0 && applicationContext != null && applicationContext.packageName != packageName) {
+                        iconResId = resources.getIdentifier(customIconResource, "drawable", applicationContext.packageName)
+                    }
+                    if (iconResId == 0) {
+                        iconResId = resources.getIdentifier(customIconResource, "mipmap", packageName)
+                    }
+
                     if (iconResId != 0) {
                         try {
                             val sessionCommand = androidx.media3.session.SessionCommand(name, extrasBundle)
@@ -377,32 +535,46 @@ class FlutterMediaSessionService : MediaSessionService() {
                                 .setSessionCommand(sessionCommand)
                                 .setIconResId(iconResId)
                                 .setDisplayName(customLabel)
+                                .setEnabled(true)
                                 .build()
                             newCustomLayout.add(button)
+                            android.util.Log.d("FlutterMediaSession", "Successfully registered custom action '$name' with iconResId: $iconResId")
                         } catch (e: Exception) {
                             android.util.Log.e("FlutterMediaSession", "Failed to create custom action '$name'", e)
                         }
                     } else {
-                        android.util.Log.w("FlutterMediaSession", "Custom action icon resource '$customIconResource' not found for action '$name'. Action will be ignored.")
+                        android.util.Log.w("FlutterMediaSession", "Custom action icon resource '$customIconResource' not found in package '$packageName' for action '$name'. Action will be ignored.")
                     }
                 }
             }
         }
+        return Pair(newCustomLayout, allActionNames)
+    }
 
+    /**
+     * Updates the set of media actions available in the system controls.
+     */
+    fun updateAvailableActions(actions: List<Any>?) {
+        val (newCustomLayout, allActionNames) = parseCustomLayout(actions)
         customLayout = newCustomLayout
-        player.updateAvailableActions(if (actions == null) null else standardActions)
+        player.updateAvailableActions(if (actions == null) null else allActionNames)
         
-        // Notify all connected controllers about the new custom layout
+        // Notify all controllers (including legacy controllers) about the new custom layout and updated commands
         mediaSession?.let { session ->
-            for (controller in session.connectedControllers) {
+            session.setCustomLayout(customLayout)
+            val updatedPlayerCommands = player.availableCommands
+
+            val allControllers = mutableSetOf<MediaSession.ControllerInfo>()
+            allControllers.addAll(baseControllerCommands.keys)
+            allControllers.addAll(session.connectedControllers)
+
+            for (controller in allControllers) {
                 val baseCommands = baseControllerCommands[controller]
-                if (baseCommands != null) {
-                    val sessionCommandsBuilder = baseCommands.first.buildUpon()
-                    for (button in customLayout) {
-                        button.sessionCommand?.let { sessionCommandsBuilder.add(it) }
-                    }
-                    session.setAvailableCommands(controller, sessionCommandsBuilder.build(), baseCommands.second)
+                val sessionCommandsBuilder = (baseCommands?.first ?: MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS).buildUpon()
+                for (button in customLayout) {
+                    button.sessionCommand?.let { sessionCommandsBuilder.add(it) }
                 }
+                session.setAvailableCommands(controller, sessionCommandsBuilder.build(), updatedPlayerCommands)
                 session.setCustomLayout(controller, customLayout)
             }
         }
@@ -421,16 +593,16 @@ class FlutterMediaSessionService : MediaSessionService() {
             // Store the default commands for this controller so we can append custom commands to them later dynamically
             baseControllerCommands[controller] = Pair(connectionResult.availableSessionCommands, connectionResult.availablePlayerCommands)
             
-            val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
-            
+            val sessionCommandsBuilder = connectionResult.availableSessionCommands.buildUpon()
             for (button in customLayout) {
-                button.sessionCommand?.let { availableSessionCommands.add(it) }
+                button.sessionCommand?.let { sessionCommandsBuilder.add(it) }
             }
             
-            return MediaSession.ConnectionResult.accept(
-                availableSessionCommands.build(),
-                connectionResult.availablePlayerCommands
-            )
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(sessionCommandsBuilder.build())
+                .setAvailablePlayerCommands(session.player.availableCommands)
+                .setCustomLayout(customLayout)
+                .build()
         }
 
         override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
@@ -464,6 +636,76 @@ class FlutterMediaSessionService : MediaSessionService() {
             }
             return super.onCustomCommand(session, controller, customCommand, args)
         }
+
+        override fun onMediaButtonEvent(
+            session: MediaSession,
+            controllerInfo: MediaSession.ControllerInfo,
+            intent: Intent
+        ): Boolean {
+            val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? android.view.KeyEvent
+            }
+            if (keyEvent != null) {
+                android.util.Log.i("FlutterMediaSession", "onMediaButtonEvent: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
+                if (handleMediaKeyEvent(keyEvent)) {
+                    return true
+                }
+            }
+            return super.onMediaButtonEvent(session, controllerInfo, intent)
+        }
+    }
+
+    internal fun handleMediaKeyEvent(keyEvent: android.view.KeyEvent): Boolean {
+        android.util.Log.i("FlutterMediaSession", "handleMediaKeyEvent: action=${keyEvent.action}, keyCode=${keyEvent.keyCode}")
+        if (keyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+            when (keyEvent.keyCode) {
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("play")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("pause")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                android.view.KeyEvent.KEYCODE_HEADSETHOOK -> {
+                    val action = if (player.isCurrentlyPlaying()) "pause" else "play"
+                    FlutterMediaSessionPlugin.instance?.sendAction(action)
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
+                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("skipToNext")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("skipToPrevious")
+                    return true
+                }
+                android.view.KeyEvent.KEYCODE_MEDIA_STOP -> {
+                    FlutterMediaSessionPlugin.instance?.sendAction("stop")
+                    return true
+                }
+            }
+        } else if (keyEvent.action == android.view.KeyEvent.ACTION_UP) {
+            // Consume ACTION_UP for handled keys so default media receivers don't double trigger
+            when (keyEvent.keyCode) {
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY,
+                android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                android.view.KeyEvent.KEYCODE_HEADSETHOOK,
+                android.view.KeyEvent.KEYCODE_MEDIA_NEXT,
+                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                android.view.KeyEvent.KEYCODE_MEDIA_REWIND,
+                android.view.KeyEvent.KEYCODE_MEDIA_STOP -> return true
+            }
+        }
+        return false
     }
 
     /**
@@ -471,7 +713,7 @@ class FlutterMediaSessionService : MediaSessionService() {
      */
     inner class ForwardingPlayer : androidx.media3.common.SimpleBasePlayer(mainLooper) {
         private var currentMetadata: MediaMetadata = MediaMetadata.EMPTY
-        private var playbackStatus: String = "buffering"
+        private var playbackStatus: String = "paused"
 
         /** Outer-class accessor — `playbackStatus` is private to this inner
          *  class so [FlutterMediaSessionService.onHandlesInterruptionsChanged]
@@ -598,12 +840,6 @@ class FlutterMediaSessionService : MediaSessionService() {
                 if (actions.contains("fastForward")) {
                     commandsBuilder.add(Player.COMMAND_SEEK_FORWARD)
                 }
-                if (actions.contains("shuffle")) {
-                    commandsBuilder.add(Player.COMMAND_SET_SHUFFLE_MODE)
-                }
-                if (actions.contains("repeat")) {
-                    commandsBuilder.add(Player.COMMAND_SET_REPEAT_MODE)
-                }
             }
             
             return State.Builder()
@@ -613,6 +849,12 @@ class FlutterMediaSessionService : MediaSessionService() {
                 .setRepeatMode(repeatMode)
                 .setShuffleModeEnabled(shuffleModeEnabled)
                 .setCurrentMediaItemIndex(0)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build()
+                )
                 .setPlaylist(listOf(
                     MediaItemData.Builder("channel_0")
                         .setMediaItem(MediaItem.Builder().setMediaId("channel_0").setMediaMetadata(currentMetadata).build())
@@ -648,11 +890,13 @@ class FlutterMediaSessionService : MediaSessionService() {
                     FlutterMediaSessionPlugin.instance?.sendAction("skipToPrevious")
                 }
                 else -> {
-                    // Update internal state immediately for better responsiveness
-                    this.lastPositionMs = positionMs
-                    this.lastPositionUpdateTimeMs = android.os.SystemClock.elapsedRealtime()
-                    invalidateState()
-                    FlutterMediaSessionPlugin.instance?.sendAction("seekTo", positionMs)
+                    if (availableActions == null || availableActions?.contains("seekTo") == true) {
+                        // Update internal state immediately for better responsiveness
+                        this.lastPositionMs = positionMs
+                        this.lastPositionUpdateTimeMs = android.os.SystemClock.elapsedRealtime()
+                        invalidateState()
+                        FlutterMediaSessionPlugin.instance?.sendAction("seekTo", positionMs)
+                    }
                 }
             }
             return Futures.immediateVoidFuture()

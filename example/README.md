@@ -1,16 +1,6 @@
 # Flutter Media Session Example
 
-A Material Design 3 music player that demonstrates how to integrate the `flutter_media_session` plugin with a real audio player (`audioplayers`).
-
-## Features
-
-- 📱 **Native Control Center Integration**: See what's playing in the system's media center (Android, Windows, Web).
-- 🖼️ **Dynamic Metadata**: Real-time updates for song titles, artists, and high-quality artwork from network URLs.
-- ⏯️ **Remote Control**: Respond to Play, Pause, Skip Next, and Skip Previous commands from your headphones, lock screen, or system media panel.
-- 🚀 **Material 3 Interface**: A clean, modern UI featuring:
-    - Animated song transitions.
-    - Progress synchronization with system controls.
-    - Adaptive color schemes.
+A music player that demonstrates how to integrate the `flutter_media_session` plugin with a real audio player (`audioplayers`).
 
 ## Getting Started
 
@@ -51,30 +41,53 @@ await _mediaSession.activate();
 
 ### Syncing with Audio Player
 
-The app listens to `audioplayers` events and updates the plugin's metadata and playback state accordingly.
+The app defines a `MediaSessionAdapter` to synchronize playback state and metadata, then binds it to `FlutterMediaSession`:
 
 ```dart
-_audioPlayer.onPositionChanged.listen((p) {
-  _mediaSession.updatePlaybackState(
-    PlaybackState(
-      status: PlaybackStatus.playing,
-      position: p,
-      speed: 1.0,
-    ),
-  );
-});
+class MyPlayerAdapter implements MediaSessionAdapter {
+  final AudioPlayer player;
+  StreamSubscription? _actionSubscription;
+
+  MyPlayerAdapter(this.player);
+
+  @override
+  void bind(FlutterMediaSession session) {
+    _actionSubscription = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+      if (action.name == 'play') player.resume();
+      if (action.name == 'pause') player.pause();
+    });
+  }
+
+  @override
+  void unbind() {
+    _actionSubscription?.cancel();
+  }
+
+  void syncState() {
+    FlutterMediaSessionPlatform.instance.updatePlaybackState(
+      PlaybackState(
+        status: PlaybackStatus.playing,
+        position: player.position,
+      ),
+    );
+  }
+}
+
+// Bind the adapter to your session instance:
+_mediaSession.bind(MyPlayerAdapter(_audioPlayer));
 ```
 
 ### Handling External Actions
 
-When a user clicks "Next" on their headphones or system panel, the app receives an event through the `onMediaAction` stream.
+Alternatively, for simple use cases without a full adapter, you can use `setActionHandler` or listen to `FlutterMediaSessionPlatform.instance.onMediaAction`:
 
 ```dart
-_mediaSession.onMediaAction.listen((action) {
-  if (action == MediaAction.skipToNext) {
-    _playNextSong();
-  }
-});
+_mediaSession.setActionHandler(
+  onPlay: () => _audioPlayer.resume(),
+  onPause: () => _audioPlayer.pause(),
+  onSkipToNext: () => _playNextSong(),
+  onSkipToPrevious: () => _playPreviousSong(),
+);
 ```
 
 ## Demo Songs

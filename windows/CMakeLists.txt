@@ -43,6 +43,7 @@ set_target_properties(${PLUGIN_NAME} PROPERTIES
 target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 if(MSVC)
   target_compile_options(${PLUGIN_NAME} PRIVATE "/await")
+  target_compile_definitions(${PLUGIN_NAME} PRIVATE _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 endif()
 
 # Source include directories and library dependencies. Add any plugin-specific

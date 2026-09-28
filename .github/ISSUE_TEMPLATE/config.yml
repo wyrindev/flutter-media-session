@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/wyrindev/flutter-media-session/discussions
+    about: Please ask questions or start discussions here before filing a bug report.
+  - name: Documentation
+    url: https://github.com/wyrindev/flutter-media-session/tree/main/doc
+    about: Read our comprehensive architecture and usage guides.
