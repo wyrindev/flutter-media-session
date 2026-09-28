@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
-import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class FakeFlutterMediaSessionPlatform
@@ -10,7 +9,8 @@ class FakeFlutterMediaSessionPlatform
   final List<MediaMetadata> metadataUpdates = [];
   final List<PlaybackState> playbackStateUpdates = [];
   final List<Set<MediaAction>?> availableActionsUpdates = [];
-  final StreamController<MediaAction> actionController = StreamController<MediaAction>.broadcast();
+  final StreamController<MediaAction> actionController =
+      StreamController<MediaAction>.broadcast();
 
   @override
   Future<void> activate() => Future.value();
@@ -49,7 +49,8 @@ class FakeFlutterMediaSessionPlatform
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
 
   @override
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) =>
+  Future<void> setSkipIntervals(
+          {int forwardSeconds = 10, int backwardSeconds = 10}) =>
       Future.value();
 
   @override
@@ -64,7 +65,8 @@ class FakeFlutterMediaSessionPlatform
 class TestCustomAdapter extends MediaSessionAdapter {
   late FlutterMediaSession _session;
   bool isBound = false;
-  final StreamController<String> playerEvents = StreamController<String>.broadcast();
+  final StreamController<String> playerEvents =
+      StreamController<String>.broadcast();
   StreamSubscription? _actionSub;
 
   @override
@@ -89,7 +91,8 @@ class TestCustomAdapter extends MediaSessionAdapter {
   }
 
   void simulateStateChange(PlaybackStatus status, Duration position) {
-    _session.updatePlaybackState(PlaybackState(status: status, position: position));
+    _session
+        .updatePlaybackState(PlaybackState(status: status, position: position));
   }
 }
 
@@ -123,10 +126,13 @@ void main() {
     expect(fakePlatform.metadataUpdates.first.title, 'Test Title');
     expect(fakePlatform.metadataUpdates.first.artist, 'Test Artist');
 
-    adapter.simulateStateChange(PlaybackStatus.playing, const Duration(seconds: 15));
+    adapter.simulateStateChange(
+        PlaybackStatus.playing, const Duration(seconds: 15));
     expect(fakePlatform.playbackStateUpdates.length, 1);
-    expect(fakePlatform.playbackStateUpdates.first.status, PlaybackStatus.playing);
-    expect(fakePlatform.playbackStateUpdates.first.position, const Duration(seconds: 15));
+    expect(
+        fakePlatform.playbackStateUpdates.first.status, PlaybackStatus.playing);
+    expect(fakePlatform.playbackStateUpdates.first.position,
+        const Duration(seconds: 15));
 
     session.unbind();
   });

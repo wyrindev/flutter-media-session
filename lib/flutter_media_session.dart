@@ -65,7 +65,7 @@ class FlutterMediaSession {
     VoidCallback? onRepeat,
   }) {
     _actionHandlerSubscription?.cancel();
-    
+
     // ignore: deprecated_member_use
     _actionHandlerSubscription = onMediaAction.listen((action) {
       switch (action.name) {
@@ -114,7 +114,8 @@ class FlutterMediaSession {
   /// A stream of media actions triggered from the system media controls.
   ///
   /// Actions include 'play', 'pause', 'skipToNext', 'skipToPrevious', etc.
-  @Deprecated('Use the modern Adapter bind/unbind pattern or setActionHandler instead. Scheduled for removal in 3.0.0.')
+  @Deprecated(
+      'Use the modern Adapter bind/unbind pattern or setActionHandler instead. Scheduled for removal in 3.0.0.')
   Stream<MediaAction> get onMediaAction =>
       FlutterMediaSessionPlatform.instance.onMediaAction;
 
@@ -139,13 +140,15 @@ class FlutterMediaSession {
   }
 
   /// Updates the media metadata (title, artist, album, etc.) displayed in system controls.
-  @Deprecated('Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
+  @Deprecated(
+      'Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
   Future<void> updateMetadata(MediaMetadata metadata) {
     return FlutterMediaSessionPlatform.instance.updateMetadata(metadata);
   }
 
   /// Updates the playback state (status, position, speed) synchronized with system controls.
-  @Deprecated('Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
+  @Deprecated(
+      'Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
   Future<void> updatePlaybackState(PlaybackState state) {
     return FlutterMediaSessionPlatform.instance.updatePlaybackState(state);
   }
@@ -164,7 +167,8 @@ class FlutterMediaSession {
   ///   MediaAction.stop,
   /// });
   /// ```
-  @Deprecated('Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
+  @Deprecated(
+      'Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
   Future<void> updateAvailableActions(Set<MediaAction>? actions) {
     return FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
   }
@@ -172,7 +176,8 @@ class FlutterMediaSession {
   /// Requests the POST_NOTIFICATIONS permission on Android (33+).
   ///
   /// Returns true if granted or if not needed (e.g., older Android version).
-  @Deprecated('No longer needed as activate() automatically requests notification permission on Android. Scheduled for removal in 3.0.0.')
+  @Deprecated(
+      'No longer needed as activate() automatically requests notification permission on Android. Scheduled for removal in 3.0.0.')
   Future<bool> requestNotificationPermission() {
     return FlutterMediaSessionPlatform.instance.requestNotificationPermission();
   }
@@ -197,7 +202,8 @@ class FlutterMediaSession {
   /// Sets the preferred skip intervals for rewind (backward) and fast-forward (forward) commands.
   ///
   /// This is currently supported on iOS and macOS.
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) {
+  Future<void> setSkipIntervals(
+      {int forwardSeconds = 10, int backwardSeconds = 10}) {
     return FlutterMediaSessionPlatform.instance.setSkipIntervals(
       forwardSeconds: forwardSeconds,
       backwardSeconds: backwardSeconds,
@@ -217,11 +223,13 @@ class FlutterMediaSession {
   /// for it and silently pause each other. Turn it on for players
   /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
   Future<void> setAutoHandleInterruptions(bool enabled) {
-    return FlutterMediaSessionPlatform.instance.setHandlesInterruptions(enabled);
+    return FlutterMediaSessionPlatform.instance
+        .setHandlesInterruptions(enabled);
   }
 
   /// Deprecated. Use [setAutoHandleInterruptions] instead.
-  @Deprecated('Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
+  @Deprecated(
+      'Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
   Future<void> setHandlesInterruptions(bool enabled) {
     return setAutoHandleInterruptions(enabled);
   }

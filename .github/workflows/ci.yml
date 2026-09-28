@@ -6,11 +6,13 @@ on:
       - main
       - release/v*
       - dev/v*
+      - support/**
   pull_request:
     branches:
       - main
       - release/v*
       - dev/v*
+      - support/**
   workflow_dispatch:
 
 jobs:

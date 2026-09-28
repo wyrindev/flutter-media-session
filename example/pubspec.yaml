@@ -16,6 +16,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   audioplayers: ^6.6.0
   window_manager: ^0.4.3
+  package_info_plus: ^8.0.0
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   integration_test:

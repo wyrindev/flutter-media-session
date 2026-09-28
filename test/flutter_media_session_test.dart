@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
-import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 import 'package:flutter_media_session/flutter_media_session_method_channel.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -36,7 +35,8 @@ class MockFlutterMediaSessionPlatform
   Future<void> setAutoHandleInterruptions(bool enabled) => Future.value();
 
   @override
-  Future<void> setSkipIntervals({int forwardSeconds = 10, int backwardSeconds = 10}) =>
+  Future<void> setSkipIntervals(
+          {int forwardSeconds = 10, int backwardSeconds = 10}) =>
       Future.value();
 
   @override
@@ -67,9 +67,7 @@ void main() {
         customLabel: 'Shuffle',
         customIconResource: 'ic_shuffle');
     final repeat = MediaAction.custom(
-        name: 'repeat',
-        customLabel: 'Repeat',
-        customIconResource: 'ic_repeat');
+        name: 'repeat', customLabel: 'Repeat', customIconResource: 'ic_repeat');
 
     await flutterMediaSessionPlugin.updateAvailableActions({shuffle, repeat});
     // This just verifies it doesn't throw, as the mock is empty.

@@ -39,9 +39,7 @@ void main() {
         customLabel: 'Shuffle',
         customIconResource: 'ic_shuffle');
     final repeat = MediaAction.custom(
-        name: 'repeat',
-        customLabel: 'Repeat',
-        customIconResource: 'ic_repeat');
+        name: 'repeat', customLabel: 'Repeat', customIconResource: 'ic_repeat');
 
     await platform.updateAvailableActions({shuffle, repeat});
 
