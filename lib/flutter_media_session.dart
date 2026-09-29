@@ -161,7 +161,7 @@ class FlutterMediaSession {
   ///
   /// When enabled, the plugin requests audio focus on Android while
   /// playback is `playing` and forwards focus events through
-  /// [onMediaAction] — `pause` on focus loss, `play` when transient
+  /// [FlutterMediaSessionPlatform.onMediaAction] — `pause` on focus loss, `play` when transient
   /// focus returns. Defaults to `false`.
   ///
   /// Leave this off if your audio player already manages focus
