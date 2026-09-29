@@ -1,5 +1,5 @@
 /// The primary library for controlling system media sessions and player integration.
-library flutter_media_session;
+library;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';

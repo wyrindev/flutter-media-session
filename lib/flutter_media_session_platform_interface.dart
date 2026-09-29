@@ -1,5 +1,5 @@
 /// The platform interface library for Flutter Media Session.
-library flutter_media_session_platform_interface;
+library;
 
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'src/models/media_metadata.dart';

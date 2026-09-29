@@ -1,5 +1,5 @@
 /// The method channel implementation library for Flutter Media Session.
-library flutter_media_session_method_channel;
+library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
