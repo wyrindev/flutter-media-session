@@ -12,12 +12,22 @@ enum AudioSourceType {
   const AudioSourceType(this.label, this.baseUrl);
 }
 
+enum ActionSlotLayoutMode {
+  symmetrical('Symmetrical'),
+  sequential('Sequential');
+
+  final String label;
+  const ActionSlotLayoutMode(this.label);
+}
+
 class SettingsPanel extends StatelessWidget {
   final bool active;
   final VoidCallback onActivate;
   final VoidCallback onDeactivate;
   final Set<MediaAction>? availableActions;
   final void Function(Set<MediaAction>) onActionsChanged;
+  final ActionSlotLayoutMode layoutMode;
+  final ValueChanged<ActionSlotLayoutMode> onLayoutModeChanged;
   final MediaAction shuffleAction;
   final MediaAction repeatAction;
   final bool handlesInterruptions;
@@ -34,6 +44,8 @@ class SettingsPanel extends StatelessWidget {
     required this.onDeactivate,
     required this.availableActions,
     required this.onActionsChanged,
+    required this.layoutMode,
+    required this.onLayoutModeChanged,
     required this.shuffleAction,
     required this.repeatAction,
     required this.handlesInterruptions,
@@ -129,6 +141,34 @@ class SettingsPanel extends StatelessWidget {
                           _singleActionChip(action),
                       ],
                     ),
+                    if (!kIsWeb && Platform.isAndroid) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        "Action Slot Layout",
+                        style: textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: SegmentedButton<ActionSlotLayoutMode>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ActionSlotLayoutMode.symmetrical,
+                              label: Text('Symmetrical'),
+                              icon: Icon(Icons.sync_alt),
+                            ),
+                            ButtonSegment(
+                              value: ActionSlotLayoutMode.sequential,
+                              label: Text('Sequential'),
+                              icon: Icon(Icons.format_list_numbered),
+                            ),
+                          ],
+                          selected: {layoutMode},
+                          onSelectionChanged: (set) =>
+                              onLayoutModeChanged(set.first),
+                        ),
+                      ),
+                    ],
                     if (!kIsWeb && Platform.isAndroid) ...[
                       const SizedBox(height: 16),
                       const Divider(),

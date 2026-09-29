@@ -2,6 +2,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 import 'flutter_media_session_method_channel.dart';
 
 /// The platform-specific interface for [FlutterMediaSession].
@@ -55,6 +56,11 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   Future<void> updateAvailableActions(Set<MediaAction>? actions) {
     throw UnimplementedError(
         'updateAvailableActions() has not been implemented.');
+  }
+
+  /// Sets the customizable action slot layout for system media controls.
+  Future<void> setActionLayout(ActionSlotLayout layout) {
+    throw UnimplementedError('setActionLayout() has not been implemented.');
   }
 
   /// Requests the POST_NOTIFICATIONS permission on Android (33+).

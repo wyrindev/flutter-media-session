@@ -19,6 +19,11 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.CommandButton
+import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.MediaNotification
+import androidx.core.app.NotificationCompat
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
@@ -43,6 +48,80 @@ class FlutterMediaSessionService : MediaSessionService() {
     private var isReceiverRegistered = false
 
     private var customLayout: List<androidx.media3.session.CommandButton> = emptyList()
+    private var activeActionSlotNames: List<String>? = null
+    private var activeCompactIndices: List<Int>? = null
+
+    private fun buttonMatchesAction(button: CommandButton, actionName: String): Boolean {
+        button.sessionCommand?.customAction?.let {
+            if (it == actionName) return true
+        }
+        return when (button.playerCommand) {
+            Player.COMMAND_PLAY_PAUSE -> actionName == "play" || actionName == "pause"
+            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> actionName == "skipToPrevious"
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> actionName == "skipToNext"
+            Player.COMMAND_SEEK_BACK -> actionName == "rewind"
+            Player.COMMAND_SEEK_FORWARD -> actionName == "fastForward"
+            Player.COMMAND_STOP -> actionName == "stop"
+            else -> false
+        }
+    }
+
+    inner class FlutterMediaNotificationProvider(context: Context) :
+        DefaultMediaNotificationProvider(context) {
+
+        override fun addNotificationActions(
+            mediaSession: MediaSession,
+            mediaButtons: ImmutableList<CommandButton>,
+            builder: NotificationCompat.Builder,
+            actionFactory: MediaNotification.ActionFactory
+        ): IntArray {
+            val slotNames = activeActionSlotNames
+            if (slotNames.isNullOrEmpty()) {
+                return super.addNotificationActions(mediaSession, mediaButtons, builder, actionFactory)
+            }
+
+            val orderedButtons = mutableListOf<CommandButton>()
+            val remainingButtons = mediaButtons.toMutableList()
+
+            for (slotName in slotNames) {
+                val matched = remainingButtons.firstOrNull { buttonMatchesAction(it, slotName) }
+                if (matched != null) {
+                    orderedButtons.add(matched)
+                    remainingButtons.remove(matched)
+                }
+            }
+
+            super.addNotificationActions(
+                mediaSession,
+                ImmutableList.copyOf(orderedButtons),
+                builder,
+                actionFactory
+            )
+
+            val customCompact = activeCompactIndices
+            if (!customCompact.isNullOrEmpty()) {
+                val validIndices = customCompact.filter { it in orderedButtons.indices }
+                if (validIndices.isNotEmpty()) {
+                    return validIndices.toIntArray()
+                }
+            }
+
+            val compactList = mutableListOf<Int>()
+            for ((index, button) in orderedButtons.withIndex()) {
+                if (button.playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
+                    button.playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM ||
+                    button.playerCommand == Player.COMMAND_PLAY_PAUSE ||
+                    button.playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
+                    button.playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
+                ) {
+                    compactList.add(index)
+                    if (compactList.size == 3) break
+                }
+            }
+            return if (compactList.isNotEmpty()) compactList.toIntArray() else IntArray(minOf(3, orderedButtons.size)) { it }
+        }
+    }
+
     private val baseControllerCommands = object : LinkedHashMap<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>() {
         override fun removeEldestEntry(eldest: Map.Entry<androidx.media3.session.MediaSession.ControllerInfo, Pair<androidx.media3.session.SessionCommands, androidx.media3.common.Player.Commands>>?): Boolean {
             return size > 100
@@ -244,10 +323,33 @@ class FlutterMediaSessionService : MediaSessionService() {
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
         // Parse any initial actions passed before service creation
-        val (initialCustomLayout, initialActionNames) = parseCustomLayout(FlutterMediaSessionPlugin.instance?.pendingAvailableActions)
-        customLayout = initialCustomLayout
-        if (initialActionNames.isNotEmpty()) {
-            player.updateAvailableActions(initialActionNames)
+        val pendingLayout = FlutterMediaSessionPlugin.instance?.pendingActionLayout
+        if (pendingLayout != null) {
+            @Suppress("UNCHECKED_CAST")
+            val slots = pendingLayout["slots"] as? List<Any>
+            @Suppress("UNCHECKED_CAST")
+            activeCompactIndices = pendingLayout["compactIndices"] as? List<Int>
+            val slotNames = mutableListOf<String>()
+            slots?.forEach { item ->
+                if (item is String) {
+                    slotNames.add(item)
+                } else if (item is Map<*, *>) {
+                    (item["name"] as? String)?.takeIf { it.isNotBlank() }?.let { slotNames.add(it) }
+                }
+            }
+            activeActionSlotNames = slotNames
+
+            val (initialCustomLayout, initialActionNames) = parseCustomLayout(slots)
+            customLayout = initialCustomLayout
+            if (initialActionNames.isNotEmpty()) {
+                player.updateAvailableActions(initialActionNames)
+            }
+        } else {
+            val (initialCustomLayout, initialActionNames) = parseCustomLayout(FlutterMediaSessionPlugin.instance?.pendingAvailableActions)
+            customLayout = initialCustomLayout
+            if (initialActionNames.isNotEmpty()) {
+                player.updateAvailableActions(initialActionNames)
+            }
         }
 
         // Build the session
@@ -257,7 +359,7 @@ class FlutterMediaSessionService : MediaSessionService() {
             // .setCustomLayout(initialCustomLayout)
             .build()
             
-        // setMediaNotificationProvider(FlutterMediaNotificationProvider(this))
+        setMediaNotificationProvider(FlutterMediaNotificationProvider(this))
         super.onCreate()
 
         // Register the session with the service so Media3's
@@ -552,9 +654,48 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     /**
+     * Updates the customized action slot layout for system media controls.
+     */
+    fun setActionLayout(layoutData: Map<String, Any?>?) {
+        if (layoutData == null) {
+            activeActionSlotNames = null
+            activeCompactIndices = null
+            internalUpdateActions(null)
+            return
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val slots = layoutData["slots"] as? List<Any>
+        @Suppress("UNCHECKED_CAST")
+        val compactIndices = layoutData["compactIndices"] as? List<Int>
+
+        activeCompactIndices = compactIndices
+
+        val slotNames = mutableListOf<String>()
+        if (slots != null) {
+            for (item in slots) {
+                if (item is String) {
+                    slotNames.add(item)
+                } else if (item is Map<*, *>) {
+                    (item["name"] as? String)?.takeIf { it.isNotBlank() }?.let { slotNames.add(it) }
+                }
+            }
+        }
+        activeActionSlotNames = slotNames
+
+        internalUpdateActions(slots)
+    }
+
+    /**
      * Updates the set of media actions available in the system controls.
      */
     fun updateAvailableActions(actions: List<Any>?) {
+        activeActionSlotNames = null
+        activeCompactIndices = null
+        internalUpdateActions(actions)
+    }
+
+    private fun internalUpdateActions(actions: List<Any>?) {
         val (newCustomLayout, allActionNames) = parseCustomLayout(actions)
         customLayout = newCustomLayout
         player.updateAvailableActions(if (actions == null) null else allActionNames)

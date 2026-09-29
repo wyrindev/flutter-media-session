@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 import 'flutter_media_session_platform_interface.dart';
 
 /// An implementation of [FlutterMediaSessionPlatform] that uses method channels.
@@ -50,6 +51,15 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
       }).toList();
     }
     await methodChannel.invokeMethod('updateAvailableActions', mappedActions);
+  }
+
+  @override
+  Future<void> setActionLayout(ActionSlotLayout layout) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await methodChannel.invokeMethod('setActionLayout', layout.toJson());
+    } else {
+      await updateAvailableActions(layout.allActions);
+    }
   }
 
   @override

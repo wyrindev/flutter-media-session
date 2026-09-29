@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 import 'src/adapters/media_session_adapter.dart';
 import 'flutter_media_session_platform_interface.dart';
 
 export 'src/models/media_metadata.dart';
 export 'src/models/playback_state.dart';
 export 'src/models/media_action.dart';
+export 'src/models/action_slot_layout.dart';
 export 'src/adapters/media_session_adapter.dart';
 export 'flutter_media_session_platform_interface.dart';
 
@@ -190,5 +192,14 @@ class FlutterMediaSession {
   /// battery cost.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
+  }
+
+  /// Sets the customizable action slot layout for system media controls.
+  ///
+  /// On Android, this arranges the action positions in the system notification
+  /// and media controls card, and configures which actions are visible in compact view.
+  /// On other platforms, it enables the corresponding transport controls.
+  Future<void> setActionLayout(ActionSlotLayout layout) {
+    return FlutterMediaSessionPlatform.instance.setActionLayout(layout);
   }
 }

@@ -9,6 +9,7 @@ class FakeFlutterMediaSessionPlatform
   final List<MediaMetadata> metadataUpdates = [];
   final List<PlaybackState> playbackStateUpdates = [];
   final List<Set<MediaAction>?> availableActionsUpdates = [];
+  final List<ActionSlotLayout> actionLayoutUpdates = [];
   final StreamController<MediaAction> actionController =
       StreamController<MediaAction>.broadcast();
 
@@ -33,6 +34,12 @@ class FakeFlutterMediaSessionPlatform
   @override
   Future<void> updateAvailableActions(Set<MediaAction>? actions) {
     availableActionsUpdates.add(actions);
+    return Future.value();
+  }
+
+  @override
+  Future<void> setActionLayout(ActionSlotLayout layout) {
+    actionLayoutUpdates.add(layout);
     return Future.value();
   }
 

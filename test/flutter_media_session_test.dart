@@ -23,6 +23,9 @@ class MockFlutterMediaSessionPlatform
       Future.value();
 
   @override
+  Future<void> setActionLayout(ActionSlotLayout layout) => Future.value();
+
+  @override
   Future<bool> requestNotificationPermission() => Future.value(true);
 
   @override
