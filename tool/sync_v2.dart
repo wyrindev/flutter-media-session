@@ -189,6 +189,20 @@ void main(List<String> args) async {
         RegExp(r'flutter_media_session:\s*\^\d+\.\d+\.\d+'),
         'flutter_media_session: ^$newV2Version',
       );
+
+      // Adjust note under installation section to clarify v2 maintenance status and link to main branch docs
+      final v3NotePattern = RegExp(
+        r'> \*\*Note\*\*: Version 3\.x is a complete architectural overhaul\.[^\n]*',
+      );
+      const v2NoteReplacement =
+          '> **Note**: This branch maintains the **v2 legacy release line**. '
+          'For the latest 3.x features and documentation, visit the [main branch](https://github.com/wyrindev/flutter-media-session/tree/main).';
+
+      if (v3NotePattern.hasMatch(readmeContent)) {
+        readmeContent =
+            readmeContent.replaceFirst(v3NotePattern, v2NoteReplacement);
+      }
+
       File('$worktreePath/README.md').writeAsStringSync(readmeContent);
     }
 
@@ -200,13 +214,11 @@ void main(List<String> args) async {
           mainChangelogFile.readAsStringSync(), v3VersionStr);
       final existingV2Changelog = v2ChangelogFile.readAsStringSync();
 
-      final newV2Entry = '''
-## $newV2Version
+      final changelogBody = v3Notes.isNotEmpty
+          ? v3Notes
+          : "* Synchronized fixes and maintenance updates from $tagName.";
 
-### Backported from v3 ($tagName)
-${v3Notes.isNotEmpty ? v3Notes : "* Backported updates from $tagName."}
-
-''';
+      final newV2Entry = '## $newV2Version\n\n$changelogBody\n\n';
 
       v2ChangelogFile.writeAsStringSync(newV2Entry + existingV2Changelog);
     }
@@ -264,19 +276,19 @@ ${v3Notes.isNotEmpty ? v3Notes : "* Backported updates from $tagName."}
           ['-C', worktreePath, 'push', '-u', 'origin', branchName, '--force']);
 
       // Create Pull Request using gh CLI
-      final prTitle = 'sync(v2): Backport $tagName updates ($newV2Version)';
+      final prTitle = 'sync(v2): backport $tagName updates ($newV2Version)';
       final prBody = '''
-### 🔄 Automated v3 -> v2 Backport
+### Automated v3 -> v2 Backport
 
 * **Source v3 Tag**: `$tagName`
 * **Target v2 Version**: `$newV2Version`
-* **Status**: Automated verification flagged potential items for review.
+* **Status**: Automated verification flagged items requiring manual review.
 
 #### Validation Results
 * `flutter analyze`: ${analyzeResult.exitCode == 0 ? "PASSED" : "FAILED"}
 * `flutter test`: ${testResult.exitCode == 0 ? "PASSED" : "FAILED"}
 
-Please review and merge when ready.
+Please inspect the changes and merge once verified.
 ''';
 
       final ghPrRes = await _runProcess(
