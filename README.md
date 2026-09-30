@@ -41,7 +41,7 @@ Add `flutter_media_session` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_media_session: ^3.0.7
+  flutter_media_session: ^3.0.8
 ```
 
 > **Note**: Version 3.x is a complete architectural overhaul. If you are upgrading from 1.x or 2.x, refer to the [Migration and Usage Guide](doc/usage.md).
