@@ -1,3 +1,6 @@
+/// The method channel implementation library for Flutter Media Session.
+library;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'src/models/media_metadata.dart';
@@ -7,6 +10,9 @@ import 'flutter_media_session_platform_interface.dart';
 
 /// An implementation of [FlutterMediaSessionPlatform] that uses method channels.
 class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
+  /// Constructs a [MethodChannelFlutterMediaSession] instance.
+  MethodChannelFlutterMediaSession();
+
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_media_session');

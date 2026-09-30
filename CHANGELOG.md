@@ -1,3 +1,9 @@
+## 3.0.8
+
+### Documentation
+* Added library documentation comments and explicit constructor documentation across public API elements.
+* Fixed unresolved doc references and refined comment formatting for pub.dev analysis.
+
 ## 3.0.7
 
 ### Bug Fixes
