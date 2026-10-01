@@ -275,48 +275,6 @@ class FlutterMediaSessionService : MediaSessionService() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent != null && Intent.ACTION_MEDIA_BUTTON == intent.action) {
-            // Satisfy the 5-second foreground requirement for MediaButtonReceiver on API <= 30
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
-                ensureForegroundServiceLegacy()
-            }
-            val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? android.view.KeyEvent
-            }
-            if (keyEvent != null) {
-                handleMediaKeyEvent(keyEvent)
-            }
-        }
-        return super.onStartCommand(intent, flags, startId)
-    }
-
-    /**
-     * Posts a minimal foreground notification on API <= 30 when started by MediaButtonReceiver
-     * to fulfill the Android framework requirement.
-     */
-    private fun ensureForegroundServiceLegacy() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        try {
-            val channelId = "default"
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            if (nm.getNotificationChannel(channelId) == null) {
-                nm.createNotificationChannel(
-                    android.app.NotificationChannel(channelId, "Media playback", android.app.NotificationManager.IMPORTANCE_LOW)
-                )
-            }
-            val notification = android.app.Notification.Builder(this, channelId)
-                .setSmallIcon(applicationInfo.icon)
-                .build()
-            startForeground(1001, notification)
-        } catch (e: Exception) {
-            android.util.Log.w("FlutterMediaSession", "ensureForegroundServiceLegacy failed: ${e.message}")
-        }
-    }
-
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
         return mediaSession
     }
