@@ -8,6 +8,9 @@ import 'package:flutter_media_session/flutter_media_session.dart';
 /// 1. Synchronizing playback state and metadata from the player to the media session.
 /// 2. Forwarding system media control actions from the media session back to the player.
 abstract class MediaSessionAdapter {
+  /// Abstract const constructor for [MediaSessionAdapter].
+  const MediaSessionAdapter();
+
   /// Binds this adapter to the given [FlutterMediaSession] instance.
   ///
   /// The adapter should set up event listeners on the media player and start

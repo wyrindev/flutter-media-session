@@ -169,9 +169,8 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
   @override
   Future<void> setBackgroundKeepAlive(bool enabled) async {
     // Best-effort only: the Screen Wake Lock API keeps the screen awake while
-    // the page is visible — it does NOT keep a backgrounded tab's CPU/network
-    // alive (background tabs are throttled regardless). There is no real
-    // background keep-alive primitive on the web platform.
+    // the page is visible. It does NOT keep a backgrounded tab's CPU/network
+    // alive. There is no real background keep-alive primitive on the web platform.
     try {
       final navigator = web.window.navigator as JSObject;
       final wakeLock = navigator.getProperty<JSObject?>('wakeLock'.toJS);

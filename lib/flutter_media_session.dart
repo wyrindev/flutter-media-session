@@ -1,7 +1,8 @@
+/// The primary library for controlling system media sessions and player integration.
+library;
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'src/models/media_metadata.dart';
-import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
 import 'src/adapters/media_session_adapter.dart';
 import 'flutter_media_session_platform_interface.dart';
@@ -65,9 +66,8 @@ class FlutterMediaSession {
     VoidCallback? onRepeat,
   }) {
     _actionHandlerSubscription?.cancel();
-
-    // ignore: deprecated_member_use
-    _actionHandlerSubscription = onMediaAction.listen((action) {
+    _actionHandlerSubscription =
+        FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
           onPlay?.call();
@@ -111,14 +111,6 @@ class FlutterMediaSession {
     _actionHandlerSubscription = null;
   }
 
-  /// A stream of media actions triggered from the system media controls.
-  ///
-  /// Actions include 'play', 'pause', 'skipToNext', 'skipToPrevious', etc.
-  @Deprecated(
-      'Use the modern Adapter bind/unbind pattern or setActionHandler instead. Scheduled for removal in 3.0.0.')
-  Stream<MediaAction> get onMediaAction =>
-      FlutterMediaSessionPlatform.instance.onMediaAction;
-
   /// Activates the media session on the current platform.
   ///
   /// On Android, this starts the foreground media service and automatically
@@ -127,8 +119,8 @@ class FlutterMediaSession {
   Future<void> activate() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Unify lifecycle by automatically requesting permissions when activating on Android
-      // ignore: deprecated_member_use_from_same_package
-      await requestNotificationPermission();
+      await FlutterMediaSessionPlatform.instance
+          .requestNotificationPermission();
     }
     return FlutterMediaSessionPlatform.instance.activate();
   }
@@ -137,49 +129,6 @@ class FlutterMediaSession {
   Future<void> deactivate() {
     clearActionHandler();
     return FlutterMediaSessionPlatform.instance.deactivate();
-  }
-
-  /// Updates the media metadata (title, artist, album, etc.) displayed in system controls.
-  @Deprecated(
-      'Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
-  Future<void> updateMetadata(MediaMetadata metadata) {
-    return FlutterMediaSessionPlatform.instance.updateMetadata(metadata);
-  }
-
-  /// Updates the playback state (status, position, speed) synchronized with system controls.
-  @Deprecated(
-      'Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
-  Future<void> updatePlaybackState(PlaybackState state) {
-    return FlutterMediaSessionPlatform.instance.updatePlaybackState(state);
-  }
-
-  /// Updates which media actions are available in system controls.
-  ///
-  /// Actions not in [actions] will be disabled in the notification.
-  /// Pass null to enable all actions (the default).
-  ///
-  /// Example — disable skip buttons:
-  /// ```dart
-  /// await _mediaSession.updateAvailableActions({
-  ///   MediaAction.play,
-  ///   MediaAction.pause,
-  ///   MediaAction.seekTo,
-  ///   MediaAction.stop,
-  /// });
-  /// ```
-  @Deprecated(
-      'Use the modern Adapter bind/unbind pattern instead. Scheduled for removal in 3.0.0.')
-  Future<void> updateAvailableActions(Set<MediaAction>? actions) {
-    return FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
-  }
-
-  /// Requests the POST_NOTIFICATIONS permission on Android (33+).
-  ///
-  /// Returns true if granted or if not needed (e.g., older Android version).
-  @Deprecated(
-      'No longer needed as activate() automatically requests notification permission on Android. Scheduled for removal in 3.0.0.')
-  Future<bool> requestNotificationPermission() {
-    return FlutterMediaSessionPlatform.instance.requestNotificationPermission();
   }
 
   /// Sets the AppUserModelID for the current process on Windows.
@@ -215,40 +164,25 @@ class FlutterMediaSession {
   ///
   /// When enabled, the plugin requests audio focus on Android while
   /// playback is `playing` and forwards focus events through
-  /// [onMediaAction] — `pause` on focus loss, `play` when transient
-  /// focus returns. Defaults to `false`.
+  /// [FlutterMediaSessionPlatform.onMediaAction] (`pause` on focus loss, `play` when transient
+  /// focus returns). Defaults to `false`.
   ///
   /// Leave this off if your audio player already manages focus
-  /// (e.g. `audioplayers`, `just_audio`), otherwise both will fight
-  /// for it and silently pause each other. Turn it on for players
-  /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
+  /// (such as `audioplayers` or `just_audio`). Turn it on for players
+  /// that do not manage focus themselves (such as `fvp` or `video_player`).
   Future<void> setAutoHandleInterruptions(bool enabled) {
     return FlutterMediaSessionPlatform.instance
-        .setHandlesInterruptions(enabled);
-  }
-
-  /// Deprecated. Use [setAutoHandleInterruptions] instead.
-  @Deprecated(
-      'Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
-  Future<void> setHandlesInterruptions(bool enabled) {
-    return setAutoHandleInterruptions(enabled);
+        .setAutoHandleInterruptions(enabled);
   }
 
   /// Opts the session into a background keep-alive. Defaults to `false`.
   ///
-  /// While enabled the platform holds the best keep-alive primitive it has —
-  /// Android: a partial wake lock (CPU) + high-perf Wi-Fi lock (radio);
-  /// macOS: an idle-system-sleep assertion; Windows: a system-required
-  /// execution-state request; web: a best-effort screen wake lock; iOS: no-op —
-  /// for the lifetime of the session, released as soon as it is disabled.
+  /// While enabled, the platform holds available keep-alive primitives
+  /// (wake lock on Android, prevent-sleep on macOS/Windows, screen wake lock on Web)
+  /// for the lifetime of the session.
   ///
-  /// Use this to keep a backgrounded session alive whose audio is rendered
-  /// **off-device** — most importantly a Chromecast/DLNA control socket on the
-  /// local network, which Doze / app-standby otherwise tears down ("Broken
-  /// pipe") a few minutes after the app is backgrounded. Enable it only for
-  /// that case (e.g. while a cast session is active) and disable it when the
-  /// session ends — it is off by default so normal on-device playback pays no
-  /// battery cost.
+  /// Use this to keep a backgrounded session alive when audio is rendered off-device,
+  /// such as a Chromecast or DLNA socket on the local network.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
   }

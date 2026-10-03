@@ -1,3 +1,6 @@
+/// The platform interface library for Flutter Media Session.
+library;
+
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
@@ -90,32 +93,24 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
     throw UnimplementedError('setSkipIntervals() has not been implemented.');
   }
 
-  @Deprecated(
-      'Use setAutoHandleInterruptions instead. Scheduled for removal in 3.0.0.')
-  Future<void> setHandlesInterruptions(bool enabled) {
-    return setAutoHandleInterruptions(enabled);
-  }
-
   /// Opts the plugin into handling system audio interruptions
   /// (calls, navigation prompts, other apps grabbing audio).
   ///
   /// When enabled, the plugin requests audio focus on Android while
   /// playback is `playing`, and forwards focus events to your app via
-  /// the existing [onMediaAction] stream — `pause` on a loss, `play`
-  /// when transient focus returns. Defaults to `false`.
+  /// the existing [onMediaAction] stream (`pause` on focus loss, `play`
+  /// when transient focus returns). Defaults to `false`.
   ///
   /// Leave this off if your audio player already manages focus
-  /// (e.g. `audioplayers`, `just_audio`), otherwise both will fight
-  /// for it and silently pause each other. Turn it on for players
-  /// that don't manage focus themselves (e.g. `fvp`, `video_player`).
+  /// (such as `audioplayers` or `just_audio`). Turn it on for players
+  /// that do not manage focus themselves (such as `fvp` or `video_player`).
   Future<void> setAutoHandleInterruptions(bool enabled) {
     throw UnimplementedError(
         'setAutoHandleInterruptions() has not been implemented.');
   }
 
-  /// Opts the session into an Android background keep-alive (wake + Wi-Fi
-  /// locks) for off-device playback such as casting. Android only; defaults to
-  /// a no-op so other platforms (and any that do not override it) are safe.
+  /// Opts the session into a background keep-alive for off-device playback
+  /// such as casting. Defaults to a no-op on platforms where not implemented.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return Future.value();
   }

@@ -46,9 +46,6 @@ class FakePlatform
   Future<bool> requestNotificationPermission() => Future.value(true);
 
   @override
-  Future<void> setHandlesInterruptions(bool enabled) => Future.value();
-
-  @override
   Future<void> setBackgroundKeepAlive(bool enabled) => Future.value();
 
   @override

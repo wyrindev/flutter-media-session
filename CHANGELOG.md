@@ -1,3 +1,9 @@
+## 2.5.1
+
+### Bug Fixes
+* **Android**:
+  * Removed redundant `onStartCommand` media button handling in `FlutterMediaSessionService` to eliminate duplicate event dispatch and prevent state decoupling between the service notification and player callback.
+
 ## 2.5.0
 
 ### Improvements & Backports

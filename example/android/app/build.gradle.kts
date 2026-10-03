@@ -8,7 +8,7 @@ val agpVersion = try {
     "0.0.0"
 }
 
-val isAgp9OrHigher = agpVersion.startsWith("9.") ||
+val isAgp9OrHigher = agpVersion.startsWith("9.") || 
     (agpVersion.split(".").firstOrNull()?.toIntOrNull() ?: 0) >= 9
 
 plugins {
@@ -73,7 +73,7 @@ tasks.configureEach {
                 val jvmTargetMethod = compilerOptions.javaClass.getMethod("getJvmTarget")
                 val jvmTargetProperty = jvmTargetMethod.invoke(compilerOptions)
                 val setMethod = jvmTargetProperty.javaClass.getMethod("set", Any::class.java)
-
+                
                 val jvmTargetClass = Class.forName("org.jetbrains.kotlin.gradle.dsl.JvmTarget")
                 val jvm17 = jvmTargetClass.getField("JVM_17").get(null)
                 setMethod.invoke(jvmTargetProperty, jvm17)

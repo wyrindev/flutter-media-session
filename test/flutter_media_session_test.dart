@@ -26,9 +26,6 @@ class MockFlutterMediaSessionPlatform
   Future<bool> requestNotificationPermission() => Future.value(true);
 
   @override
-  Future<void> setHandlesInterruptions(bool enabled) => Future.value();
-
-  @override
   Future<void> setBackgroundKeepAlive(bool enabled) => Future.value();
 
   @override
@@ -57,7 +54,6 @@ void main() {
   });
 
   test('updateAvailableActions handles shuffle and repeat', () async {
-    FlutterMediaSession flutterMediaSessionPlugin = FlutterMediaSession();
     MockFlutterMediaSessionPlatform fakePlatform =
         MockFlutterMediaSessionPlatform();
     FlutterMediaSessionPlatform.instance = fakePlatform;
@@ -69,7 +65,8 @@ void main() {
     final repeat = MediaAction.custom(
         name: 'repeat', customLabel: 'Repeat', customIconResource: 'ic_repeat');
 
-    await flutterMediaSessionPlugin.updateAvailableActions({shuffle, repeat});
+    await FlutterMediaSessionPlatform.instance
+        .updateAvailableActions({shuffle, repeat});
     // This just verifies it doesn't throw, as the mock is empty.
   });
 }
