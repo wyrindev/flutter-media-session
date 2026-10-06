@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to publish (e.g. v3.0.9)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   publish:
