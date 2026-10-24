@@ -302,10 +302,7 @@ class _PlayerHomeState extends State<PlayerHome> {
           MediaAction.skipToNext
         else if (hasFastForward)
           MediaAction.fastForward,
-        if (hasShuffle)
-          _shuffleAction
-        else if (hasStop)
-          MediaAction.stop,
+        if (hasShuffle) _shuffleAction else if (hasStop) MediaAction.stop,
       ];
       _adapter.syncActionLayout(ActionSlotLayout(slots));
     } else {

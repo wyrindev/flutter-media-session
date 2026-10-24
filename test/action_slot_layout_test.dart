@@ -23,7 +23,9 @@ void main() {
       customIconResource: 'ic_dislike',
     );
 
-    test('symmetrical preset produces balanced slot ordering and compact indices', () {
+    test(
+        'symmetrical preset produces balanced slot ordering and compact indices',
+        () {
       final layout = ActionSlotLayout.symmetrical(
         left: custom1,
         right: custom2,
@@ -37,13 +39,15 @@ void main() {
         custom2,
       ]);
       expect(layout.compactActionIndices, [1, 2, 3]);
-      expect(layout.allActions, containsAll([
-        custom1,
-        MediaAction.skipToPrevious,
-        MediaAction.play,
-        MediaAction.skipToNext,
-        custom2,
-      ]));
+      expect(
+          layout.allActions,
+          containsAll([
+            custom1,
+            MediaAction.skipToPrevious,
+            MediaAction.play,
+            MediaAction.skipToNext,
+            custom2,
+          ]));
     });
 
     test('symmetrical preset with omitted custom actions', () {
@@ -60,7 +64,9 @@ void main() {
       expect(layout.compactActionIndices, [1, 2, 3]);
     });
 
-    test('sequential preset produces sequential slot ordering and compact indices', () {
+    test(
+        'sequential preset produces sequential slot ordering and compact indices',
+        () {
       final layout = ActionSlotLayout.sequential(
         custom1: custom1,
         custom2: custom2,
@@ -85,7 +91,8 @@ void main() {
         4: custom2,
       };
 
-      final layout = ActionSlotLayout.fromMap(map, compactActionIndices: [1, 2, 3]);
+      final layout =
+          ActionSlotLayout.fromMap(map, compactActionIndices: [1, 2, 3]);
       expect(layout.slots.length, 5);
       expect(layout.slots[0], custom1);
       expect(layout.slots[4], custom2);
@@ -110,7 +117,8 @@ void main() {
       expect(slotsJson[4]['name'], 'dislike');
     });
 
-    test('FlutterMediaSession.setActionLayout calls platform instance', () async {
+    test('FlutterMediaSession.setActionLayout calls platform instance',
+        () async {
       final mock = MockPlatform();
       FlutterMediaSessionPlatform.instance = mock;
 
