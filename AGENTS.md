@@ -9,7 +9,7 @@ Agent instructions for working in this repository.
 `flutter_media_session` is a Flutter federated plugin. It bridges player engines (`just_audio`, `media_kit`, etc.) to OS media hubs (Android notifications, iOS/macOS lock screen, Windows SMTC, Web MediaSession API) via a metadata and remote command routing layer.
 
 - **No audio engine is included.** The plugin only handles metadata, playback state, and transport commands.
-- **Current version**: `3.1.0` (see `pubspec.yaml`)
+- **Current version**: see `pubspec.yaml`
 - **Dart SDK**: `>=3.3.0 <4.0.0` / **Flutter SDK**: `>=3.3.0`
 
 ---
