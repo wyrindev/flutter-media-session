@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_media_session/flutter_media_session_method_channel.dart';
@@ -48,5 +49,43 @@ void main() {
     final List args = calls.first.arguments;
     expect(args.any((a) => a['name'] == 'shuffle'), isTrue);
     expect(args.any((a) => a['name'] == 'repeat'), isTrue);
+  });
+
+  test('setActionLayout invokes setActionLayout on Android', () async {
+    final List<MethodCall> calls = [];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+      calls.add(methodCall);
+      return null;
+    });
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final shuffle = MediaAction.custom(
+          name: 'shuffle',
+          customLabel: 'Shuffle',
+          customIconResource: 'ic_shuffle');
+      final layout = ActionSlotLayout.symmetrical(
+        left: shuffle,
+        skipPrevious: MediaAction.skipToPrevious,
+        playPause: MediaAction.play,
+        skipNext: MediaAction.skipToNext,
+      );
+
+      await platform.setActionLayout(layout);
+
+      expect(calls.length, 1);
+      expect(calls.first.method, 'setActionLayout');
+      final Map<dynamic, dynamic> args = calls.first.arguments;
+      expect(args['compactIndices'], [1, 2, 3]);
+      final List slots = args['slots'];
+      expect(slots.length, 4);
+      expect(slots[0]['name'], 'shuffle');
+      expect(slots[1]['name'], 'skipToPrevious');
+      expect(slots[2]['name'], 'play');
+      expect(slots[3]['name'], 'skipToNext');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

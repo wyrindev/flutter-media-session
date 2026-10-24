@@ -16,4 +16,23 @@ internal class FlutterMediaSessionPluginTest {
 
         Mockito.verify(mockResult).notImplemented()
     }
+
+    @Test
+    fun onMethodCall_setActionLayout_cachesPendingLayout() {
+        val plugin = FlutterMediaSessionPlugin()
+
+        val layoutData = mapOf(
+            "slots" to listOf(
+                mapOf("name" to "shuffle", "customLabel" to "Shuffle", "customIconResource" to "ic_shuffle_on"),
+                mapOf("name" to "play")
+            ),
+            "compactIndices" to listOf(1)
+        )
+        val call = MethodCall("setActionLayout", layoutData)
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+        kotlin.test.assertEquals(layoutData, plugin.pendingActionLayout)
+    }
 }

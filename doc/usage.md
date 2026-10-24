@@ -1,30 +1,26 @@
 # Usage Guide
 
-Learn how to integrate and use the `flutter_media_session` plugin in your application to synchronize media metadata and playback state with system-level controls using the modern **Adapter Pattern**.
+This guide covers how to use `flutter_media_session` to sync media metadata and playback state with OS media hubs, handle remote transport commands, and configure platform-specific behaviors.
 
 ---
 
 ## 1. Player Adapters
 
-Rather than coupling the core package to specific audio libraries, `flutter_media_session` uses an **Adapter Pattern**. You can connect your preferred audio engine through a `MediaSessionAdapter`.
+The recommended approach is to implement `MediaSessionAdapter`, which keeps playback engine events separate from media session synchronization.
 
-Ready-to-use adapter guides are provided for popular playback engines:
-
-- **[`just_audio` Adapter Guide](adapters/just_audio.md)**: Full adapter implementation, queue mapping, and lifecycle binding for `just_audio`.
-- **[`media_kit` Adapter Guide](adapters/media_kit.md)**: Complete adapter code with playlist tracking and playback synchronization for `media_kit`.
+Ready-to-use adapter implementations and guides are provided for:
+- **[`just_audio` Adapter Guide](adapters/just_audio.md)**: Full adapter code with queue tracking, stream subscriptions, and lifecycle management for `just_audio`.
+- **[`media_kit` Adapter Guide](adapters/media_kit.md)**: Full adapter code with playlist position tracking and rate synchronization for `media_kit`.
 
 ---
 
-## 2. Writing a Custom Adapter
+## 2. Implementing a Custom Adapter
 
-You can easily adapt any other media player (e.g. `audioplayers`, standard `video_player`, or a custom native player) by implementing the `MediaSessionAdapter` interface.
-
-Here is an example for a generic player:
+To integrate a player (e.g. `audioplayers`, `video_player`, or a proprietary audio pipeline), implement the `MediaSessionAdapter` interface:
 
 ```dart
 import 'dart:async';
 import 'package:flutter_media_session/flutter_media_session.dart';
-import 'package:flutter_media_session/flutter_media_session_platform_interface.dart';
 
 class CustomPlayerAdapter implements MediaSessionAdapter {
   final MyPlayer player;
@@ -37,48 +33,68 @@ class CustomPlayerAdapter implements MediaSessionAdapter {
   void bind(FlutterMediaSession session) {
     _session = session;
 
-    // A. Sync metadata changes
+    // 1. Synchronize metadata changes
     _subscriptions.add(player.trackStream.listen((track) {
-      FlutterMediaSessionPlatform.instance.updateMetadata(MediaMetadata(
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        artworkUri: track.coverUrl,
-        duration: track.duration,
-      ));
+      FlutterMediaSessionPlatform.instance.updateMetadata(
+        MediaMetadata(
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          artworkUri: track.coverUrl,
+          duration: track.duration,
+        ),
+      );
     }));
 
-    // B. Sync playback status and progress
+    // 2. Synchronize playback status and timeline
     _subscriptions.add(player.statusStream.listen((status) {
-      FlutterMediaSessionPlatform.instance.updatePlaybackState(PlaybackState(
-        status: status == MyStatus.playing ? PlaybackStatus.playing : PlaybackStatus.paused,
-        position: player.currentPosition,
-        speed: player.speed,
-      ));
+      FlutterMediaSessionPlatform.instance.updatePlaybackState(
+        PlaybackState(
+          status: status == MyStatus.playing
+              ? PlaybackStatus.playing
+              : PlaybackStatus.paused,
+          position: player.currentPosition,
+          speed: player.playbackRate,
+          bufferedPosition: player.bufferedPosition,
+          repeatMode: player.isLooping ? MediaRepeatMode.one : MediaRepeatMode.none,
+          shuffleModeEnabled: player.isShuffle,
+        ),
+      );
     }));
 
-    // C. Forward system controls to player
-    _subscriptions.add(FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
-      switch (action.name) {
-        case 'play':
-          player.resume();
-          break;
-        case 'pause':
-          player.pause();
-          break;
-        case 'seekTo':
-          if (action.seekPosition != null) {
-            player.seek(action.seekPosition!);
-          }
-          break;
-      }
-    }));
+    // 3. Receive system transport commands
+    _subscriptions.add(
+      FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+        switch (action.name) {
+          case 'play':
+            player.play();
+            break;
+          case 'pause':
+            player.pause();
+            break;
+          case 'stop':
+            player.stop();
+            break;
+          case 'seekTo':
+            if (action.seekPosition != null) {
+              player.seek(action.seekPosition!);
+            }
+            break;
+          case 'skipToNext':
+            player.next();
+            break;
+          case 'skipToPrevious':
+            player.previous();
+            break;
+        }
+      }),
+    );
   }
 
   @override
   void unbind() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
     }
     _subscriptions.clear();
     _session = null;
@@ -86,98 +102,262 @@ class CustomPlayerAdapter implements MediaSessionAdapter {
 }
 ```
 
-Then bind your adapter in one line:
+Bind and unbind the adapter to your session:
+
 ```dart
-session.bind(CustomPlayerAdapter(myPlayer));
+final session = FlutterMediaSession();
+await session.activate();
+
+final adapter = CustomPlayerAdapter(myPlayer);
+session.bind(adapter);
+
+// When tearing down or switching players:
+session.unbind();
 ```
 
 ---
 
-## 3. Media Session Lifecycle
+## 3. High-Level Action Handling (`setActionHandler`)
 
-Understanding the session's lifecycle ensures robust notification management, background execution, and resource cleanup.
+If you are not using a full `MediaSessionAdapter` class, you can register high-level action callbacks directly on the `FlutterMediaSession` singleton. This avoids manually listening to and parsing `FlutterMediaSessionPlatform.instance.onMediaAction`:
 
-```mermaid
-graph TD
-    Idle[Uninitialized / Idle] -->|session.activate| Active[Activated / System Session Live]
-    Active -->|session.bind adapter| Bound[Bound to Player / Active Sync]
-    Bound -->|session.unbind| Active
-    Active -->|session.deactivate| Idle
+```dart
+final session = FlutterMediaSession();
+
+session.setActionHandler(
+  onPlay: () => player.play(),
+  onPause: () => player.pause(),
+  onStop: () => player.stop(),
+  onSeekTo: (position) => player.seek(position),
+  onSkipToNext: () => playlist.next(),
+  onSkipToPrevious: () => playlist.previous(),
+  onRewind: () => player.seek(player.position - const Duration(seconds: 10)),
+  onFastForward: () => player.seek(player.position + const Duration(seconds: 10)),
+  onShuffle: () => player.toggleShuffle(),
+  onRepeat: () => player.toggleRepeat(),
+);
+
+// Clear callbacks when no longer needed:
+session.clearActionHandler();
 ```
 
-### Session States
+---
 
-1.  **Idle**: The initial state. No background service is running on Android, and lock screen/notification widgets are not active.
-2.  **Activated**: Established by calling `session.activate()`. On Android, this boots up the background foreground-service which prevents the OS from killing your audio stream.
-3.  **Bound**: Occurs when `session.bind(adapter)` is called. The adapter takes control of syncing states, metadata, and responding to lock screen play/pause/skip clicks.
-4.  **Unbound**: Calling `session.unbind()` stops the active adapter from updating the media session and releases its player streams. The media session itself remains active.
-5.  **Deactivated**: Established by calling `session.deactivate()`. Releases all system resources, tears down the Android foreground service, and clears system notifications.
+## 4. Session Lifecycle Management
+
+Session state maps directly to what the OS shows (background services, lock screen widgets, system resources):
+
+```
+[ Idle ] ── session.activate() ──> [ Active (Service / SMTC Live) ]
+                                          │
+                                 session.bind(adapter)
+                                          │
+                                          ▼
+                                 [ Bound (Auto Syncing) ]
+                                          │
+                                 session.unbind()
+                                          │
+                                          ▼
+[ Idle ] <── session.deactivate() ── [ Active ]
+```
+
+- **`activate()`**:
+  - **Android**: Starts `FlutterMediaSessionService` as a foreground service with `mediaPlayback|connectedDevice` types and creates the notification channel. Automatically prompts for `POST_NOTIFICATIONS` permission on Android 13+ (API 33+).
+  - **iOS**: Activates `AVAudioSession` with the `.playback` category and registers targets on `MPRemoteCommandCenter`.
+  - **macOS**: Registers command targets with `MPRemoteCommandCenter`.
+  - **Windows**: Obtains `SystemMediaTransportControls` for the application window HWND via `ISystemMediaTransportControlsInterop` and enables default controls.
+  - **Web**: Registers command handlers on `window.navigator.mediaSession`.
+- **`deactivate()`**:
+  - Cancels high-level action handlers registered via `setActionHandler()`.
+  - **Android**: Stops the foreground service, dismisses the system notification, and unbinds the Media3 session.
+  - **iOS/macOS**: Clears now-playing info, releases power assertions, and removes remote command handlers.
+  - **Windows**: Disables SMTC and resets timeline properties.
+  - **Web**: Resets `navigator.mediaSession.playbackState` to `'none'`.
 
 ---
 
-## 4. Removed Legacy APIs
+## 5. Direct State & Action APIs
 
-Legacy direct synchronization APIs on `FlutterMediaSession` have been removed in version **3.0.0**.
+For low-level control or standalone synchronization without an adapter, interact directly with `FlutterMediaSessionPlatform.instance`:
 
-If you need to manually update state or handle actions without using an adapter, access them directly on the platform interface:
-- `FlutterMediaSessionPlatform.instance.updateMetadata(...)`
-- `FlutterMediaSessionPlatform.instance.updatePlaybackState(...)`
-- `FlutterMediaSessionPlatform.instance.updateAvailableActions(...)`
-- `FlutterMediaSessionPlatform.instance.onMediaAction`
+```dart
+// 1. Update metadata
+await FlutterMediaSessionPlatform.instance.updateMetadata(
+  const MediaMetadata(
+    title: 'Track Title',
+    artist: 'Artist Name',
+    album: 'Album Title',
+    artworkUri: 'https://example.com/artwork.jpg', // HTTP URL or local absolute path
+    duration: Duration(minutes: 4, seconds: 12),
+  ),
+);
+
+// 2. Update playback state
+await FlutterMediaSessionPlatform.instance.updatePlaybackState(
+  const PlaybackState(
+    status: PlaybackStatus.playing,
+    position: Duration(seconds: 30),
+    speed: 1.0,
+    bufferedPosition: Duration(seconds: 60),
+    repeatMode: MediaRepeatMode.all,
+    shuffleModeEnabled: true,
+  ),
+);
+
+// 3. Restrict enabled system buttons (null enables all supported buttons)
+await FlutterMediaSessionPlatform.instance.updateAvailableActions({
+  MediaAction.play,
+  MediaAction.pause,
+  MediaAction.skipToNext,
+  MediaAction.skipToPrevious,
+  MediaAction.seekTo,
+});
+
+// 4. Raw stream of media actions
+FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+  print('Received action: ${action.name}, seek: ${action.seekPosition}');
+});
+```
 
 ---
 
-## 5. Additional System Controls
+## 6. Platform-Specific Configuration
 
-### Audio Interruptions (Android)
-To automatically handle interruptions (like phone calls or other apps starting audio), use `setAutoHandleInterruptions`:
+### Action Slot Layout (Android Notification & System Controls)
+
+On Android, action buttons in the `MediaStyle` notification and Android 11+ quick settings media card can be arranged using `ActionSlotLayout`. On other platforms, setting a layout registers and enables the transport buttons included in the layout.
+
+```dart
+// Symmetrical layout (Spotify / Modern layout):
+// Order: [leftCustom, skipPrevious, playPause, skipNext, rightCustom]
+// Compact view (collapsed notification) displays: [skipPrevious, playPause, skipNext]
+await session.setActionLayout(
+  ActionSlotLayout.symmetrical(
+    left: MediaAction.custom(
+      name: 'repeat',
+      customLabel: 'Repeat',
+      customIconResource: 'ic_repeat_all',
+    ),
+    skipPrevious: MediaAction.skipToPrevious,
+    playPause: MediaAction.play,
+    skipNext: MediaAction.skipToNext,
+    right: MediaAction.custom(
+      name: 'shuffle',
+      customLabel: 'Shuffle',
+      customIconResource: 'ic_shuffle_on',
+    ),
+  ),
+);
+
+// Sequential layout (Left-to-right standard order):
+// Order: [skipPrevious, playPause, skipNext, custom1, custom2]
+await session.setActionLayout(
+  ActionSlotLayout.sequential(
+    skipPrevious: MediaAction.skipToPrevious,
+    playPause: MediaAction.play,
+    skipNext: MediaAction.skipToNext,
+    custom1: favoriteAction,
+    custom2: downloadAction,
+  ),
+);
+
+// Explicit custom layout with specific compact view indices:
+await session.setActionLayout(
+  const ActionSlotLayout(
+    [
+      MediaAction.skipToPrevious,
+      MediaAction.play,
+      MediaAction.skipToNext,
+      favoriteAction,
+    ],
+    compactActionIndices: [0, 1, 2],
+  ),
+);
+```
+
+> **Android Resource Requirement**: Custom actions require drawable resource names matching files in `android/app/src/main/res/drawable*` (e.g. `ic_repeat_all.xml` or `.png`).
+
+### Opting Out of Android Permissions
+
+The plugin's `AndroidManifest.xml` declares `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `WAKE_LOCK`, and `ACCESS_WIFI_STATE` to support off-device casting via `setBackgroundKeepAlive`.
+
+If your application only plays local audio and does not require off-device keep-alive, you can strip these permissions and update the foreground service type using Android Gradle's Manifest Merger in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Strip unused casting/keep-alive permissions -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_WIFI_STATE"
+        tools:node="remove" />
+
+    <application>
+        <!-- Update service type to match the retained permissions (Android 14+ compliance) -->
+        <service
+            android:name="dev.wyrin.flutter_media_session.FlutterMediaSessionService"
+            android:foregroundServiceType="mediaPlayback"
+            tools:replace="android:foregroundServiceType" />
+    </application>
+</manifest>
+```
+
+> **Android 14+ Notice**: If you remove `FOREGROUND_SERVICE_CONNECTED_DEVICE`, you must also override the `<service>` declaration with `tools:replace="android:foregroundServiceType"` set to `"mediaPlayback"` as shown above. Otherwise, Android 14+ will throw a `SecurityException` at runtime when starting the foreground service.
+
+### Skip Intervals (iOS & macOS)
+
+Configure the step size (in seconds) for rewind and fast-forward remote commands:
+
+```dart
+await session.setSkipIntervals(
+  forwardSeconds: 15,
+  backwardSeconds: 15,
+);
+```
+
+### Audio Interruption Handling (`setAutoHandleInterruptions`)
 
 ```dart
 await session.setAutoHandleInterruptions(true);
 ```
-> [!WARNING]
-> Keep this **disabled** (default is `false`) if your underlying media player (such as `audioplayers`, `just_audio`, or `media_kit`) already manages audio focus automatically.
-> 
-> Because `flutter_media_session` acts as a metadata/command shim, enabling this option will cause the plugin to request audio focus when playback starts. This will strip audio focus from your actual audio player within the same app, causing the actual player to immediately pause or go silent while the system media widget remains stuck in a "playing" state.
-> 
-> Only turn this **on** if your player does *not* request focus itself (e.g. using `video_player` with the `fvp`/`mdk` backend).
 
-### Background Keep-Alive (Off-Device Casting)
-To keep a backgrounded session alive when audio is rendered **off-device** (e.g. casting to Chromecast or a DLNA device on the local network), use `setBackgroundKeepAlive`:
+- **Behavior**: When enabled on Android, the plugin requests audio focus (`AUDIOFOCUS_GAIN`) when the state changes to `PlaybackStatus.playing`, and abandons focus on stop/deactivate. Focus loss events are converted into `pause` or `play` actions on the `onMediaAction` stream.
+- **When to disable (Default: `false`)**: If your underlying player engine (`just_audio`, `audioplayers`, etc.) already manages Android audio focus, leave this set to `false`. Otherwise, the plugin's focus request will conflict with the player engine within the same application process.
+- **When to enable**: Use this when playing through custom pipelines or engines that do not handle OS focus (e.g., bare `fvp` or raw video decoders).
+- **Other Platforms**: No-op on iOS, macOS, Windows, and Web (session focus is managed by the OS or audio engine).
+
+### Background Keep-Alive (`setBackgroundKeepAlive`)
+
+For audio streamed or cast off-device (e.g. Google Cast / DLNA sockets), the local audio hardware is idle, leaving the app vulnerable to OS sleep or Doze termination:
 
 ```dart
 await session.setBackgroundKeepAlive(true);
 ```
 
-While enabled, the platform holds the best keep-alive primitive it has to prevent the connection from being torn down:
-- **Android**: A partial wake lock (CPU) + high-performance Wi-Fi lock (radio), declaring `mediaPlayback|connectedDevice` foreground service types.
-- **macOS**: An `IOPMAssertion` preventing idle system sleep.
-- **Windows**: `SetThreadExecutionState` to request the system stay active.
-- **Web**: Best-effort Screen Wake Lock.
-- **iOS**: No-op (background survival depends on native audio playback).
+Platform implementation details:
+- **Android**: Acquires a `PARTIAL_WAKE_LOCK` and a `WIFI_MODE_FULL_HIGH_PERF` Wi-Fi lock, running under the `connectedDevice` foreground service type.
+- **macOS**: Holds an `IOPMAssertion` (`kIOPMAssertionTypePreventUserIdleSystemSleep`) preventing system idle sleep.
+- **Windows**: Calls `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`.
+- **Web**: Acquires a Screen Wake Lock via `navigator.wakeLock` (best-effort while tab is active).
+- **iOS**: No-op (iOS does not offer runtime CPU keep-alive locks; background longevity requires active local audio playback via `AVAudioSession`).
 
-Enable it only during active cast/off-device sessions and disable it when done to avoid unnecessary battery drain.
+### Windows AppUserModelID Setup
 
-### Windows AppUserModelID & Flyout Setup
+On Windows, portable or unpackaged `.exe` builds show up as "Unknown Application" in the SMTC volume flyout unless an Application User Model ID (AUMID) and a matching Start Menu shortcut are registered.
 
-Windows identifies applications primarily through their **App User Model ID (AUMID)**. If an application does not configure an AUMID, the Windows Media Session Manager (SMTC) cannot resolve your app identity and displays "Unknown Application".
-
-#### Option A: MSIX Packaging (Recommended)
-When packaged as an MSIX (e.g. using the [`msix`](https://pub.dev/packages/msix) package), Windows automatically assigns and resolves the AUMID from the package manifest. The plugin automatically detects MSIX runtime and defers to the OS-managed identity.
-
-#### Option B: Dynamic Shortcut for Unpackaged / Portable Apps
-If you distribute portable ZIPs or run unpackaged builds, register the AUMID and a display name during app initialization. This dynamically registers a Start Menu shortcut required by SMTC to resolve the display title:
+Call `setWindowsAppUserModelId` during early initialization:
 
 ```dart
 if (Platform.isWindows) {
-  // Call early during initialization
   await session.setWindowsAppUserModelId(
-    'YourCompany.YourApp.Id',
-    displayName: 'Your App Name', // Creates dynamic shortcut for unpackaged apps
-    // iconPath: 'C:\\path\\to\\icon.ico', // Optional custom icon
+    'Com.Company.MyApp',
+    displayName: 'My App Name', // Creates Start Menu shortcut for unpackaged apps
+    iconPath: r'C:\path\to\icon.ico', // Optional
   );
 }
 ```
 
-> [!NOTE]
-> If using custom installers (e.g., Inno Setup or WiX), configure the installer to set `AppUserModelID` on the Start Menu shortcut directly and omit `displayName` in the code.
+For complete packaging options (MSIX vs. portable vs. Inno Setup / WiX installers), see the dedicated [Windows Setup Guide](windows_setup.md).

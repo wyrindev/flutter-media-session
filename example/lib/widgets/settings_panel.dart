@@ -12,12 +12,22 @@ enum AudioSourceType {
   const AudioSourceType(this.label, this.baseUrl);
 }
 
+enum ActionSlotLayoutMode {
+  symmetrical('Symmetrical'),
+  sequential('Sequential');
+
+  final String label;
+  const ActionSlotLayoutMode(this.label);
+}
+
 class SettingsPanel extends StatelessWidget {
   final bool active;
   final VoidCallback onActivate;
   final VoidCallback onDeactivate;
   final Set<MediaAction>? availableActions;
   final void Function(Set<MediaAction>) onActionsChanged;
+  final ActionSlotLayoutMode layoutMode;
+  final ValueChanged<ActionSlotLayoutMode> onLayoutModeChanged;
   final MediaAction shuffleAction;
   final MediaAction repeatAction;
   final bool handlesInterruptions;
@@ -34,6 +44,8 @@ class SettingsPanel extends StatelessWidget {
     required this.onDeactivate,
     required this.availableActions,
     required this.onActionsChanged,
+    required this.layoutMode,
+    required this.onLayoutModeChanged,
     required this.shuffleAction,
     required this.repeatAction,
     required this.handlesInterruptions,
@@ -159,6 +171,44 @@ class SettingsPanel extends StatelessWidget {
                 )
               : const SizedBox.shrink(),
         ),
+        if (!kIsWeb && Platform.isAndroid) ...[
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          Text(
+            "Action Slot Layout",
+            style: textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            active
+                ? "Configures notification button order (takes effect on next interaction)"
+                : "Initial layout mode configured when the session activates",
+            style: textTheme.bodySmall
+                ?.copyWith(color: Theme.of(context).hintColor),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: SegmentedButton<ActionSlotLayoutMode>(
+              segments: const [
+                ButtonSegment(
+                  value: ActionSlotLayoutMode.symmetrical,
+                  label: Text('Symmetrical'),
+                  icon: Icon(Icons.sync_alt),
+                ),
+                ButtonSegment(
+                  value: ActionSlotLayoutMode.sequential,
+                  label: Text('Sequential'),
+                  icon: Icon(Icons.format_list_numbered),
+                ),
+              ],
+              selected: {layoutMode},
+              onSelectionChanged: (set) => onLayoutModeChanged(set.first),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         const Divider(),
         const SizedBox(height: 8),
