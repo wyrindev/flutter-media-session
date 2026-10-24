@@ -1,30 +1,36 @@
 # Windows Setup Guide
 
-This guide explains how to properly configure your Flutter application on Windows so that it is correctly identified by the system media center (SMTC) and doesn't appear as "Unknown Application".
+This guide explains how to make SMTC correctly show your application's name and icon rather than "Unknown Application".
 
-## The Challenge
+---
 
-Windows identifies applications primarily through their **App User Model ID (AUMID)**. If an application doesn't have an AUMID, the Windows Media Session Manager cannot associate the media controls with your app, leading it to display "Unknown Application".
+## The Identity Challenge
 
-## Solutions
+Windows SMTC identifies applications using an **Application User Model ID (AUMID)**. 
+- Packaged apps (MSIX) receive an AUMID assigned by the Windows operating system from their manifest.
+- Classic win32/unpackaged apps running directly from an executable (such as portable `.zip` distributions or `flutter run` dev sessions) do not have an OS-assigned AUMID. In this case, SMTC requires an explicit process AUMID mapped to an installed Start Menu shortcut to resolve the application title and icon.
 
-### 1. MSIX Packaging (Recommended)
+---
 
-The most robust way to ensure your application is correctly identified is to package it as an **MSIX** package. When an app is installed via MSIX, Windows automatically assigns it an AUMID based on the package information.
+## Configuration Approaches
 
-We recommend using the [msix](https://pub.dev/packages/msix) package for Flutter:
+### 1. MSIX Packaging (Recommended for Store & Modern Distribution)
 
-1. Add `msix` to your `dev_dependencies`:
+When packaged as an MSIX (for instance using the [`msix`](https://pub.dev/packages/msix) tool), Windows manages the identity and AUMID automatically:
+
+1. Add `msix` to `dev_dependencies` in `pubspec.yaml`:
    ```yaml
    dev_dependencies:
      msix: ^3.16.1
    ```
-2. Configure your app info in `pubspec.yaml`:
+2. Configure application parameters:
    ```yaml
    msix_config:
-     display_name: My Awesome App
+     display_name: My Media App
      publisher_display_name: My Company
-     # ... other config
+     identity_name: com.mycompany.mymediaapp
+     msix_version: 1.0.0.0
+     logo_path: windows/runner/resources/app_icon.ico
    ```
 3. Build and package:
    ```bash
@@ -32,80 +38,75 @@ We recommend using the [msix](https://pub.dev/packages/msix) package for Flutter
    dart run msix:create
    ```
 
-### 2. Dynamic Start Menu Shortcut (For Unpackaged Apps)
+> When running inside an MSIX container, `flutter_media_session` detects the package runtime (`GetCurrentPackageFullName`) and skips shortcut registration to avoid conflicts.
 
-If you are distributing your application as a portable ZIP (unpackaged) or testing via `flutter run`, you must explicitly set the AppUserModelID at runtime.
+---
 
-To solve the "Unknown Application" issue for unpackaged apps without an installer, the plugin provides a way to dynamically create a Start Menu shortcut on the fly. Windows SMTC requires a Start Menu shortcut to resolve the AUMID to a human-readable display name.
+### 2. Unpackaged / Portable Distribution (`displayName` Registration)
 
-#### Using the Plugin API (Version 2.1.0+)
-
-The `flutter_media_session` plugin provides a convenient method to set the AUMID and optionally register a display name:
+For portable desktop distributions (`.zip`) or unpackaged builds without an installer, call `setWindowsAppUserModelId` during early application initialization:
 
 ```dart
-if (Platform.isWindows) {
-  // Call this as early as possible in your main()
-  await FlutterMediaSession().setWindowsAppUserModelId(
-    'YourCompany.YourApp.Id',
-    // ⚠️ ONLY provide displayName if your app is portable/unpackaged.
-    // This will dynamically create a Start Menu shortcut.
-    displayName: 'My Awesome App',
-    // iconPath: 'C:\\path\\to\\icon.ico', // Optional
-  );
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_media_session/flutter_media_session.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isWindows) {
+    // Call early before initializing playback sessions
+    await FlutterMediaSession().setWindowsAppUserModelId(
+      'Com.Company.MyApp',
+      displayName: 'My App Name', // Creates Start Menu shortcut required by SMTC
+      iconPath: r'C:\path\to\icon.ico', // Optional icon path
+    );
+  }
+
+  runApp(const MyApp());
 }
 ```
 
-> [!NOTE]
-> **Best Practice for Installers / MSIX:** You should **always omit** `displayName` if you are using a custom installer (like Inno Setup), as those tools already handle shortcut creation. 
-> 
-> *Note on MSIX:* The plugin automatically detects if your app is running as an MSIX package. If it is, the `setWindowsAppUserModelId` call is safely ignored to prevent conflicts with the OS-managed AUMID and to prevent duplicate shortcuts.
+#### Under the Hood
+1. Calls `SetCurrentProcessExplicitAppUserModelID(L"Com.Company.MyApp")` to identify the process to the Windows shell.
+2. Checks for `FOLDERID_Programs` and creates a Start Menu shortcut (`.lnk`) using COM `IShellLinkW` and `IPersistFile`.
+3. Sets `PKEY_AppUserModel_ID` on the shortcut's `IPropertyStore` matching the AUMID.
+4. Invokes `SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, ...)` to signal the shell to recognize the new association immediately.
 
-### 3. Custom Installers (Inno Setup, WiX, etc.)
+---
 
-If you are using a custom installer to distribute your application, you must configure your installer to embed the **AppUserModelID** directly into the Start Menu shortcut it creates. If you do this, you only need to pass the `id` to the plugin (omitting `displayName`).
+### 3. Custom Installers (Inno Setup / WiX)
 
-#### Example: Inno Setup
-In your `.iss` script, add the `AppUserModelID` parameter to your shortcut in the `[Icons]` section:
+If your app uses a traditional Windows installer, configure the installer itself to attach the AUMID property directly to the Start Menu shortcut. When doing this, pass only the `id` in Dart code and omit `displayName`:
 
-```ini
-[Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; AppUserModelID: "YourCompany.YourApp.Id"
+#### Dart Initialization
+```dart
+if (Platform.isWindows) {
+  await FlutterMediaSession().setWindowsAppUserModelId('Com.Company.MyApp');
+}
 ```
 
-#### Example: WiX Toolset
-In your `.wxs` file, add the `ShortcutProperty` to your `Shortcut` element:
+#### Inno Setup Configuration (`.iss`)
+Attach `AppUserModelID` in the `[Icons]` section:
+```ini
+[Icons]
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; AppUserModelID: "Com.Company.MyApp"
+```
 
+#### WiX Configuration (`.wxs`)
+Add `ShortcutProperty` inside the `Shortcut` element:
 ```xml
-<Shortcut Id="ApplicationStartMenuShortcut" Name="My Awesome App" ...>
-    <ShortcutProperty Key="System.AppUserModel.ID" Value="YourCompany.YourApp.Id" />
+<Shortcut Id="ApplicationStartMenuShortcut" Name="My Media App" Target="[#MyAppExe]">
+    <ShortcutProperty Key="System.AppUserModel.ID" Value="Com.Company.MyApp" />
 </Shortcut>
 ```
 
-#### Manual Native Implementation
-
-Alternatively, you can modify your `windows/runner/main.cpp` to set the AUMID before the Flutter engine starts:
-
-1. Open `windows/runner/main.cpp`.
-2. Include `<shobjidl.h>`.
-3. Call `SetCurrentProcessExplicitAppUserModelID` in `wWinMain`:
-
-```cpp
-#include <shobjidl.h>
-
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
-    // Set the AUMID
-    SetCurrentProcessExplicitAppUserModelID(L"YourCompany.YourApp.Id");
-    
-    // ... existing initialization code
-}
-```
+---
 
 ## Verifying the Setup
 
-1. Start your application.
-2. Play some media and activate the media session.
-3. Open the system media controls (volume flyout or Win+G).
-4. Verify that your application's name and icon are correctly displayed.
+1. Launch your application and start media playback.
+2. Activate the session via `session.activate()`.
+3. Adjust the system volume slider or press `Win + G` to view the Windows Media Controller widget.
+4. Confirm that your application display name and icon appear above the playback controls instead of "Unknown Application".
 
-For more details on AUMID, see the [Microsoft Documentation](https://learn.microsoft.com/en-us/windows/win32/shell/appids).

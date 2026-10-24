@@ -8,7 +8,7 @@ This guide details the steps required to prepare, test, and publish releases of 
 
 Before releasing a new version:
 
-1. **Verify All Tests and Static Analysis Pass**:
+1. **Verify Static Analysis and Tests**:
    ```bash
    flutter analyze --fatal-infos
    flutter test
@@ -53,7 +53,7 @@ Ensure that:
 
 ## 3. Tagging and GitHub Release
 
-Once dry-run validation passes and the release commit is on `main`, create and push the version tag:
+Once dry-run validation passes and the release commit is on `main`:
 
 1. **Create and Push Git Tag**:
    ```bash

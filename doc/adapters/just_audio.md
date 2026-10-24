@@ -1,12 +1,12 @@
-# just_audio Adapter Guide
+# `just_audio` Adapter Guide
 
-This guide provides a ready-to-use adapter to connect [`just_audio`](https://pub.dev/packages/just_audio) with `flutter_media_session`.
+This guide provides a production-ready adapter to connect [`just_audio`](https://pub.dev/packages/just_audio) with `flutter_media_session`.
 
 ---
 
 ## 1. Adapter Implementation
 
-Create a file named `just_audio_media_session_adapter.dart` in your project and add the following implementation:
+Save this file as `just_audio_media_session_adapter.dart` in your project:
 
 ```dart
 import 'dart:async';
@@ -251,14 +251,37 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
 }
 ```
 
----
-
-## 2. Binding to Your Session
+## 2. Usage Example
 
 ```dart
-final session = FlutterMediaSession();
-await session.activate();
+import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:just_audio/just_audio.dart';
+import 'just_audio_media_session_adapter.dart';
 
 final player = AudioPlayer();
+final session = FlutterMediaSession();
+
+// 1. Activate the system media session
+await session.activate();
+
+// 2. Bind the adapter to begin automatic bidirectional syncing
 session.bind(JustAudioMediaSessionAdapter(player));
+
+// 3. Load and play your playlist
+final playlist = ConcatenatingAudioSource(
+  children: [
+    AudioSource.uri(
+      Uri.parse('https://example.com/track1.mp3'),
+      tag: {
+        'title': 'Track 1',
+        'artist': 'Artist 1',
+        'album': 'Album 1',
+        'artworkUri': 'https://example.com/cover1.jpg',
+      },
+    ),
+  ],
+);
+
+await player.setAudioSource(playlist);
+await player.play();
 ```

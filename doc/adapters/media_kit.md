@@ -1,12 +1,12 @@
-# media_kit Adapter Guide
+# `media_kit` Adapter Guide
 
-This guide provides a ready-to-use adapter to connect [`media_kit`](https://pub.dev/packages/media_kit) with `flutter_media_session`.
+This guide provides a production-ready adapter implementation bridging [`media_kit`](https://pub.dev/packages/media_kit) `Player` with `flutter_media_session`.
 
 ---
 
 ## 1. Adapter Implementation
 
-Create a file named `media_kit_media_session_adapter.dart` in your project and add the following implementation:
+Save this file as `media_kit_media_session_adapter.dart` in your project:
 
 ```dart
 import 'dart:async';
@@ -235,14 +235,37 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
 }
 ```
 
----
-
-## 2. Binding to Your Session
+## 2. Usage Example
 
 ```dart
-final session = FlutterMediaSession();
-await session.activate();
+import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:media_kit/media_kit.dart';
+import 'media_kit_media_session_adapter.dart';
 
-final player = Player();
-session.bind(MediaKitMediaSessionAdapter(player));
+void main() async {
+  // 1. Initialize media_kit native libraries
+  MediaKit.ensureInitialized();
+
+  final player = Player();
+  final session = FlutterMediaSession();
+
+  // 2. Activate the system media session
+  await session.activate();
+
+  // 3. Bind the adapter to begin automatic bidirectional syncing
+  session.bind(MediaKitMediaSessionAdapter(player));
+
+  // 4. Open media with metadata extras
+  await player.open(
+    Media(
+      'https://example.com/audio.mp3',
+      extras: {
+        'title': 'Track Title',
+        'artist': 'Artist Name',
+        'album': 'Album Title',
+        'artworkUri': 'https://example.com/cover.jpg',
+      },
+    ),
+  );
+}
 ```
