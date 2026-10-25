@@ -116,7 +116,19 @@ class ActionSlotLayout {
   Map<int, MediaAction> toMap() => slots.asMap();
 
   /// Returns the set of unique [MediaAction]s contained in the slots.
-  Set<MediaAction> get allActions => slots.toSet();
+  ///
+  /// If either [MediaAction.play] or [MediaAction.pause] is present in the slots,
+  /// both are included in the returned set as they represent the dual states of
+  /// the playback transport control.
+  Set<MediaAction> get allActions {
+    final set = slots.toSet();
+    if (set.contains(MediaAction.play)) {
+      set.add(MediaAction.pause);
+    } else if (set.contains(MediaAction.pause)) {
+      set.add(MediaAction.play);
+    }
+    return set;
+  }
 
   /// Serializes this layout for platform channel transmission.
   Map<String, dynamic> toJson() {

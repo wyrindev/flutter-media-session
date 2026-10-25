@@ -88,4 +88,34 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  test('setActionLayout calls updateAvailableActions with allActions on non-Android', () async {
+    final List<MethodCall> calls = [];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+      calls.add(methodCall);
+      return null;
+    });
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      final layout = ActionSlotLayout.symmetrical(
+        skipPrevious: MediaAction.skipToPrevious,
+        playPause: MediaAction.play,
+        skipNext: MediaAction.skipToNext,
+      );
+
+      await platform.setActionLayout(layout);
+
+      expect(calls.length, 1);
+      expect(calls.first.method, 'updateAvailableActions');
+      final List args = calls.first.arguments;
+      expect(args, contains('play'));
+      expect(args, contains('pause'));
+      expect(args, contains('skipToPrevious'));
+      expect(args, contains('skipToNext'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }

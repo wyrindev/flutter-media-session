@@ -135,8 +135,18 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
   Future<void> updateAvailableActions(Set<MediaAction>? actions) async {
     try {
       final session = web.window.navigator.mediaSession;
+      final effectiveActions =
+          actions != null ? Set<MediaAction>.from(actions) : null;
+      if (effectiveActions != null) {
+        if (effectiveActions.contains(MediaAction.play)) {
+          effectiveActions.add(MediaAction.pause);
+        } else if (effectiveActions.contains(MediaAction.pause)) {
+          effectiveActions.add(MediaAction.play);
+        }
+      }
       for (final entry in _webActionMap.entries) {
-        if (actions == null || actions.contains(entry.value)) {
+        if (effectiveActions == null ||
+            effectiveActions.contains(entry.value)) {
           _registerAction(session, entry.key, entry.value);
         } else {
           // Unregister by setting handler to null

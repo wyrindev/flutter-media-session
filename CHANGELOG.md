@@ -1,3 +1,13 @@
+## 3.1.0-pre.3
+
+### Bug Fixes
+
+* **Web**: Fixed media card pause action not updating playback status and button to play by ensuring both play and pause handlers remain registered when either action is available.
+* **Core**: Included both `MediaAction.play` and `MediaAction.pause` in `ActionSlotLayout.allActions` when either action is present in slots.
+* **Darwin**: Ensured both play and pause commands are enabled in `MPRemoteCommandCenter` when either action is available.
+
+---
+
 ## 3.1.0-pre.2
 
 ### Bug Fixes
