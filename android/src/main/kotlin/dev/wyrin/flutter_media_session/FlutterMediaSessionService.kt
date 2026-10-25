@@ -50,6 +50,8 @@ class FlutterMediaSessionService : MediaSessionService() {
     private var customLayout: List<androidx.media3.session.CommandButton> = emptyList()
     private var activeActionSlotNames: List<String>? = null
     private var activeCompactIndices: List<Int>? = null
+    private var currentAvailableActions: List<Any>? = null
+    private var currentActionSlots: List<Any>? = null
 
     private fun buttonMatchesAction(button: CommandButton, actionName: String): Boolean {
         button.sessionCommand?.customAction?.let {
@@ -350,6 +352,7 @@ class FlutterMediaSessionService : MediaSessionService() {
 
         // Parse any initial actions passed before service creation
         val pendingLayout = FlutterMediaSessionPlugin.instance?.pendingActionLayout
+        val pendingActions = FlutterMediaSessionPlugin.instance?.pendingAvailableActions
         if (pendingLayout != null) {
             @Suppress("UNCHECKED_CAST")
             val slots = pendingLayout["slots"] as? List<Any>
@@ -364,18 +367,25 @@ class FlutterMediaSessionService : MediaSessionService() {
                 }
             }
             activeActionSlotNames = slotNames
+            currentActionSlots = slots
+        }
+        currentAvailableActions = pendingActions
 
-            val (initialCustomLayout, initialActionNames) = parseCustomLayout(slots)
-            customLayout = initialCustomLayout
-            if (initialActionNames.isNotEmpty()) {
-                player.updateAvailableActions(initialActionNames)
-            }
-        } else {
-            val (initialCustomLayout, initialActionNames) = parseCustomLayout(FlutterMediaSessionPlugin.instance?.pendingAvailableActions)
-            customLayout = initialCustomLayout
-            if (initialActionNames.isNotEmpty()) {
-                player.updateAvailableActions(initialActionNames)
-            }
+        val layoutSource = currentActionSlots ?: currentAvailableActions
+        val (initialCustomLayout, _) = parseCustomLayout(layoutSource)
+        customLayout = initialCustomLayout
+
+        val combinedInitialActions = mutableSetOf<String>()
+        currentAvailableActions?.forEach { action ->
+            if (action is String) combinedInitialActions.add(action)
+            else if (action is Map<*, *>) (action["name"] as? String)?.takeIf { it.isNotBlank() }?.let { combinedInitialActions.add(it) }
+        }
+        currentActionSlots?.forEach { action ->
+            if (action is String) combinedInitialActions.add(action)
+            else if (action is Map<*, *>) (action["name"] as? String)?.takeIf { it.isNotBlank() }?.let { combinedInitialActions.add(it) }
+        }
+        if (combinedInitialActions.isNotEmpty()) {
+            player.updateAvailableActions(combinedInitialActions.toList())
         }
 
         // Build the session
@@ -643,51 +653,73 @@ class FlutterMediaSessionService : MediaSessionService() {
         if (layoutData == null) {
             activeActionSlotNames = null
             activeCompactIndices = null
-            internalUpdateActions(null)
-            return
-        }
+            currentActionSlots = null
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            val slots = layoutData["slots"] as? List<Any>
+            @Suppress("UNCHECKED_CAST")
+            val compactIndices = layoutData["compactIndices"] as? List<Int>
 
-        @Suppress("UNCHECKED_CAST")
-        val slots = layoutData["slots"] as? List<Any>
-        @Suppress("UNCHECKED_CAST")
-        val compactIndices = layoutData["compactIndices"] as? List<Int>
+            activeCompactIndices = compactIndices
+            currentActionSlots = slots
 
-        activeCompactIndices = compactIndices
-
-        val slotNames = mutableListOf<String>()
-        if (slots != null) {
-            for (item in slots) {
-                if (item is String) {
-                    slotNames.add(item)
-                } else if (item is Map<*, *>) {
-                    (item["name"] as? String)?.takeIf { it.isNotBlank() }?.let { slotNames.add(it) }
+            val slotNames = mutableListOf<String>()
+            if (slots != null) {
+                for (item in slots) {
+                    if (item is String) {
+                        slotNames.add(item)
+                    } else if (item is Map<*, *>) {
+                        (item["name"] as? String)?.takeIf { it.isNotBlank() }?.let { slotNames.add(it) }
+                    }
                 }
             }
+            activeActionSlotNames = slotNames
         }
-        activeActionSlotNames = slotNames
 
-        internalUpdateActions(slots)
+        applyActionsAndLayout()
     }
 
     /**
      * Updates the set of media actions available in the system controls.
      */
     fun updateAvailableActions(actions: List<Any>?) {
-        activeActionSlotNames = null
-        activeCompactIndices = null
-        internalUpdateActions(actions)
+        currentAvailableActions = actions
+        applyActionsAndLayout()
     }
 
-    private fun internalUpdateActions(actions: List<Any>?) {
-        val (newCustomLayout, allActionNames) = parseCustomLayout(actions)
+    private fun applyActionsAndLayout() {
+        val layoutSource = currentActionSlots ?: currentAvailableActions
+        val (newCustomLayout, _) = parseCustomLayout(layoutSource)
         customLayout = newCustomLayout
-        player.updateAvailableActions(if (actions == null) null else allActionNames)
-        
+
+        val combinedActionNames = mutableSetOf<String>()
+        currentAvailableActions?.forEach { action ->
+            if (action is String) {
+                combinedActionNames.add(action)
+            } else if (action is Map<*, *>) {
+                (action["name"] as? String)?.takeIf { it.isNotBlank() }?.let { combinedActionNames.add(it) }
+            }
+        }
+        currentActionSlots?.forEach { action ->
+            if (action is String) {
+                combinedActionNames.add(action)
+            } else if (action is Map<*, *>) {
+                (action["name"] as? String)?.takeIf { it.isNotBlank() }?.let { combinedActionNames.add(it) }
+            }
+        }
+
+        val actionNamesList = if (currentAvailableActions == null && currentActionSlots == null) {
+            null
+        } else {
+            combinedActionNames.toList()
+        }
+        player.updateAvailableActions(actionNamesList)
+
         // Notify all controllers (including legacy controllers) about the new custom layout and updated commands
         mediaSession?.let { session ->
             session.setCustomLayout(customLayout)
             val updatedPlayerCommands = player.availableCommands
-            
+
             val allControllers = mutableSetOf<MediaSession.ControllerInfo>()
             allControllers.addAll(baseControllerCommands.keys)
             allControllers.addAll(session.connectedControllers)
@@ -948,6 +980,8 @@ class FlutterMediaSessionService : MediaSessionService() {
                 }
                 if (actions.contains("seekTo")) {
                     commandsBuilder.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+                    commandsBuilder.add(Player.COMMAND_SEEK_TO_DEFAULT_POSITION)
                 }
                 if (actions.contains("skipToNext")) {
                     commandsBuilder.add(Player.COMMAND_SEEK_TO_NEXT)

@@ -549,7 +549,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _currentDuration = Duration.zero;
       _isBuffering = true;
       _hasError = false;
-      _status = PlaybackStatus.idle;
+      _status = PlaybackStatus.buffering;
       _loadedUrl = current.url;
     });
     _updateAll();
@@ -581,7 +581,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _position = Duration.zero;
       _isBuffering = true;
       _hasError = false;
-      _status = PlaybackStatus.idle;
+      _status = PlaybackStatus.buffering;
     });
     _updatePlayback();
     try {
@@ -1100,10 +1100,8 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
     );
 
     PlaybackStatus status = state._status;
-    if (state._isBuffering) {
+    if (state._isBuffering || state._isSwitchingTrack) {
       status = PlaybackStatus.buffering;
-    } else if (state._isSwitchingTrack) {
-      status = PlaybackStatus.idle;
     }
 
     FlutterMediaSessionPlatform.instance.updatePlaybackState(

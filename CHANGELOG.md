@@ -1,3 +1,11 @@
+## 3.1.0-pre.4
+
+### Bug Fixes
+
+* **Android**: Fixed media notification momentarily disappearing during track changes by maintaining buffering state during track transitions instead of transitioning to idle.
+
+---
+
 ## 3.1.0-pre.3
 
 ### Bug Fixes
