@@ -129,7 +129,9 @@ void main() {
       expect(mock.lastLayout, layout);
     });
 
-    test('allActions includes both play and pause if either is present in slots', () {
+    test(
+        'allActions includes both play and pause if either is present in slots',
+        () {
       final playLayout = ActionSlotLayout([MediaAction.play]);
       expect(playLayout.allActions, contains(MediaAction.play));
       expect(playLayout.allActions, contains(MediaAction.pause));
