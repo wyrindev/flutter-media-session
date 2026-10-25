@@ -193,7 +193,8 @@ class FlutterMediaSession {
   ///
   /// On Android, this arranges the action positions in the system notification
   /// and media controls card, and configures which actions are visible in compact view.
-  /// On other platforms, it enables the corresponding transport controls.
+  /// On other platforms, this has no effect as native system media controls do not
+  /// support slot reordering (use [updateAvailableActions] via the platform instance instead).
   Future<void> setActionLayout(ActionSlotLayout layout) {
     return FlutterMediaSessionPlatform.instance.setActionLayout(layout);
   }

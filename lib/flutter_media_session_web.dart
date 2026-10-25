@@ -160,7 +160,7 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
 
   @override
   Future<void> setActionLayout(ActionSlotLayout layout) async {
-    await updateAvailableActions(layout.allActions);
+    // No-op on web: browser media session controls do not support slot reordering.
   }
 
   @override

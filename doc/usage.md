@@ -225,7 +225,7 @@ FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
 
 ### Action Slot Layout (Android Notification & System Controls)
 
-On Android, action buttons in the `MediaStyle` notification and Android 11+ quick settings media card can be arranged using `ActionSlotLayout`. On other platforms, setting a layout registers and enables the transport buttons included in the layout.
+On Android, action buttons in the `MediaStyle` notification and Android 11+ quick settings media card can be arranged using `ActionSlotLayout`. On other platforms, this is a safe no-op as native media controls do not support slot reordering (use `updateAvailableActions` via `FlutterMediaSessionPlatform.instance` to configure which controls are enabled).
 
 ```dart
 // Symmetrical layout (Spotify / Modern layout):

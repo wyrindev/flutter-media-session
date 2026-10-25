@@ -89,7 +89,7 @@ void main() {
     }
   });
 
-  test('setActionLayout calls updateAvailableActions with allActions on non-Android', () async {
+  test('setActionLayout is a no-op on non-Android platforms', () async {
     final List<MethodCall> calls = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
@@ -107,13 +107,7 @@ void main() {
 
       await platform.setActionLayout(layout);
 
-      expect(calls.length, 1);
-      expect(calls.first.method, 'updateAvailableActions');
-      final List args = calls.first.arguments;
-      expect(args, contains('play'));
-      expect(args, contains('pause'));
-      expect(args, contains('skipToPrevious'));
-      expect(args, contains('skipToNext'));
+      expect(calls, isEmpty);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
