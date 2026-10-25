@@ -160,11 +160,26 @@ void FlutterMediaSessionPlugin::InitSmtc() {
             MediaActionId action_id = (MediaActionId)0;
 
             switch (button) {
-                case SystemMediaTransportControlsButton::Play: action_id = MediaActionId::Play; break;
-                case SystemMediaTransportControlsButton::Pause: action_id = MediaActionId::Pause; break;
+                case SystemMediaTransportControlsButton::Play:
+                    action_id = MediaActionId::Play;
+                    try {
+                        smtc_.PlaybackStatus(MediaPlaybackStatus::Playing);
+                    } catch (...) {}
+                    break;
+                case SystemMediaTransportControlsButton::Pause:
+                    action_id = MediaActionId::Pause;
+                    try {
+                        smtc_.PlaybackStatus(MediaPlaybackStatus::Paused);
+                    } catch (...) {}
+                    break;
                 case SystemMediaTransportControlsButton::Next: action_id = MediaActionId::SkipToNext; break;
                 case SystemMediaTransportControlsButton::Previous: action_id = MediaActionId::SkipToPrevious; break;
-                case SystemMediaTransportControlsButton::Stop: action_id = MediaActionId::Stop; break;
+                case SystemMediaTransportControlsButton::Stop:
+                    action_id = MediaActionId::Stop;
+                    try {
+                        smtc_.PlaybackStatus(MediaPlaybackStatus::Stopped);
+                    } catch (...) {}
+                    break;
                 case SystemMediaTransportControlsButton::FastForward: action_id = MediaActionId::FastForward; break;
                 case SystemMediaTransportControlsButton::Rewind: action_id = MediaActionId::Rewind; break;
                 default: break;
@@ -508,8 +523,12 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
                   }
               }
               try {
-                  smtc_.IsPlayEnabled(hasPlay);
-                  smtc_.IsPauseEnabled(hasPause);
+                  // On Windows SMTC, Play and Pause represent the same toggle button in the UI.
+                  // If either play or pause is supported/available, both must be enabled so SMTC
+                  // can display the Pause button when playing and the Play button when paused.
+                  bool canPlayPause = hasPlay || hasPause;
+                  smtc_.IsPlayEnabled(canPlayPause);
+                  smtc_.IsPauseEnabled(canPlayPause);
                   smtc_.IsNextEnabled(hasNext);
                   smtc_.IsPreviousEnabled(hasPrevious);
                   smtc_.IsStopEnabled(hasStop);

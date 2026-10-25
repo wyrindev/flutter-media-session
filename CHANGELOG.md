@@ -1,3 +1,11 @@
+## 3.1.0-pre.2
+
+### Bug Fixes
+
+* **Windows**: Fixed SMTC play/pause state desynchronization by enabling both play and pause controls when either action is available and applying immediate status updates on transport control clicks.
+
+---
+
 ## 3.1.0-pre.1
 
 ### Features
@@ -15,13 +23,13 @@
 
 ### Bug Fixes
 
-* **Android**: Removed redundant `onStartCommand` media button handling in `FlutterMediaSessionService` to eliminate duplicate event dispatch and prevent state decoupling between the service notification and player callback.
+* **Android**: Removed redundant `onStartCommand` media button handling in `FlutterMediaSessionService` to eliminate duplicate event dispatch and prevent state desynchronization between the service notification and player callback.
 
 ---
 
 ## 3.0.8
 
-### Documentation
+### Improvements
 
 * Added library documentation comments and explicit constructor documentation across public API elements.
 * Fixed unresolved doc references and refined comment formatting for pub.dev analysis.
@@ -87,7 +95,7 @@
 ### Improvements
 
 * Re-exported `flutter_media_session_platform_interface.dart` directly from `flutter_media_session.dart`, allowing custom `MediaSessionAdapter` implementations with a single import.
-* Updated `example/README.md` and `doc/usage.md` snippets to align with 3.x adapter patterns and remove deprecated 2.x API references.
+* Updated `example/README.md` and `doc/usage.md` snippets to align with 3.x adapter patterns and removed deprecated 2.x API references.
 
 ---
 
@@ -115,21 +123,19 @@
 
 ## 3.0.0
 
-This release consolidates the Adapter Pattern API, introduces off-device casting background keep-alive, resolves platform compiler warnings, and removes the deprecated legacy direct-sync APIs from the public class interface.
-
 ### Features
 
-* **Background Keep-Alive (`setBackgroundKeepAlive`)**: An opt-in API that keeps backgrounded sessions alive when audio is rendered off-device (e.g., Chromecast/DLNA). Off by default; uses the best available primitive per platform:
+* **Background Keep-Alive (`setBackgroundKeepAlive`)**: Added an opt-in API that keeps backgrounded sessions alive when audio is rendered off-device (e.g., Chromecast/DLNA). Off by default; uses the best available primitive per platform:
   * **Android**: Partial wake lock (CPU) + high-performance Wi-Fi lock (radio), under `mediaPlayback|connectedDevice` foreground service type.
   * **macOS**: `IOPMAssertion` to prevent idle system sleep.
   * **Windows**: `SetThreadExecutionState` to prevent system sleep.
   * **Web**: Best-effort Screen Wake Lock.
   * **iOS**: No-op (depends on native audio playback).
-* **Android**: Dynamically detects the Android Gradle Plugin (AGP) version to support both older KGP versions and the new built-in Kotlin mechanism in AGP 9.0+, preventing compile errors and JVM target mismatches.
+* **Android**: Added dynamic Android Gradle Plugin (AGP) version detection to support both older KGP versions and the new built-in Kotlin mechanism in AGP 9.0+, preventing compile errors and JVM target mismatches.
 * **Darwin**: Improved thread safety, resource management, and error handling in `MediaSessionManager`.
-* iOS/macOS repeat/shuffle synchronization via `changeShuffleModeCommand` / `changeRepeatModeCommand`.
-* Customizable skip intervals (`setSkipIntervals`).
-* Synchronized `shuffleModeEnabled` with Media3's `SimpleBasePlayer` state on Android.
+* **iOS / macOS**: Added repeat/shuffle synchronization via `changeShuffleModeCommand` / `changeRepeatModeCommand`.
+* Added customizable skip intervals (`setSkipIntervals`).
+* **Android**: Synchronized `shuffleModeEnabled` with Media3's `SimpleBasePlayer` state.
 
 ### Breaking Changes
 
@@ -139,7 +145,7 @@ This release consolidates the Adapter Pattern API, introduces off-device casting
 
 ### Bug Fixes
 
-* **Example**: Fixed reload bug by resetting the loaded URL when deactivating the media session.
+* **Example**: Fixed a reload bug by resetting the loaded URL when deactivating the media session.
 
 ---
 
@@ -153,7 +159,7 @@ This release consolidates the Adapter Pattern API, introduces off-device casting
 
 ### Bug Fixes
 
-* **Example**: Fixed reload bug by resetting the loaded URL when deactivating the media session.
+* **Example**: Fixed a reload bug by resetting the loaded URL when deactivating the media session.
 
 ---
 
@@ -260,7 +266,9 @@ This release consolidates the Adapter Pattern API, introduces off-device casting
 
 Initial release.
 
-* Support for Android (Media3), Windows (SMTC), and Web (Media Session API).
-* Synchronize track metadata (title, artist, album, artwork).
-* Synchronize playback states (playing, paused, position, speed).
-* Receive media actions (play, pause, next, previous) from system controls.
+### Features
+
+* Added support for Android (Media3), Windows (SMTC), and Web (Media Session API).
+* Synchronized track metadata (title, artist, album, artwork).
+* Synchronized playback states (playing, paused, position, speed).
+* Added media action handling (play, pause, next, previous) from system controls.

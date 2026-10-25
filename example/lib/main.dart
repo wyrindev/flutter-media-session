@@ -304,6 +304,7 @@ class _PlayerHomeState extends State<PlayerHome> {
           MediaAction.fastForward,
         if (hasShuffle) _shuffleAction else if (hasStop) MediaAction.stop,
       ];
+      _adapter.syncAvailableActions(_availableActions);
       _adapter.syncActionLayout(ActionSlotLayout(slots));
     } else {
       final slots = <MediaAction>[
@@ -319,6 +320,7 @@ class _PlayerHomeState extends State<PlayerHome> {
         if (hasRepeat) _repeatAction,
         if (hasShuffle) _shuffleAction,
       ];
+      _adapter.syncAvailableActions(_availableActions);
       _adapter.syncActionLayout(ActionSlotLayout(slots));
     }
   }
