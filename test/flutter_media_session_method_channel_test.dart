@@ -88,4 +88,28 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  test('setActionLayout is a no-op on non-Android platforms', () async {
+    final List<MethodCall> calls = [];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+      calls.add(methodCall);
+      return null;
+    });
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      final layout = ActionSlotLayout.symmetrical(
+        skipPrevious: MediaAction.skipToPrevious,
+        playPause: MediaAction.play,
+        skipNext: MediaAction.skipToNext,
+      );
+
+      await platform.setActionLayout(layout);
+
+      expect(calls, isEmpty);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }

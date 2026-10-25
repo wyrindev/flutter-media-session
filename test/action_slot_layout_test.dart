@@ -128,5 +128,21 @@ void main() {
 
       expect(mock.lastLayout, layout);
     });
+
+    test(
+        'allActions includes both play and pause if either is present in slots',
+        () {
+      final playLayout = ActionSlotLayout([MediaAction.play]);
+      expect(playLayout.allActions, contains(MediaAction.play));
+      expect(playLayout.allActions, contains(MediaAction.pause));
+
+      final pauseLayout = ActionSlotLayout([MediaAction.pause]);
+      expect(pauseLayout.allActions, contains(MediaAction.play));
+      expect(pauseLayout.allActions, contains(MediaAction.pause));
+
+      final noPlayPauseLayout = ActionSlotLayout([MediaAction.skipToNext]);
+      expect(noPlayPauseLayout.allActions, isNot(contains(MediaAction.play)));
+      expect(noPlayPauseLayout.allActions, isNot(contains(MediaAction.pause)));
+    });
   });
 }

@@ -63,8 +63,6 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   Future<void> setActionLayout(ActionSlotLayout layout) async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       await methodChannel.invokeMethod('setActionLayout', layout.toJson());
-    } else {
-      await updateAvailableActions(layout.allActions);
     }
   }
 
