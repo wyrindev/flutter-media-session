@@ -1,14 +1,8 @@
 # Windows Setup Guide
 
-This guide explains how to make SMTC correctly show your application's name and icon rather than "Unknown Application".
-
----
-
-## The Identity Challenge
-
-Windows SMTC identifies applications using an **Application User Model ID (AUMID)**. 
-- Packaged apps (MSIX) receive an AUMID assigned by the Windows operating system from their manifest.
-- Classic win32/unpackaged apps running directly from an executable (such as portable `.zip` distributions or `flutter run` dev sessions) do not have an OS-assigned AUMID. In this case, SMTC requires an explicit process AUMID mapped to an installed Start Menu shortcut to resolve the application title and icon.
+SMTC identifies apps by **Application User Model ID (AUMID)**:
+- **Packaged apps (MSIX)**: AUMID is assigned automatically from the manifest.
+- **Unpackaged / portable apps**: No OS-assigned AUMID. SMTC requires an explicit process AUMID mapped to a Start Menu shortcut to resolve the display name and icon.
 
 ---
 
@@ -42,9 +36,9 @@ When packaged as an MSIX (for instance using the [`msix`](https://pub.dev/packag
 
 ---
 
-### 2. Unpackaged / Portable Distribution (`displayName` Registration)
+### 2. Unpackaged / Portable Distribution
 
-For portable desktop distributions (`.zip`) or unpackaged builds without an installer, call `setWindowsAppUserModelId` during early application initialization:
+For portable builds (`.zip`) or unpackaged apps without an installer, call `setWindowsAppUserModelId` during early initialization:
 
 ```dart
 import 'dart:io';
@@ -68,16 +62,16 @@ Future<void> main() async {
 ```
 
 #### Under the Hood
-1. Calls `SetCurrentProcessExplicitAppUserModelID(L"Com.Company.MyApp")` to identify the process to the Windows shell.
-2. Checks for `FOLDERID_Programs` and creates a Start Menu shortcut (`.lnk`) using COM `IShellLinkW` and `IPersistFile`.
+1. Calls `SetCurrentProcessExplicitAppUserModelID` to identify the process to the Windows shell.
+2. Checks `FOLDERID_Programs` and creates a Start Menu shortcut (`.lnk`) via COM `IShellLinkW` and `IPersistFile`.
 3. Sets `PKEY_AppUserModel_ID` on the shortcut's `IPropertyStore` matching the AUMID.
-4. Invokes `SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, ...)` to signal the shell to recognize the new association immediately.
+4. Calls `SHChangeNotify(SHCNE_CREATE, SHCNF_PATH, ...)` to signal the shell to pick up the new association.
 
 ---
 
 ### 3. Custom Installers (Inno Setup / WiX)
 
-If your app uses a traditional Windows installer, configure the installer itself to attach the AUMID property directly to the Start Menu shortcut. When doing this, pass only the `id` in Dart code and omit `displayName`:
+If your app uses a Windows installer, configure it to attach the AUMID property directly to the Start Menu shortcut. Pass only `id` in Dart and omit `displayName`:
 
 #### Dart Initialization
 ```dart

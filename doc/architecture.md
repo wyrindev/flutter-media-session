@@ -1,12 +1,6 @@
 # Architecture & Design Decisions
 
-This document covers the internal design, lifecycle, threading model, and native platform bindings of `flutter_media_session`.
-
----
-
-## 1. Architectural Layers & Federated Design
-
-`flutter_media_session` follows the Flutter federated plugin pattern, separating application-level playback logic, the platform interface contract, and platform-specific native implementations:
+`flutter_media_session` follows the Flutter federated plugin pattern, separating application-level playback logic, the platform interface contract, and platform-specific native implementations.
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -32,18 +26,18 @@ This document covers the internal design, lifecycle, threading model, and native
 
 1. **Player Engine Layer**: Manages decoding, buffering, rendering, and audio hardware output. The core plugin does not import or bundle any audio player packages.
 2. **Adapter Layer (`MediaSessionAdapter`)**: Subscribes to player streams, maps application metadata to `MediaMetadata`, maps playback status to `PlaybackState`, and converts incoming system `MediaAction` events into player function calls.
-3. **Public API (`FlutterMediaSession`)**: Exposes adapter lifecycle binding (`bind`/`unbind`), direct action callbacks (`setActionHandler`), and session configuration methods (`activate`, `deactivate`, `setActionLayout`, `setSkipIntervals`, `setAutoHandleInterruptions`, `setBackgroundKeepAlive`, `setWindowsAppUserModelId`).
-4. **Platform Interface (`FlutterMediaSessionPlatform`)**: Defines the typed contract across all platform implementations and standardizes channel communication.
+3. **Public API (`FlutterMediaSession`)**: Adapter lifecycle binding (`bind`/`unbind`), direct action callbacks (`setActionHandler`), and session configuration (`activate`, `deactivate`, `setActionLayout`, `setSkipIntervals`, `setAutoHandleInterruptions`, `setBackgroundKeepAlive`, `setWindowsAppUserModelId`).
+4. **Platform Interface (`FlutterMediaSessionPlatform`)**: Typed contract across all platform implementations.
 5. **Platform Implementations**:
-   - `MethodChannelFlutterMediaSession`: Uses `MethodChannel('flutter_media_session')` for imperative commands and `EventChannel('flutter_media_session_events')` for action event streaming.
-   - `FlutterMediaSessionWeb`: Direct interop with browser DOM APIs using `package:web`.
+   - `MethodChannelFlutterMediaSession`: `MethodChannel('flutter_media_session')` for imperative commands; `EventChannel('flutter_media_session_events')` for action events.
+   - `FlutterMediaSessionWeb`: Browser DOM interop via `package:web`.
 
 ---
 
 ## 2. Design Rationale: Decoupled Adapter Architecture
 
 Bundling an audio engine inside a media session plugin causes a few concrete problems:
-- **Dependency bloat & version conflicts**: Locking consumers to a specific player (e.g. `just_audio` or `media_kit`) pulls in unneeded native libraries and transitive dependencies for everyone else.
+- **Dependency bloat & version conflicts**: Locking consumers to a specific player pulls in unneeded native libraries and transitive dependencies for everyone else.
 - **Divergent player primitives**: Different engines model state differently. `just_audio` uses `ProcessingState` + `playing`; `media_kit` uses separate `playing`, `buffering`, and `completed` booleans. The adapter isolates this mapping outside the plugin core.
 - **Resource ownership**: Keeping session management separate from playback enables multi-player scenarios, such as crossfading between two player instances while maintaining a single uninterrupted system session.
 
@@ -51,7 +45,7 @@ Bundling an audio engine inside a media session plugin causes a few concrete pro
 
 ## 3. Lifecycle Mechanics & Resource Management
 
-Media sessions interface with shared operating system hubs (notifications, lock screens, Control Center, Windows taskbar). Strict lifecycle transitions ensure proper foreground service handling and prevent resource leaks.
+Media sessions interface with shared OS hubs (notifications, lock screens, Control Center, Windows taskbar). Strict lifecycle transitions prevent resource leaks and ensure proper foreground service handling.
 
 ```
 App Playback Start

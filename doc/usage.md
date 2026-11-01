@@ -1,12 +1,12 @@
 # Usage Guide
 
-This guide covers how to use `flutter_media_session` to sync media metadata and playback state with OS media hubs, handle remote transport commands, and configure platform-specific behaviors.
+> The latest documentation and interactive guides are available at **[docs.wyrin.dev/flutter-media-session](https://docs.wyrin.dev/flutter-media-session)**.
 
 ---
 
 ## 1. Player Adapters
 
-The recommended approach is to implement `MediaSessionAdapter`, which keeps playback engine events separate from media session synchronization.
+The recommended approach is to implement `MediaSessionAdapter`, keeping playback engine events separate from media session synchronization.
 
 Ready-to-use adapter implementations and guides are provided for:
 - **[`just_audio` Adapter Guide](adapters/just_audio.md)**: Full adapter code with queue tracking, stream subscriptions, and lifecycle management for `just_audio`.
@@ -119,7 +119,7 @@ session.unbind();
 
 ## 3. High-Level Action Handling (`setActionHandler`)
 
-If you are not using a full `MediaSessionAdapter` class, you can register high-level action callbacks directly on the `FlutterMediaSession` singleton. This avoids manually listening to and parsing `FlutterMediaSessionPlatform.instance.onMediaAction`:
+Without a full `MediaSessionAdapter`, register action callbacks directly on the singleton to avoid manually parsing `FlutterMediaSessionPlatform.instance.onMediaAction`:
 
 ```dart
 final session = FlutterMediaSession();
@@ -146,7 +146,6 @@ session.clearActionHandler();
 ## 4. Session Lifecycle Management
 
 Session state maps directly to what the OS shows (background services, lock screen widgets, system resources):
-
 ```
 [ Idle ] ── session.activate() ──> [ Active (Service / SMTC Live) ]
                                           │
@@ -178,7 +177,7 @@ Session state maps directly to what the OS shows (background services, lock scre
 
 ## 5. Direct State & Action APIs
 
-For low-level control or standalone synchronization without an adapter, interact directly with `FlutterMediaSessionPlatform.instance`:
+For low-level control without an adapter, interact directly with `FlutterMediaSessionPlatform.instance`:
 
 ```dart
 // 1. Update metadata
@@ -223,9 +222,9 @@ FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
 
 ## 6. Platform-Specific Configuration
 
-### Action Slot Layout (Android Notification & System Controls)
+### Action Slot Layout (Android)
 
-On Android, action buttons in the `MediaStyle` notification and Android 11+ quick settings media card can be arranged using `ActionSlotLayout`. On other platforms, this is a safe no-op as native media controls do not support slot reordering (use `updateAvailableActions` via `FlutterMediaSessionPlatform.instance` to configure which controls are enabled).
+On Android, action buttons in the `MediaStyle` notification and Android 11+ quick settings media card can be arranged using `ActionSlotLayout`. On other platforms this is a no-op — use `updateAvailableActions` via `FlutterMediaSessionPlatform.instance` to control which controls are enabled.
 
 ```dart
 // Symmetrical layout (Spotify / Modern layout):
@@ -281,7 +280,7 @@ await session.setActionLayout(
 
 The plugin's `AndroidManifest.xml` declares `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `WAKE_LOCK`, and `ACCESS_WIFI_STATE` to support off-device casting via `setBackgroundKeepAlive`.
 
-If your application only plays local audio and does not require off-device keep-alive, you can strip these permissions and update the foreground service type using Android Gradle's Manifest Merger in `android/app/src/main/AndroidManifest.xml`:
+If your app only plays local audio, strip these permissions via Manifest Merger in `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -324,14 +323,14 @@ await session.setSkipIntervals(
 await session.setAutoHandleInterruptions(true);
 ```
 
-- **Behavior**: When enabled on Android, the plugin requests audio focus (`AUDIOFOCUS_GAIN`) when the state changes to `PlaybackStatus.playing`, and abandons focus on stop/deactivate. Focus loss events are converted into `pause` or `play` actions on the `onMediaAction` stream.
-- **When to disable (Default: `false`)**: If your underlying player engine (`just_audio`, `audioplayers`, etc.) already manages Android audio focus, leave this set to `false`. Otherwise, the plugin's focus request will conflict with the player engine within the same application process.
-- **When to enable**: Use this when playing through custom pipelines or engines that do not handle OS focus (e.g., bare `fvp` or raw video decoders).
-- **Other Platforms**: No-op on iOS, macOS, Windows, and Web (session focus is managed by the OS or audio engine).
+- **Behavior**: On Android, requests `AUDIOFOCUS_GAIN` when playback transitions to `PlaybackStatus.playing`, and abandons focus on stop/deactivate. Focus loss events are converted into `pause` or `play` actions on `onMediaAction`.
+- **Default (`false`)**: If your player engine (`just_audio`, `audioplayers`, etc.) already manages Android audio focus, leave this disabled to avoid conflicting focus requests within the same process.
+- **When to enable**: When using custom pipelines or engines that do not handle OS focus (e.g., bare `fvp` or raw video decoders).
+- **Other platforms**: No-op on iOS, macOS, Windows, and Web.
 
 ### Background Keep-Alive (`setBackgroundKeepAlive`)
 
-For audio streamed or cast off-device (e.g. Google Cast / DLNA sockets), the local audio hardware is idle, leaving the app vulnerable to OS sleep or Doze termination:
+For audio streamed or cast off-device (e.g. Google Cast / DLNA), the local audio hardware is idle, leaving the app vulnerable to OS sleep or Doze termination:
 
 ```dart
 await session.setBackgroundKeepAlive(true);

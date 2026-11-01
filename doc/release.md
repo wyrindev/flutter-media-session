@@ -1,24 +1,19 @@
 # Release & Publishing Guide
 
-This guide details the steps required to prepare, test, and publish releases of `flutter_media_session` to [pub.dev](https://pub.dev/packages/flutter_media_session) and GitHub.
-
 ---
 
 ## 1. Pre-Release Checklist
 
-Before releasing a new version:
-
-1. **Verify Static Analysis and Tests**:
+1. **Verify static analysis and tests**:
    ```bash
    flutter analyze --fatal-infos
    flutter test
    ```
-2. **Format Code**:
+2. **Check formatting**:
    ```bash
    dart format --set-exit-if-changed .
    ```
-3. **Verify Example Project Builds**:
-   Ensure the example builds cleanly across the target platforms:
+3. **Verify example builds**:
    ```bash
    cd example
    flutter pub get
@@ -27,51 +22,40 @@ Before releasing a new version:
    flutter build web
    cd ..
    ```
-4. **Update Version & Changelog**:
-   - Bump version in `pubspec.yaml` following [Semantic Versioning](https://semver.org/):
-     - `MAJOR` for incompatible API changes.
-     - `MINOR` for backwards-compatible new functionality.
-     - `PATCH` for backwards-compatible bug fixes.
-   - Update `CHANGELOG.md` with an entry for the new version detailing bug fixes, new features, and breaking changes.
+4. **Bump version and update changelog**:
+   - Update version in `pubspec.yaml` ([Semantic Versioning](https://semver.org/)).
+   - Add a `CHANGELOG.md` entry for the new version.
 
 ---
 
-## 2. Verification
-
-Before publishing to pub.dev, perform a dry run to validate package structure, licensing, analyzer checks, and pubspec requirements:
+## 2. Dry-Run Verification
 
 ```bash
 dart pub publish --dry-run
 ```
 
-Ensure that:
-- No warnings or errors are raised.
-- No unintended files are included in the package payload (check `.pubignore` if necessary).
-- All dependencies meet pub.dev score and compatibility criteria.
+- No warnings or errors.
+- No unintended files included (check `.pubignore` if needed).
 
 ---
 
-## 3. Tagging and GitHub Release
+## 3. Tag and Push
 
-Once dry-run validation passes and the release commit is on `main`:
-
-1. **Create and Push Git Tag**:
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
-
-2. **Create GitHub Release**:
-   Create a release on GitHub matching the pushed tag (`vX.Y.Z`) and summarize changes from `CHANGELOG.md`.
-
----
-
-## 4. Publishing to Pub.dev
-
-After tagging the release commit, publish the package to pub.dev:
+Push a version tag to trigger the automated release pipeline:
 
 ```bash
-dart pub publish
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
-Authenticate with your Google Account as prompted by the Dart CLI.
+Pushing the tag automatically:
+1. **`release.yml`** — Creates a GitHub Release with a changelog generated from merged PRs since the previous tag. Pre-release tags (`-pre.*`) are skipped.
+2. **`publish.yml`** — Publishes to pub.dev using OIDC. Requires **manual approval** in the `pub.dev` environment on GitHub Actions before the publish step runs.
+
+> To approve: go to **Actions → Publish to pub.dev → the triggered run → Review deployments** and approve the `pub.dev` environment.
+
+---
+
+## 4. Verify Publication
+
+After the Actions run completes, confirm the new version appears on [pub.dev](https://pub.dev/packages/flutter_media_session).

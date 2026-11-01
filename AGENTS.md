@@ -37,9 +37,20 @@ doc/
   usage.md
   architecture.md
   windows_setup.md
-  adapters/just_audio.md
-  adapters/media_kit.md
   release.md
+  adapters/
+    just_audio.md
+    media_kit.md
+  api/                                    # dart doc output (generated, not hand-authored)
+.github/
+  ISSUE_TEMPLATE/
+    bug_report.yml
+    feature_request.yml
+  workflows/
+    ci.yml                                # Runs analyze + test on PRs
+    release.yml                           # Creates GitHub Release on tag push (skips -pre.* tags)
+    publish.yml                           # Publishes to pub.dev; requires manual approval
+  pull_request_template.md
 ```
 
 ---
@@ -54,7 +65,7 @@ await session.activate();
 await session.deactivate();
 ```
 
-`activate()` on Android automatically calls `requestNotificationPermission()` before starting the foreground service. Do **not** call `requestNotificationPermission()` manually.
+`activate()` on Android automatically requests `POST_NOTIFICATIONS` permission before starting the foreground service. Do **not** call `requestNotificationPermission()` manually.
 
 ### Adapter binding
 
@@ -63,7 +74,8 @@ session.bind(adapter);   // Calls adapter.bind(session) internally; unbinds any 
 session.unbind();        // Cancels subscriptions; does NOT deactivate the session
 ```
 
-Never call `adapter.bind()` directly — always go through `session.bind()`.
+- Never call `adapter.bind()` directly — always go through `session.bind()`.
+- Adapters accept an optional `manageLifecycle: true` flag that calls `activate()` on bind and `deactivate()` on unbind automatically.
 
 ### Direct updates (low-level)
 
@@ -76,6 +88,14 @@ await FlutterMediaSessionPlatform.instance.updateAvailableActions({...});
 ```
 
 These methods do **not** exist on the public `FlutterMediaSession` class (removed in 3.0.0).
+
+### Action layout (Android only)
+
+`setActionLayout` is called on `session`, not on the platform instance:
+
+```dart
+await session.setActionLayout(ActionSlotLayout.symmetrical(left: ..., right: ...));
+```
 
 ### MediaAction name strings
 

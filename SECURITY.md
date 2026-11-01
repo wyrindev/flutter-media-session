@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security updates are actively provided for the current major version of `flutter_media_session`.
+Security updates are provided for the current major version only.
 
 | Version | Supported          |
 | :------ | :----------------- |
@@ -14,7 +14,7 @@ Security updates are actively provided for the current major version of `flutter
 
 ## Reporting a Vulnerability
 
-Security is taken seriously. If you discover a security vulnerability, please report it privately rather than creating a public issue.
+If you discover a security vulnerability, report it privately rather than creating a public issue.
 
 ### Preferred Method: GitHub Private Vulnerability Reporting
 You can report security vulnerabilities privately via GitHub:

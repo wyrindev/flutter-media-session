@@ -42,6 +42,8 @@ dependencies:
   flutter_media_session: ^3.1.0-pre.4
 ```
 
+> Full documentation, tutorials, and setup guides are available at **[docs.wyrin.dev/flutter-media-session](https://docs.wyrin.dev/flutter-media-session)**.
+
 ## Platform Prerequisites
 
 ### iOS
@@ -76,7 +78,7 @@ No configuration required.
 
 ### Approach A: Using a Player Adapter (Recommended)
 
-Adapters handle the stream subscriptions and state mapping between your player and the media session. Ready-to-use adapters for `just_audio` and `media_kit` are available in the docs:
+Adapters handle the stream subscriptions and state mapping between your player and the media session. Ready-to-use adapter guides are available on the [Documentation site](https://docs.wyrin.dev/flutter-media-session) and in `doc/adapters/`:
 
 ```dart
 import 'package:flutter_media_session/flutter_media_session.dart';
@@ -138,10 +140,15 @@ session.setActionHandler(
 
 ## Documentation
 
-- **[Usage Guide](doc/usage.md)**: Full API reference, writing custom adapters, configuring Android notification layouts (`ActionSlotLayout`), audio interruption handling, background keep-alive, and high-level callbacks.
-- **[Player Adapter Guides](doc/usage.md#1-player-adapters)**:
-  - **[`just_audio` Adapter](doc/adapters/just_audio.md)**: Implementation and binding guide for `just_audio`.
-  - **[`media_kit` Adapter](doc/adapters/media_kit.md)**: Implementation and binding guide for `media_kit`.
-- **[Windows Setup Guide](doc/windows_setup.md)**: Resolving the "Unknown Application" display name issue via MSIX, Inno Setup, or dynamic runtime shortcut registration.
-- **[Architecture & Design Decisions](doc/architecture.md)**: Platform internals, Android Media3 service lifecycles, iOS/macOS `MediaPlayer` integration, Windows SMTC thread dispatching, and Web MediaSession limits.
-- **[Release Guide](doc/release.md)**: Verification steps, build checks, and publishing procedures.
+For full documentation, guides, and tutorials, visit:
+
+👉 **[docs.wyrin.dev/flutter-media-session](https://docs.wyrin.dev/flutter-media-session)**
+
+For offline reference, local documentation is also included in the repository:
+- **[Usage Guide](doc/usage.md)**: API reference, writing custom adapters, Android notification layouts (`ActionSlotLayout`), audio interruption handling, and background keep-alive.
+- **[Player Adapter Guides](https://docs.wyrin.dev/flutter-media-session/adapters/just_audio)**:
+  - **[`just_audio` Adapter](doc/adapters/just_audio.md)**
+  - **[`media_kit` Adapter](doc/adapters/media_kit.md)**
+- **[Windows Setup Guide](doc/windows_setup.md)**: Resolving the "Unknown Application" display name issue via MSIX or shortcut registration.
+- **[Architecture & Design Decisions](doc/architecture.md)**: Platform internals, foreground service lifecycle, and native thread dispatching.
+- **[Release Guide](doc/release.md)**: Release verification and CI publishing workflow.

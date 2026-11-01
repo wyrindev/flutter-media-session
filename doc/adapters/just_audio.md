@@ -1,12 +1,14 @@
-# `just_audio` Adapter Guide
+# `just_audio` Adapter
 
-This guide provides a production-ready adapter to connect [`just_audio`](https://pub.dev/packages/just_audio) with `flutter_media_session`.
+Integrate [`just_audio`](https://pub.dev/packages/just_audio) with `flutter_media_session`.
+
+> Tested with `just_audio: ^0.9.40` (`>=0.9.0 <1.0.0`).
 
 ---
 
 ## 1. Adapter Implementation
 
-Save this file as `just_audio_media_session_adapter.dart` in your project:
+Save this file as `just_audio_media_session_adapter.dart` in your project (e.g. `lib/services/just_audio_media_session_adapter.dart`):
 
 ```dart
 import 'dart:async';
@@ -251,7 +253,7 @@ class JustAudioMediaSessionAdapter implements MediaSessionAdapter {
 }
 ```
 
-## 2. Usage Example
+## 2. Usage
 
 ```dart
 import 'package:flutter_media_session/flutter_media_session.dart';
@@ -261,13 +263,13 @@ import 'just_audio_media_session_adapter.dart';
 final player = AudioPlayer();
 final session = FlutterMediaSession();
 
-// 1. Activate the system media session
+// Activate session, then bind adapter
 await session.activate();
-
-// 2. Bind the adapter to begin automatic bidirectional syncing
 session.bind(JustAudioMediaSessionAdapter(player));
 
-// 3. Load and play your playlist
+// Or let the adapter manage the session lifecycle automatically:
+// session.bind(JustAudioMediaSessionAdapter(player, manageLifecycle: true));
+
 final playlist = ConcatenatingAudioSource(
   children: [
     AudioSource.uri(
@@ -284,4 +286,80 @@ final playlist = ConcatenatingAudioSource(
 
 await player.setAudioSource(playlist);
 await player.play();
+```
+
+---
+
+## 3. Extending the Adapter
+
+### Custom Metadata Mapping
+
+If your app uses custom model classes (e.g. `SongItem`) instead of `Map` for `AudioSource.tag`, pass `metadataMapper`:
+
+```dart
+final adapter = JustAudioMediaSessionAdapter(
+  player,
+  manageLifecycle: true,
+  metadataMapper: (AudioPlayer player) {
+    final currentItem = player.sequenceState?.currentSource;
+    final tag = currentItem?.tag;
+
+    if (tag is MySongModel) {
+      return MediaMetadata(
+        title: tag.name,
+        artist: tag.singer,
+        album: tag.albumTitle,
+        artworkUri: tag.thumbnailUrl,
+        duration: player.duration ?? Duration.zero,
+      );
+    }
+
+    return MediaMetadata(
+      title: 'Unknown Title',
+      artist: 'Unknown Artist',
+      duration: player.duration ?? Duration.zero,
+    );
+  },
+);
+```
+
+### Custom Actions
+
+For custom notification buttons defined via `setActionLayout`, listen to `onMediaAction` directly:
+
+```dart
+StreamSubscription<MediaAction>? _actionSubscription;
+
+void setupCustomActions() {
+  _actionSubscription = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+    switch (action.name) {
+      case 'favorite':
+        myFavoritesService.toggleLike();
+        break;
+      case 'download':
+        myDownloadService.startDownload();
+        break;
+    }
+  });
+}
+
+void dispose() {
+  _actionSubscription?.cancel();
+}
+```
+
+### Subclassing
+
+To intercept actions or add custom state streams:
+
+```dart
+class MyCustomJustAudioAdapter extends JustAudioMediaSessionAdapter {
+  MyCustomJustAudioAdapter(super.player, {super.manageLifecycle, super.metadataMapper});
+
+  @override
+  void bind(FlutterMediaSession session) {
+    super.bind(session);
+    // Add custom stream subscriptions or analytics here
+  }
+}
 ```

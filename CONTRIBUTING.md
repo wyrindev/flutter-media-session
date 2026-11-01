@@ -1,67 +1,57 @@
-# 🤝 Contributing to flutter_media_session
+# Contributing
 
-First off, thank you for considering contributing to `flutter_media_session`! It's people like you who make this project better for everyone.
-
----
-
-## 🛠️ Development Environment
-
-To ensure compatibility, please use the following SDK versions:
+## Development Environment
 
 - **Flutter SDK**: `>= 3.3.0`
 - **Dart SDK**: `>= 3.3.0 < 4.0.0`
 
-Testing on physical devices is highly recommended, especially for Android and iOS background behavior.
+Testing on physical devices is recommended, especially for Android and iOS background behavior.
 
 ---
 
-## 🐛 Issues
+## Issues
 
-Before creating a new issue, please search existing issues to see if it has already been reported.
+Search existing issues before filing a new one.
 
 ### Bug Reports
-- Use a clear and descriptive title.
-- Provide a minimal reproduction code snippet (MRE).
-- List the affected platforms (Android, iOS, etc.) and device models.
-- Include `flutter doctor -v` output.
+- Use a clear title.
+- Include a minimal reproduction snippet (MRE).
+- List affected platforms and device models.
+- Attach `flutter doctor -v` output.
 
 ### Feature Requests
-- Describe the feature you'd like to see and why it's useful.
-- If possible, suggest an API design that fits the current plugin structure.
+- Describe the use case and, if possible, a proposed API shape.
 
 > [!TIP]
-> Always open an issue to discuss significant changes before starting work on a PR.
+> Open an issue to discuss significant changes before starting a PR.
 
 ---
 
-## 🚀 Pull Requests
+## Pull Requests
 
-When you're ready to contribute code, follow these steps:
-
-### 1. Pre-requisites
-- **Fork** the repository and create your branch from `main`.
-- For changes targeting the `v2` line, open your PR against the `dev/v2` branch.
-- Ensure your code follows the `flutter_lints` rules.
-- **Discuss First**: Unless it's a minor fix (typos, small bug fixes), there should be an associated issue discussed beforehand.
+### 1. Before You Start
+- Fork the repository and branch from `main`.
+- For `v2` changes, target the `dev/v2` branch.
+- Follow `flutter_lints` rules.
+- For anything beyond typos or small bug fixes, there should be a related issue.
 
 ### 2. PR Permissions
-When opening a Pull Request, **ensure that "Allow edits from maintainers" is checked**.
+When opening a Pull Request, **check "Allow edits from maintainers"**.
 
 > [!IMPORTANT]
-> This is a mandatory requirement. It allows us to help with rebasing or minor adjustments to get your code merged faster.
+> This is required — it allows rebasing and minor adjustments without going back and forth.
 
-### 3. Formatting
-We use structured titles for PRs and commit messages:
+### 3. Commit & PR Format
 
-Format: `<type>(<platform>): <description>`
+`<type>(<platform>): <description>`
 
-- **Types**: `feat`, `fix`, `docs`, `refactor`, `style`, `test`, `chore`.
-- **Platforms**: `android`, `ios`, `macos`, `windows`, `web`, `all`, `core`.
+- **Types**: `feat`, `fix`, `docs`, `refactor`, `style`, `test`, `chore`
+- **Platforms**: `android`, `ios`, `macos`, `windows`, `web`, `all`, `core`
 
 **Example**: `feat(android): add support for custom media actions`
 
 ---
 
-## 📜 License
+## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](https://github.com/wyrindev/flutter-media-session/blob/main/LICENSE).
