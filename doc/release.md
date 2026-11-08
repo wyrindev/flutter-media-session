@@ -23,7 +23,7 @@
    cd ..
    ```
 4. **Bump version and update changelog**:
-   - Update version in `pubspec.yaml` ([Semantic Versioning](https://semver.org/)).
+   - Update version in `pubspec.yaml` and `example/pubspec.yaml` ([Semantic Versioning](https://semver.org/)).
    - Add a `CHANGELOG.md` entry for the new version.
 
 ---

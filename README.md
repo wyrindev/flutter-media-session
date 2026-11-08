@@ -39,7 +39,7 @@ Or add `flutter_media_session` manually to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_media_session: ^3.1.0-pre.4
+  flutter_media_session: ^3.1.0
 ```
 
 > Full documentation, tutorials, and setup guides are available at **[docs.wyrin.dev/flutter-media-session](https://docs.wyrin.dev/flutter-media-session)**.
