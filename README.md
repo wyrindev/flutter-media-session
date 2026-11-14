@@ -14,6 +14,29 @@ A Flutter plugin that connects media playback to OS media hubs — Android notif
 
 The plugin handles metadata and remote command routing only. It does not include an audio engine; you bring your own player (`just_audio`, `media_kit`, `audioplayers`, etc.) and wire it in via an adapter.
 
+## Features
+
+- **Cross-platform OS integration** — Android media notifications (Media3), iOS/macOS Lock Screen & Now Playing, Windows SMTC volume flyout, and Web MediaSession API, all from a single Dart API.
+- **Adapter pattern** — drop in a ready-made adapter for `just_audio` or `media_kit` and metadata / playback state sync is handled automatically.
+- **Configurable action slots** — control which transport buttons appear in Android notifications via `ActionSlotLayout`, including custom actions with your own icons.
+- **Remote command routing** — receive play, pause, seek, skip, shuffle, and repeat commands from lock screens, headsets, and system media hubs through a unified callback interface.
+- **Background keep-alive** — optionally acquire a wake lock to sustain playback while the app is backgrounded.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><b>Android</b></td>
+      <td align="center"><b>Web (Chrome)</b></td>
+      <td align="center"><b>Windows 11</b></td>
+    </tr>
+    <tr>
+      <td><img src="doc/img/screenshot/android.png" width="240" alt="Android notification"></td>
+      <td><img src="doc/img/screenshot/web.png" width="240" alt="Chrome media session"></td>
+      <td><img src="doc/img/screenshot/windows.png" width="200" alt="Windows SMTC"></td>
+    </tr>
+  </table>
+</div>
+
 ## Platform Support
 
 | Platform | Minimum Version |

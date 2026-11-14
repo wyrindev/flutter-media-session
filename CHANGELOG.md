@@ -1,40 +1,22 @@
-## 3.1.0-pre.4
-
-### Bug Fixes
-
-* **Android**: Fixed media notification momentarily disappearing during track changes by maintaining buffering state during track transitions instead of transitioning to idle.
-
----
-
-## 3.1.0-pre.3
-
-### Bug Fixes
-
-* **Web**: Fixed media card pause action not updating playback status and button to play by ensuring both play and pause handlers remain registered when either action is available.
-* **Core**: Included both `MediaAction.play` and `MediaAction.pause` in `ActionSlotLayout.allActions` when either action is present in slots.
-* **Core**: Made `setActionLayout` a safe no-op on non-Android platforms, preventing slot layouts from overwriting previously configured available actions.
-* **Darwin**: Ensured both play and pause commands are enabled in `MPRemoteCommandCenter` when either action is available.
-
----
-
-## 3.1.0-pre.2
-
-### Bug Fixes
-
-* **Windows**: Fixed SMTC play/pause state desynchronization by enabling both play and pause controls when either action is available and applying immediate status updates on transport control clicks.
-
----
-
-## 3.1.0-pre.1
+## 3.1.0
 
 ### Features
 
-* **Android**: Added `ActionSlotLayout` and `setActionLayout` to customize media notification button ordering (`symmetrical` and `sequential` presets) and compact view slots.
+* **Android**: Added `ActionSlotLayout` and `setActionLayout` to customize media notification button ordering and compact view slots.
 
 ### Improvements
 
 * **Android**: Cleaned up duplicate media button and action registration logs.
 * **Example**: Added action slot layout configuration in the settings panel.
+
+### Bug Fixes
+
+* **Android**: Fixed media notification momentarily disappearing during track changes by maintaining buffering state during track transitions instead of transitioning to idle.
+* **Web**: Fixed media card pause action not updating playback status and button to play by ensuring both play and pause handlers remain registered when either action is available.
+* **Windows**: Fixed SMTC play/pause state desynchronization by enabling both play and pause controls when either action is available and applying immediate status updates on transport control clicks.
+* **Core**: Included both `MediaAction.play` and `MediaAction.pause` in `ActionSlotLayout.allActions` when either action is present in slots.
+* **Core**: Made `setActionLayout` a safe no-op on non-Android platforms, preventing slot layouts from overwriting previously configured available actions.
+* **Darwin**: Ensured both play and pause commands are enabled in `MPRemoteCommandCenter` when either action is available.
 
 ---
 
