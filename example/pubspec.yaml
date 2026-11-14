@@ -19,6 +19,7 @@ dependencies:
   window_manager: ^0.4.3
   package_info_plus: ^10.2.1
   shared_preferences: ^2.2.0
+  material_ui: ^1.11.0
 
 dev_dependencies:
   integration_test:
