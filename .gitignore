@@ -40,10 +40,10 @@ unlinked_spec.ds
 
 # Android related
 **/android/**/gradle-wrapper.jar
+!**/android/gradle/wrapper/gradle-wrapper.properties
 .gradle/
 **/android/.gradle
 **/android/captures/
-**/android/gradle/
 **/android/gradlew
 **/android/gradlew.bat
 **/android/local.properties

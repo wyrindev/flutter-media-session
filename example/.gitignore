@@ -38,7 +38,7 @@ migrate_working_dir/
 /android/flutter_media_session_example_android.iml
 /android/.gradle
 /android/captures/
-/android/gradle/
+/android/gradle/wrapper/gradle-wrapper.jar
 /android/.cxx
 /android/.externalNativeBuild
 /android/app/debug/
