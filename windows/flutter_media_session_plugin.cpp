@@ -559,7 +559,7 @@ void FlutterMediaSessionPlugin::HandleMethodCall(
       result->Success();
   } else if (method_name == "requestNotificationPermission") {
       result->Success(flutter::EncodableValue(true));
-  } else if (method_name == "setWindowsAppUserModelId") {
+  } else if (method_name == "setWindowsAppUserModelId" || method_name == "setAppId") {
       UINT32 length = 0;
       if (GetCurrentPackageFullName(&length, NULL) != APPMODEL_ERROR_NO_PACKAGE) {
           // Successfully retrieved package name, indicating MSIX

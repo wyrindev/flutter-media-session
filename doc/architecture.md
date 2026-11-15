@@ -21,12 +21,13 @@
 │  - Android (Media3)       │ │ (HTML5 MediaSession API) │
 │  - Darwin (iOS / macOS)   │ └──────────────────────────┘
 │  - Windows (SMTC)         │
+│  - Linux (D-Bus MPRIS 2)  │
 └───────────────────────────┘
 ```
 
 1. **Player Engine Layer**: Manages decoding, buffering, rendering, and audio hardware output. The core plugin does not import or bundle any audio player packages.
 2. **Adapter Layer (`MediaSessionAdapter`)**: Subscribes to player streams, maps application metadata to `MediaMetadata`, maps playback status to `PlaybackState`, and converts incoming system `MediaAction` events into player function calls.
-3. **Public API (`FlutterMediaSession`)**: Adapter lifecycle binding (`bind`/`unbind`), direct action callbacks (`setActionHandler`), and session configuration (`activate`, `deactivate`, `setActionLayout`, `setSkipIntervals`, `setAutoHandleInterruptions`, `setBackgroundKeepAlive`, `setWindowsAppUserModelId`).
+3. **Public API (`FlutterMediaSession`)**: Adapter lifecycle binding (`bind`/`unbind`), direct action callbacks (`setActionHandler`), and session configuration (`activate`, `deactivate`, `setActionLayout`, `setSkipIntervals`, `setAutoHandleInterruptions`, `setBackgroundKeepAlive`, `setAppId`, and deprecated `setWindowsAppUserModelId`).
 4. **Platform Interface (`FlutterMediaSessionPlatform`)**: Typed contract across all platform implementations.
 5. **Platform Implementations**:
    - `MethodChannelFlutterMediaSession`: `MethodChannel('flutter_media_session')` for imperative commands; `EventChannel('flutter_media_session_events')` for action events.
@@ -56,6 +57,7 @@ App Playback Start
        │      ├── iOS: Configures `AVAudioSession` category `.playback`, registers `MPRemoteCommandCenter`.
        │      ├── macOS: Registers `MPRemoteCommandCenter` handlers.
        │      ├── Windows: Calls `GetForWindow(HWND)` to initialize SMTC.
+       │      ├── Linux: Owns D-Bus name `org.mpris.MediaPlayer2.<app>.instance<PID>` and exports MPRIS 2 interfaces.
        │      └── Web: Binds action handlers on `navigator.mediaSession`.
        │
        ├──> `FlutterMediaSession.bind(adapter)`
@@ -71,6 +73,7 @@ App Playback Stop / Teardown
               ├── Android: Calls `stopForeground(STOP_FOREGROUND_REMOVE)` and stops the service.
               ├── iOS/macOS: Clears `MPNowPlayingInfoCenter.default().nowPlayingInfo` and releases commands.
               ├── Windows: Disables SMTC (`smtc.IsEnabled(false)`).
+              ├── Linux: Unregisters MPRIS 2 D-Bus objects and releases the D-Bus bus name.
               └── Web: Sets `navigator.mediaSession.playbackState = 'none'`.
 ```
 
@@ -116,9 +119,26 @@ App Playback Stop / Teardown
   - Supports local artwork files by brokering access via `StorageFile::GetFileFromPathAsync` and `RandomAccessStreamReference::CreateFromFile`.
 - **App Identification (AUMID)**:
   - If packaged with MSIX, the OS automatically resolves the identity.
-  - For unpackaged apps, `setWindowsAppUserModelId` invokes `SetCurrentProcessExplicitAppUserModelID` and dynamically creates a Start Menu shortcut (`IShellLinkW` + `IPropertyStore`) matching the AUMID to resolve the display name in SMTC.
+  - For unpackaged apps, `setAppId` (and deprecated `setWindowsAppUserModelId`) invokes `SetCurrentProcessExplicitAppUserModelID` and dynamically creates a Start Menu shortcut (`IShellLinkW` + `IPropertyStore`) matching the AUMID to resolve the display name in SMTC.
 - **Keep-Alive**:
   - Calls `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)` when `setBackgroundKeepAlive(true)` is invoked, preventing system sleep.
+
+### Linux: D-Bus MPRIS 2 Architecture
+
+- **Core Framework**: Built directly with GDBus (`gio/gio.h`) and GLib, requiring no external MPRIS daemons or heavy C++ wrappers.
+- **D-Bus Object & Bus Registration**:
+  - Upon `activate()`, acquires the session bus and owns the well-known name `org.mpris.MediaPlayer2.<app>.instance<PID>`.
+  - Exports standard MPRIS 2 interfaces on `/org/mpris/MediaPlayer2`:
+    - `org.mpris.MediaPlayer2`: Root properties (`Identity`, `DesktopEntry`, `CanQuit`, `CanRaise`).
+    - `org.mpris.MediaPlayer2.Player`: Playback methods (`Play`, `Pause`, `PlayPause`, `Stop`, `Next`, `Previous`, `Seek`, `SetPosition`) and properties (`PlaybackStatus`, `Metadata`, `Position`, `Rate`, `LoopStatus`, `Shuffle`, `Volume`).
+- **App Identity**:
+  - `setAppId(appId, displayName: ...)` sets `DesktopEntry` to `<appId>` (without `.desktop`) and updates `Identity` to `displayName` (or falls back to `appId`).
+- **Property Change Notifications**:
+  - Emits `org.freedesktop.DBus.Properties.PropertiesChanged` signals whenever metadata, playback status, rate, loop status, or volume changes.
+- **Event Dispatch**:
+  - Incoming method calls from MPRIS clients (`playerctl`, GNOME Shell, KDE plasma media controller) are routed to the Flutter event sink.
+- **Deactivation**:
+  - Upon `deactivate()`, unregisters exported object paths and releases the bus name.
 
 ### Web: W3C Media Session API
 

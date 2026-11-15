@@ -40,7 +40,7 @@ jobs:
         run: flutter test
 
   build_android:
-    name: Build Android (APK)
+    name: Build Android
     needs: analyze_and_test
     runs-on: ubuntu-latest
     steps:
@@ -52,6 +52,9 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -143,6 +146,36 @@ jobs:
 
       - name: Build Windows App
         run: flutter build windows --debug
+        working-directory: example
+
+  build_linux:
+    name: Build Linux
+    needs: analyze_and_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Install example dependencies
+        run: flutter pub get
+        working-directory: example
+
+      - name: Build Linux App
+        run: flutter build linux --debug
         working-directory: example
 
   build_web:

@@ -8,11 +8,11 @@
 [![pub points](https://img.shields.io/pub/points/flutter_media_session)](https://pub.dev/packages/flutter_media_session/score)
 [![CI](https://github.com/wyrindev/flutter-media-session/actions/workflows/ci.yml/badge.svg)](https://github.com/wyrindev/flutter-media-session/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Web-blue.svg)](https://pub.dev/packages/flutter_media_session)
+[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-blue.svg)](https://pub.dev/packages/flutter_media_session)
 
-A Flutter plugin that connects media playback to OS media hubs — Android notifications, iOS Lock Screen & Dynamic Island, macOS Control Center, Windows SMTC, and the Web Media Session API.
+A Flutter plugin that connects media playback, background audio service, and hardware media buttons to OS media hubs — Android notifications, iOS Lock Screen & Dynamic Island, macOS Control Center, Windows SMTC, Linux MPRIS, and the Web Media Session API.
 
-The plugin handles metadata and remote command routing only. It does not include an audio engine; you bring your own player (`just_audio`, `media_kit`, `audioplayers`, etc.) and wire it in via an adapter.
+Handle lock screen controls, headset/keyboard media buttons (play, pause, next, prev, seek), background playback keep-alive, and playback metadata without bundling a heavyweight audio player. Wire it directly into your own player (`just_audio`, `media_kit`, `audioplayers`, etc.) via lightweight adapters.
 
 ## Features
 
@@ -45,10 +45,10 @@ The plugin handles metadata and remote command routing only. It does not include
 | <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;"> iOS | iOS 12.0+ |
 | <img src="doc/img/platform/apple.svg" alt="Apple" width="18" style="vertical-align: middle;"> macOS | macOS 10.15+ |
 | <img src="doc/img/platform/windows.svg" alt="Windows" width="18" style="vertical-align: middle;"> Windows | Windows 10 1809+ (Build 17763+) |
+| <img src="doc/img/platform/tux.svg" alt="Linux" width="18" style="vertical-align: middle;"> Linux | D-Bus MPRIS 2 |
 | Web | Modern Browsers |
-| <img src="doc/img/platform/tux.svg" alt="Linux" width="18" style="vertical-align: middle;"> Linux | Planned (MPRIS) |
 
-> For architecture and native backend details (Media3, MediaPlayer, SMTC), see the [Architecture Guide](doc/architecture.md).
+> For architecture and native backend details, see the [Architecture Guide](doc/architecture.md).
 
 ## Installation
 
@@ -62,7 +62,7 @@ Or add `flutter_media_session` manually to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_media_session: ^3.1.0
+  flutter_media_session: ^3.2.0
 ```
 
 > Full documentation, tutorials, and setup guides are available at **[docs.wyrin.dev/flutter-media-session](https://docs.wyrin.dev/flutter-media-session)**.
@@ -92,6 +92,11 @@ To keep media controls responsive and receive remote commands while your applica
 
 - **Packaged Apps (MSIX)**: When packaged via MSIX, Windows assigns the App User Model ID (AUMID) automatically from the manifest. No configuration required.
 - **Unpackaged / Portable Apps**: To display your application's name and icon instead of "Unknown Application" in the volume flyout, refer to the [Windows Setup Guide](doc/windows_setup.md).
+
+### Linux
+
+- **Build Dependencies**: Requires `clang`, `cmake`, `ninja-build`, `pkg-config`, and `libgtk-3-dev`.
+- **Runtime**: Connects directly to the session bus via GDBus and exports MPRIS 2 interfaces (`org.mpris.MediaPlayer2`). No additional runtime daemon required. For details, see the [Linux Setup Guide](doc/linux_setup.md).
 
 ### macOS & Web
 
@@ -173,5 +178,6 @@ For offline reference, local documentation is also included in the repository:
   - **[`just_audio` Adapter](doc/adapters/just_audio.md)**
   - **[`media_kit` Adapter](doc/adapters/media_kit.md)**
 - **[Windows Setup Guide](doc/windows_setup.md)**: Resolving the "Unknown Application" display name issue via MSIX or shortcut registration.
+- **[Linux Setup Guide](doc/linux_setup.md)**: Build requirements, MPRIS 2 D-Bus interface mapping, and `playerctl` verification.
 - **[Architecture & Design Decisions](doc/architecture.md)**: Platform internals, foreground service lifecycle, and native thread dispatching.
 - **[Release Guide](doc/release.md)**: Release verification and CI publishing workflow.
