@@ -26,8 +26,8 @@ Future<void> main() async {
       await windowManager.focus();
     });
   }
-  if (!kIsWeb && Platform.isWindows) {
-    await FlutterMediaSession().setWindowsAppUserModelId(
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    await FlutterMediaSession().setAppId(
       'dev.wyrin.flutter_media_session_example',
       displayName: 'Flutter Media Session Example',
     );

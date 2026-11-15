@@ -74,6 +74,16 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'requestNotificationPermission() has not been implemented.');
   }
 
+  /// Sets the application identity (App ID / AUMID / DesktopEntry) for the current process.
+  ///
+  /// On Windows, this sets the AppUserModelID (AUMID) and can create a Start Menu shortcut
+  /// with [displayName] and [iconPath] for unpackaged/portable apps.
+  /// On Linux, this sets the MPRIS `DesktopEntry` (to associate with `.desktop` files)
+  /// and `Identity` (with [displayName]).
+  Future<void> setAppId(String id, {String? displayName, String? iconPath}) {
+    throw UnimplementedError('setAppId() has not been implemented.');
+  }
+
   /// Sets the AppUserModelID for the current process on Windows.
   ///
   /// This is used by Windows to identify the application in the system media center.
@@ -85,10 +95,10 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   /// you should **omit** [displayName] to avoid creating duplicate shortcuts.
   ///
   /// This method is only effective on Windows.
+  @Deprecated('Use setAppId instead. Deprecated starting in v4.0.0-pre.1.')
   Future<void> setWindowsAppUserModelId(String id,
       {String? displayName, String? iconPath}) {
-    throw UnimplementedError(
-        'setWindowsAppUserModelId() has not been implemented.');
+    return setAppId(id, displayName: displayName, iconPath: iconPath);
   }
 
   /// Sets the preferred skip intervals for rewind (backward) and fast-forward (forward) commands.

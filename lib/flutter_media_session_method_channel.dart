@@ -74,13 +74,19 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
-  Future<void> setWindowsAppUserModelId(String id,
+  Future<void> setAppId(String id,
       {String? displayName, String? iconPath}) async {
-    await methodChannel.invokeMethod('setWindowsAppUserModelId', {
+    await methodChannel.invokeMethod('setAppId', {
       'id': id,
       if (displayName != null) 'displayName': displayName,
       if (iconPath != null) 'iconPath': iconPath,
     });
+  }
+
+  @override
+  Future<void> setWindowsAppUserModelId(String id,
+      {String? displayName, String? iconPath}) async {
+    await setAppId(id, displayName: displayName, iconPath: iconPath);
   }
 
   @override
