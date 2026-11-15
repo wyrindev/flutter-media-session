@@ -53,6 +53,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
