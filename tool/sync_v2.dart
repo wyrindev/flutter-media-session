@@ -44,13 +44,13 @@ void main(List<String> args) async {
   // Ensure origin/support/v2 and tags are fetched
   await _runGit(['fetch', 'origin', 'support/v2', '--tags']);
 
-  // 2. Find previous v3 tag
+  // 2. Find previous v3 tag (filtering out -pre.* tags for stable comparison)
   final allTagsRes = await _runGit(['tag', '-l', 'v3.*']);
   final v3Tags = allTagsRes.stdout
       .toString()
       .split('\n')
       .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
+      .where((s) => s.isNotEmpty && !s.contains('-pre.'))
       .toList();
 
   v3Tags.sort((a, b) {
@@ -90,10 +90,12 @@ void main(List<String> args) async {
       'android/',
       'darwin/',
       'windows/',
+      'linux/',
       'test/',
-      'example/'
+      'example/',
+      'doc/'
     ];
-    final syncableFiles = ['README.md', 'pubspec.yaml'];
+    final syncableFiles = ['README.md', 'pubspec.yaml', 'CHANGELOG.md'];
 
     final hasSyncableChanges = changedFiles.any((file) {
       if (syncableFiles.contains(file)) return true;
@@ -102,7 +104,7 @@ void main(List<String> args) async {
 
     if (!hasSyncableChanges) {
       print(
-          '✅ No syncable files (lib, native, tests, example, README, pubspec) changed in $tagName.');
+          '✅ No syncable files (lib, native, doc, tests, example, README, pubspec) changed in $tagName.');
       print('⏩ Skipping v2 sync.');
       return;
     }
@@ -157,7 +159,7 @@ void main(List<String> args) async {
     await _ensureGitConfigured(worktreePath);
 
     // Copy syncable directories/files from current v3 tag/HEAD to worktree
-    final syncDirs = ['lib', 'android', 'darwin', 'windows', 'test', 'example'];
+    final syncDirs = ['lib', 'android', 'darwin', 'windows', 'linux', 'test', 'example', 'doc'];
     for (final dir in syncDirs) {
       final targetDir = Directory('$worktreePath/$dir');
       if (targetDir.existsSync()) {
@@ -169,10 +171,35 @@ void main(List<String> args) async {
       }
     }
 
+    // Clean up docs.wyrin.dev links in doc/ to ensure local and offline parity
+    final docDir = Directory('$worktreePath/doc');
+    if (docDir.existsSync()) {
+      for (final entity in docDir.listSync(recursive: true)) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          var docContent = entity.readAsStringSync();
+          if (docContent.contains('docs.wyrin.dev')) {
+            // Remove banner quote for docs.wyrin.dev if present
+            docContent = docContent.replaceAll(
+              RegExp(r'> The latest documentation and interactive guides are available at \*\*\[docs\.wyrin\.dev[^\n]*\n*', multiLine: true),
+              '',
+            );
+            docContent = docContent.replaceAll(
+              'https://docs.wyrin.dev/flutter-media-session',
+              'https://github.com/wyrindev/flutter-media-session/tree/support/v2/doc',
+            );
+            docContent = docContent.replaceAll('docs.wyrin.dev/flutter-media-session', 'github.com/wyrindev/flutter-media-session/tree/support/v2/doc');
+            entity.writeAsStringSync(docContent);
+          }
+        }
+      }
+    }
+
     // Process pubspec.yaml in v2 worktree
     final v2PubspecFile = File('$worktreePath/pubspec.yaml');
-    if (v2PubspecFile.existsSync()) {
-      var content = v2PubspecFile.readAsStringSync();
+    final srcPubspecFile = File('pubspec.yaml');
+    if (v2PubspecFile.existsSync() && srcPubspecFile.existsSync()) {
+      // Use latest pubspec schema (including linux platform declaration) but preserve version
+      var content = srcPubspecFile.readAsStringSync();
       content = content.replaceFirst(
         RegExp(r'^version:\s*.*$', multiLine: true),
         'version: $newV2Version',
@@ -190,6 +217,24 @@ void main(List<String> args) async {
         'flutter_media_session: ^$newV2Version',
       );
 
+      // Clean up docs.wyrin.dev references
+      readmeContent = readmeContent.replaceAll(
+        RegExp(r'> Full documentation, tutorials, and setup guides are available at \*\*\[docs\.wyrin\.dev[^\n]*\n*', multiLine: true),
+        '',
+      );
+      readmeContent = readmeContent.replaceAll(
+        RegExp(r'👉 \*\*\[docs\.wyrin\.dev[^\n]*\n*', multiLine: true),
+        '',
+      );
+      readmeContent = readmeContent.replaceAll(
+        'https://docs.wyrin.dev/flutter-media-session/adapters/just_audio',
+        'doc/adapters/just_audio.md',
+      );
+      readmeContent = readmeContent.replaceAll(
+        'on the [Documentation site](https://docs.wyrin.dev/flutter-media-session) and in `doc/adapters/`:',
+        'in `doc/adapters/`:',
+      );
+
       // Adjust note under installation section to clarify v2 maintenance status and link to main branch docs
       final v3NotePattern = RegExp(
         r'> \*\*Note\*\*: Version 3\.x is a complete architectural overhaul\.[^\n]*',
@@ -201,6 +246,15 @@ void main(List<String> args) async {
       if (v3NotePattern.hasMatch(readmeContent)) {
         readmeContent =
             readmeContent.replaceFirst(v3NotePattern, v2NoteReplacement);
+      } else {
+        // Insert after installation codeblock if not already present
+        final installMatch = RegExp(r'(```yaml[\s\S]*?flutter_media_session: \^' + RegExp.escape(newV2Version.toString()) + r'[\s\S]*?```)');
+        if (installMatch.hasMatch(readmeContent)) {
+          readmeContent = readmeContent.replaceFirst(
+            installMatch,
+            '${installMatch.firstMatch(readmeContent)!.group(0)}\n\n$v2NoteReplacement',
+          );
+        }
       }
 
       File('$worktreePath/README.md').writeAsStringSync(readmeContent);
@@ -242,23 +296,20 @@ void main(List<String> args) async {
       return;
     }
 
-    final newTagName = 'v$newV2Version';
-
     if (is100PercentSafe) {
       print(
-          '✅ Codebase is 100% verified. Directly committing and pushing to support/v2...');
+          '✅ Codebase is 100% verified. Directly committing to support/v2...');
       await _runGit(['-C', worktreePath, 'add', '.']);
       await _runGit([
         '-C',
         worktreePath,
         'commit',
         '-m',
-        'chore(v2): sync v3 updates for release $newV2Version',
+        'chore(v2): sync $tagName updates for release $newV2Version',
       ]);
-      await _runGit(['-C', worktreePath, 'tag', newTagName]);
-      await _runGit(
-          ['-C', worktreePath, 'push', 'origin', 'HEAD:support/v2', '--tags']);
-      print('🎉 Successfully updated support/v2 and pushed tag $newTagName');
+      // Update local support/v2 ref to point to this new commit
+      await _runGit(['fetch', worktreePath, 'HEAD:support/v2']);
+      print('🎉 Successfully updated local support/v2 to release $newV2Version');
     } else {
       print(
           '⚠️ Validation checks failed or require review. Opening Pull Request...');
@@ -400,7 +451,12 @@ Future<ProcessResult> _runGit(List<String> args) {
 
 Future<ProcessResult> _runProcess(String executable, List<String> args,
     {String? workingDirectory}) {
-  return Process.run(executable, args, workingDirectory: workingDirectory);
+  final resolvedExecutable =
+      Platform.isWindows && !executable.endsWith('.bat') && !executable.endsWith('.exe')
+          ? '$executable.bat'
+          : executable;
+  return Process.run(resolvedExecutable, args,
+      workingDirectory: workingDirectory, runInShell: true);
 }
 
 class _SemVer implements Comparable<_SemVer> {
