@@ -34,6 +34,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
     private var pendingMetadata: Map<String, Any?>? = null
     private var pendingPlaybackState: Map<String, Any?>? = null
     var pendingAvailableActions: List<Any>? = null
+    var pendingActionLayout: Map<String, Any?>? = null
     private var pendingActivateResult: Result? = null
     /**
      * When true, the service requests audio focus while playing and forwards
@@ -159,6 +160,16 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                     FlutterMediaSessionService.instance?.updateAvailableActions(actions)
                 } else {
                     pendingAvailableActions = actions
+                }
+                result.success(null)
+            }
+            "setActionLayout" -> {
+                @Suppress("UNCHECKED_CAST")
+                val layoutData = call.arguments as? Map<String, Any?>
+                if (FlutterMediaSessionService.instance != null) {
+                    FlutterMediaSessionService.instance?.setActionLayout(layoutData)
+                } else {
+                    pendingActionLayout = layoutData
                 }
                 result.success(null)
             }
@@ -378,6 +389,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
         pendingAvailableActions?.let {
             service.updateAvailableActions(it)
             pendingAvailableActions = null
+        }
+
+        pendingActionLayout?.let {
+            service.setActionLayout(it)
+            pendingActionLayout = null
         }
     }
 }

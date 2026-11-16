@@ -1,6 +1,6 @@
 name: flutter_media_session
-description: "Sync media metadata and playback state with system controls on Android, iOS, macOS, Windows, and Web."
-version: 2.5.1
+description: "Sync media metadata, background audio playback, and hardware media buttons with OS controls across Android, iOS, macOS, Windows, Linux, and Web."
+version: 2.6.0
 homepage: https://github.com/wyrindev/flutter-media-session
 repository: https://github.com/wyrindev/flutter-media-session
 issue_tracker: https://github.com/wyrindev/flutter-media-session/issues
@@ -38,6 +38,8 @@ flutter:
         sharedDarwinSource: true
       windows:
         pluginClass: FlutterMediaSessionPluginCApi
+      linux:
+        pluginClass: FlutterMediaSessionPlugin
       web:
         pluginClass: FlutterMediaSessionWeb
         fileName: flutter_media_session_web.dart
@@ -54,4 +56,5 @@ platforms:
   ios:
   macos:
   windows:
+  linux:
   web:

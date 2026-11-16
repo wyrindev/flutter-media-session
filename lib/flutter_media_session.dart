@@ -4,12 +4,14 @@ library;
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 import 'src/adapters/media_session_adapter.dart';
 import 'flutter_media_session_platform_interface.dart';
 
 export 'src/models/media_metadata.dart';
 export 'src/models/playback_state.dart';
 export 'src/models/media_action.dart';
+export 'src/models/action_slot_layout.dart';
 export 'src/adapters/media_session_adapter.dart';
 export 'flutter_media_session_platform_interface.dart';
 
@@ -131,6 +133,17 @@ class FlutterMediaSession {
     return FlutterMediaSessionPlatform.instance.deactivate();
   }
 
+  /// Sets the application identity (App ID / AUMID / DesktopEntry) for the current process.
+  ///
+  /// On Windows, this sets the AppUserModelID (AUMID) and can create a Start Menu shortcut
+  /// with [displayName] and [iconPath] for unpackaged/portable apps.
+  /// On Linux, this sets the MPRIS `DesktopEntry` (to associate with `.desktop` files)
+  /// and `Identity` (with [displayName]).
+  Future<void> setAppId(String id, {String? displayName, String? iconPath}) {
+    return FlutterMediaSessionPlatform.instance
+        .setAppId(id, displayName: displayName, iconPath: iconPath);
+  }
+
   /// Sets the AppUserModelID for the current process on Windows.
   ///
   /// This is used by Windows to identify the application in the system media center.
@@ -142,10 +155,10 @@ class FlutterMediaSession {
   /// you should **omit** [displayName] to avoid creating duplicate shortcuts.
   ///
   /// This method is only effective on Windows.
+  @Deprecated('Use setAppId instead. Deprecated starting in v4.0.0-pre.1.')
   Future<void> setWindowsAppUserModelId(String id,
       {String? displayName, String? iconPath}) {
-    return FlutterMediaSessionPlatform.instance.setWindowsAppUserModelId(id,
-        displayName: displayName, iconPath: iconPath);
+    return setAppId(id, displayName: displayName, iconPath: iconPath);
   }
 
   /// Sets the preferred skip intervals for rewind (backward) and fast-forward (forward) commands.
@@ -185,5 +198,15 @@ class FlutterMediaSession {
   /// such as a Chromecast or DLNA socket on the local network.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
+  }
+
+  /// Sets the customizable action slot layout for system media controls.
+  ///
+  /// On Android, this arranges the action positions in the system notification
+  /// and media controls card, and configures which actions are visible in compact view.
+  /// On other platforms, this has no effect as native system media controls do not
+  /// support slot reordering (use [updateAvailableActions] via the platform instance instead).
+  Future<void> setActionLayout(ActionSlotLayout layout) {
+    return FlutterMediaSessionPlatform.instance.setActionLayout(layout);
   }
 }

@@ -1,3 +1,16 @@
+## 2.6.0
+
+### Features
+
+* **Linux**: Added native MPRIS 2 support via D-Bus (`org.mpris.MediaPlayer2`), enabling media controls in GNOME, KDE Plasma, Cinnamon, XFCE, and other desktop environments, as well as CLI tools such as `playerctl`.
+* **Core**: Added `setAppId(String id, {String? displayName, String? iconPath})` as a unified cross-platform replacement for `setWindowsAppUserModelId`. On Windows it sets the AUMID; on Linux it sets the MPRIS `DesktopEntry` and `Identity`.
+
+### Deprecations
+
+* **Core**: `setWindowsAppUserModelId` is deprecated in favour of `setAppId`. It will be removed in `v4.0.0`. Migrate by renaming the call and removing the `Platform.isWindows` guard where appropriate.
+
+---
+
 ## 2.5.1
 
 ### Bug Fixes

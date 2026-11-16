@@ -43,6 +43,9 @@ class FakePlatform
   }
 
   @override
+  Future<void> setActionLayout(ActionSlotLayout layout) => Future.value();
+
+  @override
   Future<bool> requestNotificationPermission() => Future.value(true);
 
   @override
@@ -58,6 +61,10 @@ class FakePlatform
 
   @override
   Stream<MediaAction> get onMediaAction => actionController.stream;
+
+  @override
+  Future<void> setAppId(String id, {String? displayName, String? iconPath}) =>
+      Future.value();
 
   @override
   Future<void> setWindowsAppUserModelId(String id,

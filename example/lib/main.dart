@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_media_session/flutter_media_session.dart';
 import 'dart:async';
@@ -26,8 +26,8 @@ Future<void> main() async {
       await windowManager.focus();
     });
   }
-  if (!kIsWeb && Platform.isWindows) {
-    await FlutterMediaSession().setWindowsAppUserModelId(
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    await FlutterMediaSession().setAppId(
       'dev.wyrin.flutter_media_session_example',
       displayName: 'Flutter Media Session Example',
     );
@@ -83,6 +83,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   bool _shouldResumeAfterDrag = false;
   final _random = Random();
   final List<int> _history = [];
+  ActionSlotLayoutMode _layoutMode = ActionSlotLayoutMode.symmetrical;
 
   // Note: Custom icons (ic_shuffle_on, etc.) must be added to Android's
   // res/drawable folder to appear in the notification. On other platforms,
@@ -276,26 +277,52 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _updateAvailableActions() async {
     if (!_active) return;
 
-    // Ensure actions maintain a fixed order to prevent Android custom buttons from jumping
-    if (_availableActions != null) {
-      final fixedOrder = [
-        MediaAction.play,
-        MediaAction.pause,
-        MediaAction.skipToNext,
-        MediaAction.skipToPrevious,
-        MediaAction.seekTo,
-        MediaAction.stop,
-        MediaAction.rewind,
-        MediaAction.fastForward,
-        _repeatAction, // Fixed order: e.g. repeat before shuffle
-        _shuffleAction,
-      ];
-      _availableActions = fixedOrder
-          .where((ref) => _availableActions!.any((a) => a.name == ref.name))
-          .toSet();
+    if (_availableActions == null) {
+      _adapter.syncAvailableActions(null);
+      return;
     }
 
-    _adapter.syncAvailableActions(_availableActions);
+    final hasShuffle = _availableActions!.any((a) => a.name == 'shuffle');
+    final hasRepeat = _availableActions!.any((a) => a.name == 'repeat');
+    final hasPrev = _availableActions!.contains(MediaAction.skipToPrevious);
+    final hasNext = _availableActions!.contains(MediaAction.skipToNext);
+    final hasRewind = _availableActions!.contains(MediaAction.rewind);
+    final hasFastForward = _availableActions!.contains(MediaAction.fastForward);
+    final hasStop = _availableActions!.contains(MediaAction.stop);
+
+    if (_layoutMode == ActionSlotLayoutMode.symmetrical) {
+      final slots = <MediaAction>[
+        if (hasRepeat) _repeatAction,
+        if (hasPrev)
+          MediaAction.skipToPrevious
+        else if (hasRewind)
+          MediaAction.rewind,
+        MediaAction.play,
+        if (hasNext)
+          MediaAction.skipToNext
+        else if (hasFastForward)
+          MediaAction.fastForward,
+        if (hasShuffle) _shuffleAction else if (hasStop) MediaAction.stop,
+      ];
+      _adapter.syncAvailableActions(_availableActions);
+      _adapter.syncActionLayout(ActionSlotLayout(slots));
+    } else {
+      final slots = <MediaAction>[
+        if (hasPrev)
+          MediaAction.skipToPrevious
+        else if (hasRewind)
+          MediaAction.rewind,
+        MediaAction.play,
+        if (hasNext)
+          MediaAction.skipToNext
+        else if (hasFastForward)
+          MediaAction.fastForward,
+        if (hasRepeat) _repeatAction,
+        if (hasShuffle) _shuffleAction,
+      ];
+      _adapter.syncAvailableActions(_availableActions);
+      _adapter.syncActionLayout(ActionSlotLayout(slots));
+    }
   }
 
   Future<void> _deactivate() async {
@@ -522,7 +549,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _currentDuration = Duration.zero;
       _isBuffering = true;
       _hasError = false;
-      _status = PlaybackStatus.idle;
+      _status = PlaybackStatus.buffering;
       _loadedUrl = current.url;
     });
     _updateAll();
@@ -554,7 +581,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _position = Duration.zero;
       _isBuffering = true;
       _hasError = false;
-      _status = PlaybackStatus.idle;
+      _status = PlaybackStatus.buffering;
     });
     _updatePlayback();
     try {
@@ -688,6 +715,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 setState(() => _availableActions = actions);
                                 _updateAvailableActions();
                               },
+                              layoutMode: _layoutMode,
+                              onLayoutModeChanged: (mode) {
+                                setState(() => _layoutMode = mode);
+                                _updateAvailableActions();
+                              },
                               shuffleAction: _shuffleAction,
                               repeatAction: _repeatAction,
                               handlesInterruptions: _handlesInterruptions,
@@ -749,6 +781,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                       availableActions: _availableActions,
                       onActionsChanged: (actions) {
                         setState(() => _availableActions = actions);
+                        _updateAvailableActions();
+                      },
+                      layoutMode: _layoutMode,
+                      onLayoutModeChanged: (mode) {
+                        setState(() => _layoutMode = mode);
                         _updateAvailableActions();
                       },
                       shuffleAction: _shuffleAction,
@@ -1063,10 +1100,8 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
     );
 
     PlaybackStatus status = state._status;
-    if (state._isBuffering) {
+    if (state._isBuffering || state._isSwitchingTrack) {
       status = PlaybackStatus.buffering;
-    } else if (state._isSwitchingTrack) {
-      status = PlaybackStatus.idle;
     }
 
     FlutterMediaSessionPlatform.instance.updatePlaybackState(
@@ -1083,5 +1118,11 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
   void syncAvailableActions(Set<MediaAction>? actions) {
     if (_session == null) return;
     FlutterMediaSessionPlatform.instance.updateAvailableActions(actions);
+  }
+
+  /// Synchronizes customizable action slot layout.
+  void syncActionLayout(ActionSlotLayout layout) {
+    if (_session == null) return;
+    FlutterMediaSessionPlatform.instance.setActionLayout(layout);
   }
 }

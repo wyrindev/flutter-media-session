@@ -213,8 +213,9 @@ class MediaSessionManager: NSObject {
         let center = MPRemoteCommandCenter.shared()
 
         if let actions = actions {
-            center.playCommand.isEnabled = actions.contains("play")
-            center.pauseCommand.isEnabled = actions.contains("pause")
+            let canPlayPause = actions.contains("play") || actions.contains("pause")
+            center.playCommand.isEnabled = canPlayPause
+            center.pauseCommand.isEnabled = canPlayPause
             center.nextTrackCommand.isEnabled = actions.contains("skipToNext")
             center.previousTrackCommand.isEnabled = actions.contains("skipToPrevious")
             center.stopCommand.isEnabled = actions.contains("stop")

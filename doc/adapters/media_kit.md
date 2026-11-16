@@ -1,12 +1,14 @@
-# media_kit Adapter Guide
+# `media_kit` Adapter
 
-This guide provides a ready-to-use adapter to connect [`media_kit`](https://pub.dev/packages/media_kit) with `flutter_media_session`.
+Integrate [`media_kit`](https://pub.dev/packages/media_kit) `Player` with `flutter_media_session`.
+
+> Tested with `media_kit: ^1.1.10` (`>=1.1.0 <2.0.0`).
 
 ---
 
 ## 1. Adapter Implementation
 
-Create a file named `media_kit_media_session_adapter.dart` in your project and add the following implementation:
+Save this file as `media_kit_media_session_adapter.dart` in your project (e.g. `lib/services/media_kit_media_session_adapter.dart`):
 
 ```dart
 import 'dart:async';
@@ -159,7 +161,7 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
       speed: state.rate,
       bufferedPosition: state.buffer,
       repeatMode: repeatMode,
-      shuffleModeEnabled: false,
+      shuffleModeEnabled: false, // media_kit has no native shuffle state
     );
 
     FlutterMediaSessionPlatform.instance.updatePlaybackState(playbackState).catchError((e) {
@@ -235,14 +237,115 @@ class MediaKitMediaSessionAdapter implements MediaSessionAdapter {
 }
 ```
 
----
+## 2. Usage
 
-## 2. Binding to Your Session
+> **Shuffle:** `media_kit` has no built-in shuffle state, so `shuffleModeEnabled` is fixed to `false` and `MediaAction.shuffle` is excluded from available actions. To add shuffle, expose a `MediaAction.custom(name: 'shuffle', ...)` and manage playlist order in your app.
 
 ```dart
-final session = FlutterMediaSession();
-await session.activate();
+import 'package:flutter_media_session/flutter_media_session.dart';
+import 'package:media_kit/media_kit.dart';
+import 'media_kit_media_session_adapter.dart';
 
-final player = Player();
-session.bind(MediaKitMediaSessionAdapter(player));
+void main() async {
+  MediaKit.ensureInitialized();
+
+  final player = Player();
+  final session = FlutterMediaSession();
+
+  // Activate session, then bind adapter
+  await session.activate();
+  session.bind(MediaKitMediaSessionAdapter(player));
+
+  // Or let the adapter manage the session lifecycle automatically:
+  // session.bind(MediaKitMediaSessionAdapter(player, manageLifecycle: true));
+
+  await player.open(
+    Media(
+      'https://example.com/audio.mp3',
+      extras: {
+        'title': 'Track Title',
+        'artist': 'Artist Name',
+        'album': 'Album Title',
+        'artworkUri': 'https://example.com/cover.jpg',
+      },
+    ),
+  );
+}
+```
+
+---
+
+## 3. Extending the Adapter
+
+### Custom Metadata Mapping
+
+If your app uses custom model structures for playlist entries, supply `metadataMapper`:
+
+```dart
+final adapter = MediaKitMediaSessionAdapter(
+  player,
+  manageLifecycle: true,
+  metadataMapper: (Player player) {
+    final playlist = player.state.playlist;
+    if (playlist.medias.isEmpty || playlist.index < 0 || playlist.index >= playlist.medias.length) {
+      return MediaMetadata(
+        title: 'Unknown Title',
+        artist: 'Unknown Artist',
+        duration: player.state.duration,
+      );
+    }
+
+    final media = playlist.medias[playlist.index];
+    final extras = media.extras;
+
+    return MediaMetadata(
+      title: extras?['title']?.toString() ?? 'Unknown Title',
+      artist: extras?['artist']?.toString() ?? 'Unknown Artist',
+      album: extras?['album']?.toString(),
+      artworkUri: extras?['artworkUri']?.toString(),
+      duration: player.state.duration,
+    );
+  },
+);
+```
+
+### Custom Actions
+
+To intercept additional commands or custom buttons defined in `setActionLayout`, listen to `onMediaAction`:
+
+```dart
+StreamSubscription<MediaAction>? _actionSubscription;
+
+void setupCustomActions() {
+  _actionSubscription = FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+    switch (action.name) {
+      case 'favorite':
+        myFavoritesService.toggleLike();
+        break;
+      case 'quality':
+        myVideoService.toggleQuality();
+        break;
+    }
+  });
+}
+
+void dispose() {
+  _actionSubscription?.cancel();
+}
+```
+
+### Subclassing
+
+To add custom logging, analytics, or specialized behavior:
+
+```dart
+class MyCustomMediaKitAdapter extends MediaKitMediaSessionAdapter {
+  MyCustomMediaKitAdapter(super.player, {super.manageLifecycle, super.metadataMapper});
+
+  @override
+  void bind(FlutterMediaSession session) {
+    super.bind(session);
+    // Add custom stream subscriptions or native events here
+  }
+}
 ```

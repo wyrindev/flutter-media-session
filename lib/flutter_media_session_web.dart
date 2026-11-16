@@ -9,6 +9,7 @@ import 'flutter_media_session_platform_interface.dart';
 import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 
 /// Web implementation of the Flutter Media Session plugin.
 ///
@@ -134,8 +135,18 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
   Future<void> updateAvailableActions(Set<MediaAction>? actions) async {
     try {
       final session = web.window.navigator.mediaSession;
+      final effectiveActions =
+          actions != null ? Set<MediaAction>.from(actions) : null;
+      if (effectiveActions != null) {
+        if (effectiveActions.contains(MediaAction.play)) {
+          effectiveActions.add(MediaAction.pause);
+        } else if (effectiveActions.contains(MediaAction.pause)) {
+          effectiveActions.add(MediaAction.play);
+        }
+      }
       for (final entry in _webActionMap.entries) {
-        if (actions == null || actions.contains(entry.value)) {
+        if (effectiveActions == null ||
+            effectiveActions.contains(entry.value)) {
           _registerAction(session, entry.key, entry.value);
         } else {
           // Unregister by setting handler to null
@@ -145,6 +156,11 @@ class FlutterMediaSessionWeb extends FlutterMediaSessionPlatform {
         }
       }
     } catch (_) {}
+  }
+
+  @override
+  Future<void> setActionLayout(ActionSlotLayout layout) async {
+    // No-op on web: browser media session controls do not support slot reordering.
   }
 
   @override

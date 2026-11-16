@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A filled (play/pause) or tonal (prev/next) action button.
 /// - All buttons: expand on press with spring release (width animation).

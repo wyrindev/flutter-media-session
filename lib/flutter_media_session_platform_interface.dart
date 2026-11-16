@@ -5,6 +5,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 import 'flutter_media_session_method_channel.dart';
 
 /// The platform-specific interface for [FlutterMediaSession].
@@ -60,12 +61,27 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
         'updateAvailableActions() has not been implemented.');
   }
 
+  /// Sets the customizable action slot layout for system media controls.
+  Future<void> setActionLayout(ActionSlotLayout layout) {
+    throw UnimplementedError('setActionLayout() has not been implemented.');
+  }
+
   /// Requests the POST_NOTIFICATIONS permission on Android (33+).
   ///
   /// Returns true if granted or if not needed (e.g., older Android version).
   Future<bool> requestNotificationPermission() {
     throw UnimplementedError(
         'requestNotificationPermission() has not been implemented.');
+  }
+
+  /// Sets the application identity (App ID / AUMID / DesktopEntry) for the current process.
+  ///
+  /// On Windows, this sets the AppUserModelID (AUMID) and can create a Start Menu shortcut
+  /// with [displayName] and [iconPath] for unpackaged/portable apps.
+  /// On Linux, this sets the MPRIS `DesktopEntry` (to associate with `.desktop` files)
+  /// and `Identity` (with [displayName]).
+  Future<void> setAppId(String id, {String? displayName, String? iconPath}) {
+    throw UnimplementedError('setAppId() has not been implemented.');
   }
 
   /// Sets the AppUserModelID for the current process on Windows.
@@ -79,10 +95,10 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   /// you should **omit** [displayName] to avoid creating duplicate shortcuts.
   ///
   /// This method is only effective on Windows.
+  @Deprecated('Use setAppId instead. Deprecated starting in v4.0.0-pre.1.')
   Future<void> setWindowsAppUserModelId(String id,
       {String? displayName, String? iconPath}) {
-    throw UnimplementedError(
-        'setWindowsAppUserModelId() has not been implemented.');
+    return setAppId(id, displayName: displayName, iconPath: iconPath);
   }
 
   /// Sets the preferred skip intervals for rewind (backward) and fast-forward (forward) commands.

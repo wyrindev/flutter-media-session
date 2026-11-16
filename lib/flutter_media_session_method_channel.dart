@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
+import 'src/models/action_slot_layout.dart';
 import 'flutter_media_session_platform_interface.dart';
 
 /// An implementation of [FlutterMediaSessionPlatform] that uses method channels.
@@ -59,6 +60,13 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<void> setActionLayout(ActionSlotLayout layout) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await methodChannel.invokeMethod('setActionLayout', layout.toJson());
+    }
+  }
+
+  @override
   Future<bool> requestNotificationPermission() async {
     final result =
         await methodChannel.invokeMethod<bool>('requestNotificationPermission');
@@ -66,13 +74,19 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
-  Future<void> setWindowsAppUserModelId(String id,
+  Future<void> setAppId(String id,
       {String? displayName, String? iconPath}) async {
-    await methodChannel.invokeMethod('setWindowsAppUserModelId', {
+    await methodChannel.invokeMethod('setAppId', {
       'id': id,
       if (displayName != null) 'displayName': displayName,
       if (iconPath != null) 'iconPath': iconPath,
     });
+  }
+
+  @override
+  Future<void> setWindowsAppUserModelId(String id,
+      {String? displayName, String? iconPath}) async {
+    await setAppId(id, displayName: displayName, iconPath: iconPath);
   }
 
   @override
