@@ -159,7 +159,16 @@ void main(List<String> args) async {
     await _ensureGitConfigured(worktreePath);
 
     // Copy syncable directories/files from current v3 tag/HEAD to worktree
-    final syncDirs = ['lib', 'android', 'darwin', 'windows', 'linux', 'test', 'example', 'doc'];
+    final syncDirs = [
+      'lib',
+      'android',
+      'darwin',
+      'windows',
+      'linux',
+      'test',
+      'example',
+      'doc'
+    ];
     for (final dir in syncDirs) {
       final targetDir = Directory('$worktreePath/$dir');
       if (targetDir.existsSync()) {
@@ -168,6 +177,21 @@ void main(List<String> args) async {
       final srcDir = Directory(dir);
       if (srcDir.existsSync()) {
         _copyDirectory(srcDir, targetDir);
+      }
+    }
+
+    // Synchronize root and example .gitignore and gradle-wrapper to prevent Android build errors
+    for (final path in [
+      '.gitignore',
+      'example/.gitignore',
+      'example/android/.gitignore',
+      'example/android/gradle/wrapper/gradle-wrapper.properties'
+    ]) {
+      final srcFile = File(path);
+      if (srcFile.existsSync()) {
+        final targetFile = File('$worktreePath/$path');
+        targetFile.parent.createSync(recursive: true);
+        srcFile.copySync(targetFile.path);
       }
     }
 
@@ -180,14 +204,18 @@ void main(List<String> args) async {
           if (docContent.contains('docs.wyrin.dev')) {
             // Remove banner quote for docs.wyrin.dev if present
             docContent = docContent.replaceAll(
-              RegExp(r'> The latest documentation and interactive guides are available at \*\*\[docs\.wyrin\.dev[^\n]*\n*', multiLine: true),
+              RegExp(
+                  r'> The latest documentation and interactive guides are available at \*\*\[docs\.wyrin\.dev[^\n]*\n*',
+                  multiLine: true),
               '',
             );
             docContent = docContent.replaceAll(
               'https://docs.wyrin.dev/flutter-media-session',
               'https://github.com/wyrindev/flutter-media-session/tree/support/v2/doc',
             );
-            docContent = docContent.replaceAll('docs.wyrin.dev/flutter-media-session', 'github.com/wyrindev/flutter-media-session/tree/support/v2/doc');
+            docContent = docContent.replaceAll(
+                'docs.wyrin.dev/flutter-media-session',
+                'github.com/wyrindev/flutter-media-session/tree/support/v2/doc');
             entity.writeAsStringSync(docContent);
           }
         }
@@ -219,7 +247,9 @@ void main(List<String> args) async {
 
       // Clean up docs.wyrin.dev references
       readmeContent = readmeContent.replaceAll(
-        RegExp(r'> Full documentation, tutorials, and setup guides are available at \*\*\[docs\.wyrin\.dev[^\n]*\n*', multiLine: true),
+        RegExp(
+            r'> Full documentation, tutorials, and setup guides are available at \*\*\[docs\.wyrin\.dev[^\n]*\n*',
+            multiLine: true),
         '',
       );
       readmeContent = readmeContent.replaceAll(
@@ -248,7 +278,10 @@ void main(List<String> args) async {
             readmeContent.replaceFirst(v3NotePattern, v2NoteReplacement);
       } else {
         // Insert after installation codeblock if not already present
-        final installMatch = RegExp(r'(```yaml[\s\S]*?flutter_media_session: \^' + RegExp.escape(newV2Version.toString()) + r'[\s\S]*?```)');
+        final installMatch = RegExp(
+            r'(```yaml[\s\S]*?flutter_media_session: \^' +
+                RegExp.escape(newV2Version.toString()) +
+                r'[\s\S]*?```)');
         if (installMatch.hasMatch(readmeContent)) {
           readmeContent = readmeContent.replaceFirst(
             installMatch,
@@ -309,7 +342,8 @@ void main(List<String> args) async {
       ]);
       // Update local support/v2 ref to point to this new commit
       await _runGit(['fetch', worktreePath, 'HEAD:support/v2']);
-      print('🎉 Successfully updated local support/v2 to release $newV2Version');
+      print(
+          '🎉 Successfully updated local support/v2 to release $newV2Version');
     } else {
       print(
           '⚠️ Validation checks failed or require review. Opening Pull Request...');
@@ -451,10 +485,11 @@ Future<ProcessResult> _runGit(List<String> args) {
 
 Future<ProcessResult> _runProcess(String executable, List<String> args,
     {String? workingDirectory}) {
-  final resolvedExecutable =
-      Platform.isWindows && !executable.endsWith('.bat') && !executable.endsWith('.exe')
-          ? '$executable.bat'
-          : executable;
+  final resolvedExecutable = Platform.isWindows &&
+          !executable.endsWith('.bat') &&
+          !executable.endsWith('.exe')
+      ? '$executable.bat'
+      : executable;
   return Process.run(resolvedExecutable, args,
       workingDirectory: workingDirectory, runInShell: true);
 }
