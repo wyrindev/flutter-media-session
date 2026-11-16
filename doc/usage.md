@@ -338,6 +338,7 @@ await session.setBackgroundKeepAlive(true);
 
 Platform implementation details:
 - **Android**: Acquires a `PARTIAL_WAKE_LOCK` and a `WIFI_MODE_FULL_HIGH_PERF` Wi-Fi lock, running under the `connectedDevice` foreground service type.
+- **Linux**: Inhibits system screensaver and idle sleep via D-Bus (`org.freedesktop.ScreenSaver` `Inhibit`/`UnInhibit`).
 - **macOS**: Holds an `IOPMAssertion` (`kIOPMAssertionTypePreventUserIdleSystemSleep`) preventing system idle sleep.
 - **Windows**: Calls `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`.
 - **Web**: Acquires a Screen Wake Lock via `navigator.wakeLock` (best-effort while tab is active).
