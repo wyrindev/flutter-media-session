@@ -1,3 +1,12 @@
+## 3.2.1-pre.1
+
+### Bug Fixes
+
+  * **Linux**: Fixed MPRIS `Seek` and `SetPosition` commands delivering a `seekTo` action with a null `seekPosition` on the Dart side. The plugin now emits the seek target under the `args` key, matching the channel contract used by all other platforms.
+  * **Core**: `onMediaAction` now reads `positionMs` as a fallback when `args` is absent in a `seekTo` event, ensuring forward compatibility with any plugin that emits the legacy key.
+
+---
+
 ## 3.2.0
 
 ### Features

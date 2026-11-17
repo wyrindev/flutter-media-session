@@ -112,4 +112,84 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  group('onMediaAction', () {
+    const eventChannel = EventChannel('flutter_media_session_events');
+
+    test('parses seekTo action with args', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        MethodChannel(eventChannel.name, eventChannel.codec),
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'listen') {
+            await TestDefaultBinaryMessengerBinding
+                .instance.defaultBinaryMessenger
+                .handlePlatformMessage(
+              eventChannel.name,
+              eventChannel.codec.encodeSuccessEnvelope({
+                'action': 'seekTo',
+                'args': 5000,
+              }),
+              (data) {},
+            );
+          }
+          return null;
+        },
+      );
+
+      final action = await platform.onMediaAction.first;
+      expect(action.name, 'seekTo');
+      expect(action.seekPosition, const Duration(milliseconds: 5000));
+    });
+
+    test('parses seekTo action with positionMs fallback (Linux MPRIS)',
+        () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        MethodChannel(eventChannel.name, eventChannel.codec),
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'listen') {
+            await TestDefaultBinaryMessengerBinding
+                .instance.defaultBinaryMessenger
+                .handlePlatformMessage(
+              eventChannel.name,
+              eventChannel.codec.encodeSuccessEnvelope({
+                'action': 'seekTo',
+                'positionMs': 60000,
+              }),
+              (data) {},
+            );
+          }
+          return null;
+        },
+      );
+
+      final action = await platform.onMediaAction.first;
+      expect(action.name, 'seekTo');
+      expect(action.seekPosition, const Duration(milliseconds: 60000));
+    });
+
+    test('parses plain string action', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        MethodChannel(eventChannel.name, eventChannel.codec),
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'listen') {
+            await TestDefaultBinaryMessengerBinding
+                .instance.defaultBinaryMessenger
+                .handlePlatformMessage(
+              eventChannel.name,
+              eventChannel.codec.encodeSuccessEnvelope('play'),
+              (data) {},
+            );
+          }
+          return null;
+        },
+      );
+
+      final action = await platform.onMediaAction.first;
+      expect(action.name, 'play');
+      expect(action.seekPosition, isNull);
+    });
+  });
 }
