@@ -124,7 +124,8 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
         final args = event['args'];
         final positionMs = event['positionMs'];
         if (action == 'seekTo') {
-          final seekNum = (args is num) ? args : (positionMs is num ? positionMs : null);
+          final seekNum =
+              (args is num) ? args : (positionMs is num ? positionMs : null);
           if (seekNum != null) {
             return MediaAction(
               action,

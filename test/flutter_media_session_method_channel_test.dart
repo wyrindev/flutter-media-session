@@ -142,7 +142,8 @@ void main() {
       expect(action.seekPosition, const Duration(milliseconds: 5000));
     });
 
-    test('parses seekTo action with positionMs fallback (Linux MPRIS)', () async {
+    test('parses seekTo action with positionMs fallback (Linux MPRIS)',
+        () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
         MethodChannel(eventChannel.name, eventChannel.codec),
