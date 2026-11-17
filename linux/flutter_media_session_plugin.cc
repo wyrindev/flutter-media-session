@@ -342,6 +342,7 @@ static void flutter_media_session_plugin_init(FlutterMediaSessionPlugin* self) {
         g_autoptr(FlValue) event = fl_value_new_map();
         fl_value_set_string_take(event, "action", fl_value_new_string(action.c_str()));
         if (seek_position_ms >= 0) {
+          fl_value_set_string_take(event, "args", fl_value_new_int(seek_position_ms));
           fl_value_set_string_take(event, "positionMs", fl_value_new_int(seek_position_ms));
         }
 

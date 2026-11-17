@@ -122,11 +122,15 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
       if (event is Map) {
         final action = event['action'] as String;
         final args = event['args'];
-        if (action == 'seekTo' && args is num) {
-          return MediaAction(
-            action,
-            seekPosition: Duration(milliseconds: args.toInt()),
-          );
+        final positionMs = event['positionMs'];
+        if (action == 'seekTo') {
+          final seekNum = (args is num) ? args : (positionMs is num ? positionMs : null);
+          if (seekNum != null) {
+            return MediaAction(
+              action,
+              seekPosition: Duration(milliseconds: seekNum.toInt()),
+            );
+          }
         }
         return MediaAction(
           action,
