@@ -327,7 +327,7 @@ await session.setAutoHandleInterruptions(true);
 ```
 
 - **Behavior**: On Android, requests `AUDIOFOCUS_GAIN` when playback transitions to `PlaybackStatus.playing`, and abandons focus on stop/deactivate. Focus loss events are converted into `pause` or `play` actions on `onMediaAction`.
-- **Default (`false`)**: If your player engine (`just_audio`, `audioplayers`, etc.) already manages Android audio focus, leave this disabled to avoid conflicting focus requests within the same process.
+- **Default (`false`)**: If your player engine (`just_audio`, `audioplayers`, etc.) already manages Android audio focus, leave this disabled to avoid conflicting focus requests within the same process. To enable it with such a player, turn the player's own focus handling off (for example `audioplayers`: `AudioContextAndroid(audioFocus: AndroidAudioFocus.none)`): two focus requests in one app knock each other out.
 - **When to enable**: When using custom pipelines or engines that do not handle OS focus (e.g., bare `fvp` or raw video decoders).
 - **Other platforms**: No-op on iOS, macOS, Windows, and Web.
 
@@ -350,6 +350,7 @@ FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
 ```
 
 - The focus request is made with `CONTENT_TYPE_SPEECH` and `willPauseWhenDucked`, so the system tells the app instead of ducking it. The pause and the resume arrive as `pause` and `play` actions.
+- The plugin must be the only one in the app requesting audio focus. If the player requests its own (the default for `audioplayers` and `just_audio`), the system ducks the player's request and this has no effect; turn the player's focus handling off as above.
 - Pauses and resumes caused by an interruption (a call, a prompt) carry `MediaAction.isInterruption`, so an app can tell them from the user pressing pause, and step back on resume.
 
 ### Background Keep-Alive (`setBackgroundKeepAlive`)

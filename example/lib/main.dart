@@ -155,6 +155,7 @@ class _PlayerHomeState extends State<PlayerHome> {
     };
     _listenMediaSessionActions();
     _listenAudioPlayerEvents();
+    _applyPlayerAudioContext();
     _activate();
   }
 
@@ -251,6 +252,26 @@ class _PlayerHomeState extends State<PlayerHome> {
         _updatePlayback();
       }
     }));
+  }
+
+  /// With "Handle Audio Focus" on, the plugin owns audio focus, so the players must not request it
+  /// themselves: two focus requests in one app knock each other out, and a navigation prompt would
+  /// duck the player's own request instead of pausing.
+  Future<void> _applyPlayerAudioContext() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    final context = AudioContext(
+      android: AudioContextAndroid(
+        audioFocus: _handlesInterruptions
+            ? AndroidAudioFocus.none
+            : AndroidAudioFocus.gain,
+        contentType: _pauseWhenDucked
+            ? AndroidContentType.speech
+            : AndroidContentType.music,
+      ),
+    );
+    for (final player in _players) {
+      await player.setAudioContext(context);
+    }
   }
 
   /// The demo media library: a "Demo library" folder holding the playlist.
@@ -782,11 +803,13 @@ class _PlayerHomeState extends State<PlayerHome> {
                               onHandleInterruptionsChanged: (val) {
                                 setState(() => _handlesInterruptions = val);
                                 _plugin.setAutoHandleInterruptions(val);
+                                _applyPlayerAudioContext();
                               },
                               pauseWhenDucked: _pauseWhenDucked,
                               onPauseWhenDuckedChanged: (val) {
                                 setState(() => _pauseWhenDucked = val);
                                 _plugin.setPauseWhenDucked(val);
+                                _applyPlayerAudioContext();
                               },
                               backgroundKeepAlive: _backgroundKeepAlive,
                               onBackgroundKeepAliveChanged: (val) {
@@ -855,11 +878,13 @@ class _PlayerHomeState extends State<PlayerHome> {
                       onHandleInterruptionsChanged: (val) {
                         setState(() => _handlesInterruptions = val);
                         _plugin.setAutoHandleInterruptions(val);
+                        _applyPlayerAudioContext();
                       },
                       pauseWhenDucked: _pauseWhenDucked,
                       onPauseWhenDuckedChanged: (val) {
                         setState(() => _pauseWhenDucked = val);
                         _plugin.setPauseWhenDucked(val);
+                        _applyPlayerAudioContext();
                       },
                       backgroundKeepAlive: _backgroundKeepAlive,
                       onBackgroundKeepAliveChanged: (val) {

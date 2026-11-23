@@ -159,9 +159,11 @@ class SettingsPanel extends StatelessWidget {
                       SwitchListTile(
                         title: const Text("Pause for Navigation Prompts"),
                         subtitle: const Text(
-                            "For spoken content: pause instead of lowering the volume (needs Handle Audio Focus)"),
-                        value: pauseWhenDucked,
-                        onChanged: onPauseWhenDuckedChanged,
+                            "For spoken content: pause instead of lowering the volume. Needs Handle Audio Focus."),
+                        value: handlesInterruptions && pauseWhenDucked,
+                        onChanged: handlesInterruptions
+                            ? onPauseWhenDuckedChanged
+                            : null,
                       ),
                     ],
                     if (!kIsWeb && !Platform.isIOS) ...[
