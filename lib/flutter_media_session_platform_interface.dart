@@ -133,6 +133,11 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   }
 
   /// A stream of media actions emitted by the current platform.
+  /// Saves the library item to resume (or clears it with null), kept while the app is closed.
+  Future<void> setResumptionItem(MediaLibraryItem? item, Duration position) {
+    return Future.value();
+  }
+
   /// Whether the app was started in the background by a media browser (Android Auto) through the
   /// shared engine, rather than by the user opening it. False where that can't happen.
   Future<bool> wasStartedInBackground() {

@@ -19,6 +19,10 @@ class FakePlatform
       StreamController<MediaAction>.broadcast();
 
   @override
+  Future<void> setResumptionItem(MediaLibraryItem? item, Duration position) =>
+      Future.value();
+
+  @override
   Future<bool> wasStartedInBackground() => Future.value(false);
 
   @override

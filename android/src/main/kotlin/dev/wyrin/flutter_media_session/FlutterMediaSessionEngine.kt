@@ -61,14 +61,6 @@ object FlutterMediaSessionEngine {
     /** Whether the shared engine exists (the app uses it and it was started). */
     fun isRunning(): Boolean = FlutterEngineCache.getInstance().get(ENGINE_ID) != null
 
-    /** Ends the shared engine (the app was swiped away); the next one starts afresh. */
-    fun shutDown() {
-        val engine = FlutterEngineCache.getInstance().get(ENGINE_ID) ?: return
-        FlutterEngineCache.getInstance().remove(ENGINE_ID)
-        startedInBackground = false
-        engine.destroy()
-    }
-
     /**
      * Starts the shared engine for the media service when the app opted in and no Flutter side is
      * attached to the plugin yet. Returns whether one is now starting or running.

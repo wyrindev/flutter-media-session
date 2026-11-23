@@ -103,6 +103,18 @@ class MediaAction {
   /// The media library item to play, for [playFromMediaId] actions.
   String? get mediaId => customExtras?['mediaId'] as String?;
 
+  /// Whether this [playFromMediaId] resumes the item saved with
+  /// `FlutterMediaSession.setResumptionItem` (Android Auto reconnecting, the system's resume card),
+  /// rather than the user picking it.
+  bool get isResumption => customExtras?['resumed'] == true;
+
+  /// Where to start, for a [playFromMediaId] that resumes a saved item ([isResumption]); null to
+  /// start from the beginning.
+  Duration? get startPosition {
+    final ms = customExtras?['positionMs'];
+    return ms is int ? Duration(milliseconds: ms) : null;
+  }
+
   /// The spoken search query, for [playFromSearch] actions.
   String? get query => customExtras?['query'] as String?;
 

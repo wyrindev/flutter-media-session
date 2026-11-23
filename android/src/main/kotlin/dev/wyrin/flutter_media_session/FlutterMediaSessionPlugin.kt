@@ -194,6 +194,15 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             "wasStartedInBackground" -> {
                 result.success(FlutterMediaSessionEngine.startedInBackground)
             }
+            "setResumptionItem" -> {
+                val args = call.arguments as? Map<*, *>
+                MediaLibraryPrefs.saveResumption(
+                    context,
+                    args?.get("item") as? Map<*, *>,
+                    (args?.get("positionMs") as? Number)?.toLong() ?: 0L,
+                )
+                result.success(null)
+            }
             "setPauseWhenDucked" -> {
                 pauseWhenDucked = call.arguments as? Boolean ?: false
                 FlutterMediaSessionService.instance?.onPauseWhenDuckedChanged()

@@ -171,6 +171,25 @@ void main() {
       expect(await askChildren('root'), isNull);
     });
 
+    test('setResumptionItem sends the item and position on Android only',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await platform.setResumptionItem(
+        const MediaLibraryItem(id: 'track-2', title: 'Song 3'),
+        const Duration(seconds: 42),
+      );
+      await platform.setResumptionItem(null, Duration.zero);
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      await platform.setResumptionItem(
+          const MediaLibraryItem(id: 'x', title: 'X'), Duration.zero);
+      expect(calls.map((c) => c.method),
+          ['setResumptionItem', 'setResumptionItem']);
+      final saved = calls.first.arguments as Map;
+      expect((saved['item'] as Map)['id'], 'track-2');
+      expect(saved['positionMs'], 42000);
+      expect((calls.last.arguments as Map)['item'], isNull);
+    });
+
     test('wasStartedInBackground asks the platform on Android, false elsewhere',
         () async {
       messenger.setMockMethodCallHandler(channel, (call) async {
@@ -214,6 +233,25 @@ void main() {
         });
         expect(action, MediaAction.playFromMediaId);
         expect(action.mediaId, 'n1');
+      });
+
+      test('a resumed playFromMediaId carries its flag and position', () async {
+        final resumed = await receive({
+          'action': 'playFromMediaId',
+          'args': {'mediaId': 'n1', 'resumed': true, 'positionMs': 177958}
+        });
+        expect(resumed.mediaId, 'n1');
+        expect(resumed.isResumption, isTrue);
+        expect(resumed.startPosition, const Duration(milliseconds: 177958));
+      });
+
+      test('a picked playFromMediaId is not a resumption', () async {
+        final picked = await receive({
+          'action': 'playFromMediaId',
+          'args': {'mediaId': 'n1'}
+        });
+        expect(picked.isResumption, isFalse);
+        expect(picked.startPosition, isNull);
       });
 
       test('playFromSearch carries the spoken query', () async {
@@ -266,7 +304,8 @@ void main() {
       final played = <String>[];
       final searched = <String>[];
       FlutterMediaSession().setActionHandler(
-        onPlayFromMediaId: played.add,
+        onPlayFromMediaId: (id, resumeFrom) =>
+            played.add(resumeFrom == null ? id : '$id@${resumeFrom.inSeconds}'),
         onPlayFromSearch: searched.add,
       );
       fake.actions.add(const MediaAction('playFromMediaId',
@@ -274,8 +313,15 @@ void main() {
       fake.actions.add(const MediaAction('playFromSearch',
           customExtras: {'query': 'continue reading'}));
       fake.actions.add(MediaAction.playFromMediaId); // no id: ignored
+      fake.actions.add(const MediaAction('playFromMediaId', customExtras: {
+        'mediaId': 'n2',
+        'resumed': true,
+        'positionMs': 42000
+      }));
+      fake.actions.add(const MediaAction('playFromMediaId',
+          customExtras: {'mediaId': 'n3', 'resumed': true}));
       await Future<void>.delayed(Duration.zero);
-      expect(played, ['n1']);
+      expect(played, ['n1', 'n2@42', 'n3@0']);
       expect(searched, ['continue reading']);
     });
   });

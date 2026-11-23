@@ -74,6 +74,9 @@ class _PlayerHomeState extends State<PlayerHome> {
   bool _hasError = false;
   bool _isSwitchingTrack = false;
   int _currentIndex = 0;
+
+  /// Where a resumed track should continue from, applied once it is playing.
+  Duration? _pendingStart;
   int _trackVersion = 0;
   Duration _position = Duration.zero;
   Duration _currentDuration = Duration.zero;
@@ -171,9 +174,13 @@ class _PlayerHomeState extends State<PlayerHome> {
     await _activate();
   }
 
-  /// Activates the session first if the app was started in the background.
-  Future<void> _ensureActive() async {
-    if (!_active) await _activate();
+  Future<void>? _activating;
+
+  /// Activates the session first if the app was started in the background. Requests arriving
+  /// together (a pick and the play that follows it) share one activation, in order.
+  Future<void> _ensureActive() {
+    if (_active) return Future.value();
+    return _activating ??= _activate().whenComplete(() => _activating = null);
   }
 
   Future<void> _loadAppVersion() async {
@@ -250,6 +257,15 @@ class _PlayerHomeState extends State<PlayerHome> {
     }));
 
     _audioSubscriptions.add(_audioPlayer.onPlayerStateChanged.listen((state) {
+      final start = _pendingStart;
+      if (state == PlayerState.playing && start != null) {
+        _pendingStart = null;
+        // Report the new position right away, so the car and the notification don't show the start.
+        _audioPlayer.seek(start).then((_) {
+          if (mounted) setState(() => _position = start);
+          _updatePlayback();
+        });
+      }
       if (mounted) {
         setState(() {
           if (state == PlayerState.playing) {
@@ -325,14 +341,33 @@ class _PlayerHomeState extends State<PlayerHome> {
     }
   }
 
-  /// A media browser picked a library item.
-  Future<void> _playFromMediaId(String mediaId) async {
-    _showMessage('Media library: play $mediaId');
+  /// A media browser picked a library item, or Android Auto resumes the saved one at [start].
+  Future<void> _playFromMediaId(String mediaId, {Duration? start}) async {
+    _showMessage(start == null
+        ? 'Media library: play $mediaId'
+        : 'Resuming $mediaId at ${start.inSeconds}s');
     await _ensureActive();
     final index = int.tryParse(mediaId.replaceFirst('track-', ''));
-    if (index != null && index >= 0 && index < _playlist.length) {
-      _playIndex(index);
+    if (index == null || index < 0 || index >= _playlist.length) return;
+    if (index == _currentIndex && _loadedUrl == current.url && start == null) {
+      // The track that's already loaded (Android Auto re-sends it when it reconnects): continue it.
+      if (_status != PlaybackStatus.playing) _play();
+      return;
     }
+    _playIndex(index, start: start);
+  }
+
+  /// Tells the plugin what to resume if Android Auto (or Bluetooth) asks while the app is closed.
+  void _saveResumption() {
+    _plugin.setResumptionItem(
+      MediaLibraryItem(
+        id: 'track-$_currentIndex',
+        title: current.title,
+        subtitle: current.artist,
+        artworkUri: current.artwork,
+      ),
+      position: _pendingStart ?? _position,
+    );
   }
 
   /// A voice request ("play song 3 on ..."): the first title containing the query, else the first track.
@@ -524,6 +559,7 @@ class _PlayerHomeState extends State<PlayerHome> {
     try {
       await _audioPlayer.pause();
     } catch (_) {}
+    _saveResumption();
   }
 
   Future<void> _stop() async {
@@ -617,7 +653,10 @@ class _PlayerHomeState extends State<PlayerHome> {
     }
   }
 
-  void _playIndex(int newIndex, {bool pushHistory = true}) async {
+  /// Switches to track [newIndex]; a resumed track continues from [start] once it is playing.
+  void _playIndex(int newIndex,
+      {bool pushHistory = true, Duration? start}) async {
+    _pendingStart = start != null && start > Duration.zero ? start : null;
     if (pushHistory) {
       _history.add(_currentIndex);
       if (_history.length > 10) {
@@ -647,6 +686,7 @@ class _PlayerHomeState extends State<PlayerHome> {
       _loadedUrl = current.url;
     });
     _updateAll();
+    _saveResumption();
 
     Future.delayed(const Duration(milliseconds: 300), () async {
       if (_trackVersion != versionAtStart) return;
@@ -1145,7 +1185,10 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
         FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
-          state._ensureActive().then((_) => state._play());
+          // Controllers send play after picking an item; the track is already starting then.
+          state._ensureActive().then((_) {
+            if (!state._isSwitchingTrack) state._play();
+          });
           break;
         case 'pause':
           if (action.isInterruption) {
@@ -1154,7 +1197,12 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
           state._pause();
           break;
         case 'playFromMediaId':
-          if (action.mediaId != null) state._playFromMediaId(action.mediaId!);
+          if (action.mediaId != null) {
+            state._playFromMediaId(action.mediaId!,
+                start: action.isResumption
+                    ? (action.startPosition ?? Duration.zero)
+                    : null);
+          }
           break;
         case 'playFromSearch':
           state._playFromSearch(action.query ?? '');

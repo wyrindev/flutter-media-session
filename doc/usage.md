@@ -136,7 +136,7 @@ session.setActionHandler(
   onShuffle: () => player.toggleShuffle(),
   onRepeat: () => player.toggleRepeat(),
   // Android, with a media library (see "Media Library & Android Auto"):
-  onPlayFromMediaId: (mediaId) => playlist.playItem(mediaId),
+  onPlayFromMediaId: (mediaId, resumeFrom) => playlist.playItem(mediaId),
   onPlayFromSearch: (query) => playlist.playMatching(query),
 );
 
@@ -415,7 +415,7 @@ session.setActionHandler(
   onPlay: () => player.play(),
   onPause: () => player.pause(),
   // An item picked in the library:
-  onPlayFromMediaId: (mediaId) => playlist.playItem(mediaId),
+  onPlayFromMediaId: (mediaId, resumeFrom) => playlist.playItem(mediaId),
   // A voice request; the query is the spoken words, interpreted by the app:
   onPlayFromSearch: (query) => playlist.playMatching(query),
 );
@@ -468,7 +468,7 @@ import dev.wyrin.flutter_media_session.FlutterMediaSessionActivity
 class MainActivity : FlutterMediaSessionActivity()
 ```
 
-The app then starts in the background (running its normal `main()`, without a screen) when the library is opened in the car or something is asked to play, not merely when Android Auto connects. The screen attaches to the same engine when the app is opened, and the engine keeps running when the screen closes. Swiping the app away from recent apps stops playback and ends it, as before.
+The app then starts in the background (running its normal `main()`, without a screen) when the library is opened in the car or something is asked to play, not merely when Android Auto connects. The screen attaches to the same engine when the app is opened, and the engine keeps running when the screen closes. Swiping the app away from recent apps sends `stop`, as closing the screen used to end playback.
 
 Started this way, the app should set up its library and action handlers but not activate its session or start playing until it is asked to: an active session makes it the app Android Auto resumes, taking over from whatever was playing. `wasStartedInBackground()` tells it which case it is in:
 
@@ -481,5 +481,30 @@ if (!await session.wasStartedInBackground()) {
 ```
 
 Until the app has given the session metadata or a playback state, the session reports nothing loaded, so an automatic resume from Android Auto doesn't start playback on its own.
+
+#### Resuming playback
+
+Android Auto asks the media app it used last to resume when it connects, as do Bluetooth devices and the system's resume card. With nothing loaded, the plugin answers with the item the app saved, which survives the app being closed:
+
+```dart
+await session.setResumptionItem(
+  MediaLibraryItem(id: 'track-2', title: 'Song 3', subtitle: 'Artist'),
+  position: currentPosition,
+);
+```
+
+Save it when the item changes and when playback pauses or stops. The resume arrives as `playFromMediaId`: in `setActionHandler`, `onPlayFromMediaId` gets the saved position as `resumeFrom` (null for a pick); on the `MediaAction`, `isResumption` and `startPosition`. With nothing saved, or after `setResumptionItem(null)`, the request is declined and nothing starts.
+
+```dart
+session.setActionHandler(
+  onPlayFromMediaId: (mediaId, resumeFrom) {
+    playItem(mediaId, from: resumeFrom ?? Duration.zero);
+  },
+);
+```
+
+The id is yours: an app whose position isn't a time (a reader, a podcast app's own bookmarks) can save an id that identifies what to continue, keep the exact position itself, and leave `position` at zero.
+
+Controllers usually send `play` right after a pick or a resume; treat it as part of the request if that item is already starting. Android Auto also sends the current item again when it reconnects to a running app: continue it rather than starting it over.
 
 On other platforms `setMediaLibrary` has no effect.

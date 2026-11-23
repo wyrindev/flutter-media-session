@@ -69,7 +69,7 @@ class FlutterMediaSession {
     VoidCallback? onFastForward,
     VoidCallback? onShuffle,
     VoidCallback? onRepeat,
-    void Function(String mediaId)? onPlayFromMediaId,
+    void Function(String mediaId, Duration? resumeFrom)? onPlayFromMediaId,
     void Function(String query)? onPlayFromSearch,
   }) {
     _actionHandlerSubscription?.cancel();
@@ -110,7 +110,13 @@ class FlutterMediaSession {
           break;
         case 'playFromMediaId':
           final mediaId = action.mediaId;
-          if (mediaId != null) onPlayFromMediaId?.call(mediaId);
+          if (mediaId != null) {
+            onPlayFromMediaId?.call(
+                mediaId,
+                action.isResumption
+                    ? action.startPosition ?? Duration.zero
+                    : null);
+          }
           break;
         case 'playFromSearch':
           onPlayFromSearch?.call(action.query ?? '');
@@ -217,6 +223,22 @@ class FlutterMediaSession {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
   }
 
+  /// Saves what Android Auto, Bluetooth or the system's resume card should resume when they ask to
+  /// play while nothing is loaded (Android Auto does on connect), kept while the app is closed. The
+  /// resume arrives as [MediaAction.playFromMediaId] with [MediaAction.isResumption] and
+  /// [MediaAction.startPosition]. With nothing saved (or after `null`), such a request is declined
+  /// and nothing starts on its own.
+  ///
+  /// Update it when the item changes and when playback pauses or stops, with the position to
+  /// continue from. Android only; does nothing elsewhere.
+  Future<void> setResumptionItem(
+    MediaLibraryItem? item, {
+    Duration position = Duration.zero,
+  }) {
+    return FlutterMediaSessionPlatform.instance
+        .setResumptionItem(item, position);
+  }
+
   /// Whether a media browser (Android Auto) started the app in the background while it was closed,
   /// through the shared engine (see the Android Auto section of the usage guide), rather than the
   /// user opening it.
@@ -245,7 +267,8 @@ class FlutterMediaSession {
   ///
   /// [getChildren] is asked for the children of a library node: first [MediaLibraryItem.rootId]
   /// (the top level), then any item that is browsable. Picking a playable item arrives as a
-  /// [MediaAction.playFromMediaId] action (`onPlayFromMediaId` in [setActionHandler]); a voice
+  /// [MediaAction.playFromMediaId] action (`onPlayFromMediaId` in [setActionHandler], whose
+  /// `resumeFrom` is null for a pick and the saved position for a resume, see [setResumptionItem]); a voice
   /// request (`play X on <app>`) as [MediaAction.playFromSearch] (`onPlayFromSearch`).
   ///
   /// To be listed in Android Auto, the app must also declare itself a media app in its own

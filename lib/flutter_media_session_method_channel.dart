@@ -118,6 +118,16 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<void> setResumptionItem(
+      MediaLibraryItem? item, Duration position) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    await methodChannel.invokeMethod('setResumptionItem', {
+      'item': item?.toJson(),
+      'positionMs': position.inMilliseconds,
+    });
+  }
+
+  @override
   Future<bool> wasStartedInBackground() async {
     if (defaultTargetPlatform != TargetPlatform.android) return false;
     return await methodChannel.invokeMethod<bool>('wasStartedInBackground') ??
