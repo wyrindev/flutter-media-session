@@ -1,3 +1,11 @@
+## Unreleased
+
+### Features
+
+  * **Android**: Added an opt-in browsable media library for Android Auto and other Media3 media browsers. `FlutterMediaSession.setMediaLibrary(getChildren: ...)` provides the library's nodes from Dart (`MediaLibraryItem`); picking an item arrives as `MediaAction.playFromMediaId` and a voice request ("play X on My App") as `MediaAction.playFromSearch`, with `onPlayFromMediaId` and `onPlayFromSearch` in `setActionHandler`. `FlutterMediaSessionService` is now a `MediaLibraryService`; without `setMediaLibrary` it refuses browse requests and behaves as before. See the usage guide for the Android Auto manifest declaration.
+
+---
+
 ## 3.2.1
 
 ### Bug Fixes

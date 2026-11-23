@@ -19,6 +19,10 @@ class FakePlatform
       StreamController<MediaAction>.broadcast();
 
   @override
+  Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) =>
+      Future.value();
+
+  @override
   Future<void> activate() => Future.value();
 
   @override

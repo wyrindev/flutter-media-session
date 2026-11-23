@@ -21,6 +21,7 @@ Handle lock screen controls, headset/keyboard media buttons (play, pause, next, 
 - **Configurable action slots** — control which transport buttons appear in Android notifications via `ActionSlotLayout`, including custom actions with your own icons.
 - **Remote command routing** — receive play, pause, seek, skip, shuffle, and repeat commands from lock screens, headsets, and system media hubs through a unified callback interface.
 - **Background keep-alive** — optionally acquire a wake lock to sustain playback while the app is backgrounded.
+- **Media library & Android Auto** — opt into a browsable library and voice requests ("play X on My App") for Android Auto and other Media3 browsers.
 
 <div align="center">
   <table>

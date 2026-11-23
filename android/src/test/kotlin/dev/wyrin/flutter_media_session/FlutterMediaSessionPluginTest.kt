@@ -35,4 +35,20 @@ internal class FlutterMediaSessionPluginTest {
         Mockito.verify(mockResult).success(null)
         kotlin.test.assertEquals(layoutData, plugin.pendingActionLayout)
     }
+
+    @Test
+    fun onMethodCall_setMediaLibraryEnabled_togglesTheLibrary() {
+        val plugin = FlutterMediaSessionPlugin()
+        kotlin.test.assertFalse(plugin.mediaLibraryEnabled, "off until the app opts in")
+
+        val on: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("setMediaLibraryEnabled", true), on)
+        Mockito.verify(on).success(null)
+        kotlin.test.assertTrue(plugin.mediaLibraryEnabled)
+
+        val off: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("setMediaLibraryEnabled", false), off)
+        Mockito.verify(off).success(null)
+        kotlin.test.assertFalse(plugin.mediaLibraryEnabled)
+    }
 }

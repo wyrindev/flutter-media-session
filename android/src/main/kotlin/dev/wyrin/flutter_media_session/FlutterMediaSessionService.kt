@@ -17,8 +17,10 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaNotification
@@ -28,13 +30,17 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
 /**
- * A Media3 MediaSessionService that manages the media session lifecycle and player state.
+ * A Media3 MediaLibraryService that manages the media session lifecycle and player state.
  * It uses a ForwardingPlayer to handle media control commands (play, pause, seek, etc.) 
  * and notifies the Flutter side via the plugin's event channel.
+ *
+ * It is a library service so that apps can opt into a browsable media library (Android Auto
+ * and other Media3 browsers) with `setMediaLibrary` on the Dart side. Until they do, browse
+ * requests are refused and it behaves as a plain media session service.
  */
 @UnstableApi
-class FlutterMediaSessionService : MediaSessionService() {
-    private var mediaSession: MediaSession? = null
+class FlutterMediaSessionService : MediaLibraryService() {
+    private var mediaSession: MediaLibrarySession? = null
     private lateinit var player: ForwardingPlayer
 
     companion object {
@@ -46,6 +52,9 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     private var isReceiverRegistered = false
+
+    /** Library items handed to browsers, by id, so [CustomMediaSessionCallback.onGetItem] can answer. */
+    private val libraryItems = mutableMapOf<String, LibraryItemData>()
 
     private var customLayout: List<androidx.media3.session.CommandButton> = emptyList()
     private var activeActionSlotNames: List<String>? = null
@@ -389,9 +398,8 @@ class FlutterMediaSessionService : MediaSessionService() {
         }
 
         // Build the session
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaLibrarySession.Builder(this, player, CustomMediaSessionCallback())
             .setSessionActivity(pendingIntent)
-            .setCallback(CustomMediaSessionCallback())
             // .setCustomLayout(initialCustomLayout)
             .build()
             
@@ -413,8 +421,16 @@ class FlutterMediaSessionService : MediaSessionService() {
         }
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         return mediaSession
+    }
+
+    /**
+     * The app turned the media library on or off: the player's commands change (setting media
+     * items is how a browser asks to play an item), so controllers are told.
+     */
+    fun onMediaLibraryEnabledChanged() {
+        if (::player.isInitialized) player.refreshCommands()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -737,9 +753,93 @@ class FlutterMediaSessionService : MediaSessionService() {
     }
 
     /**
-     * Callback handler for MediaSession events.
+     * Callback handler for MediaSession events, and for the media library once the app opts in.
      */
-    inner class CustomMediaSessionCallback : MediaSession.Callback {
+    inner class CustomMediaSessionCallback : MediaLibrarySession.Callback {
+        private val libraryEnabled: Boolean
+            get() = FlutterMediaSessionPlugin.instance?.mediaLibraryEnabled == true
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: MediaLibraryService.LibraryParams?
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            if (!libraryEnabled) return Futures.immediateFuture(LibraryResult.ofError(LibraryResult.RESULT_ERROR_NOT_SUPPORTED))
+            return Futures.immediateFuture(LibraryResult.ofItem(LibraryItemData.root.toMediaItem(), params))
+        }
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: MediaLibraryService.LibraryParams?
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            val plugin = FlutterMediaSessionPlugin.instance
+            if (!libraryEnabled || plugin == null) {
+                return Futures.immediateFuture(LibraryResult.ofError(LibraryResult.RESULT_ERROR_NOT_SUPPORTED))
+            }
+            val future = com.google.common.util.concurrent.SettableFuture.create<LibraryResult<ImmutableList<MediaItem>>>()
+            plugin.requestLibraryChildren(parentId) { items ->
+                if (items == null) {
+                    future.set(LibraryResult.ofError(LibraryResult.RESULT_ERROR_UNKNOWN))
+                } else {
+                    items.forEach { libraryItems[it.id] = it }
+                    // Paging is the browser's: hand out the requested slice.
+                    val from = (page.coerceAtLeast(0).toLong() * pageSize).coerceAtMost(items.size.toLong()).toInt()
+                    val to = if (pageSize <= 0) items.size else (from + pageSize).coerceAtMost(items.size)
+                    future.set(LibraryResult.ofItemList(ImmutableList.copyOf(items.subList(from, to).map { it.toMediaItem() }), params))
+                }
+            }
+            return future
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            mediaId: String
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            if (!libraryEnabled) return Futures.immediateFuture(LibraryResult.ofError(LibraryResult.RESULT_ERROR_NOT_SUPPORTED))
+            if (mediaId == LibraryItemData.ROOT_ID) return Futures.immediateFuture(LibraryResult.ofItem(LibraryItemData.root.toMediaItem(), null))
+            val item = libraryItems[mediaId] ?: return Futures.immediateFuture(LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE))
+            return Futures.immediateFuture(LibraryResult.ofItem(item.toMediaItem(), null))
+        }
+
+        /**
+         * A browser asks to play something: an item picked from the library (its media id), or a
+         * voice request ("play X on <app>", its search query). Both go to the Dart side as actions;
+         * the app starts playback and updates the session as usual.
+         */
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            forwardPlayRequest(mediaItems)
+            return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(mediaItems, startIndex, startPositionMs))
+        }
+
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<MutableList<MediaItem>> {
+            forwardPlayRequest(mediaItems)
+            return Futures.immediateFuture(mediaItems)
+        }
+
+        private fun forwardPlayRequest(mediaItems: List<MediaItem>) {
+            val item = mediaItems.firstOrNull() ?: return
+            val query = item.requestMetadata.searchQuery
+            when {
+                query != null -> FlutterMediaSessionPlugin.instance?.sendAction("playFromSearch", mapOf("query" to query))
+                item.mediaId.isNotEmpty() -> FlutterMediaSessionPlugin.instance?.sendAction("playFromMediaId", mapOf("mediaId" to item.mediaId))
+            }
+        }
+
         override fun onConnect(
             session: MediaSession,
             controller: MediaSession.ControllerInfo
@@ -907,6 +1007,11 @@ class FlutterMediaSessionService : MediaSessionService() {
             invalidateState()
         }
 
+        /** The commands depend on settings outside the player (the media library): tell controllers again. */
+        fun refreshCommands() {
+            invalidateState()
+        }
+
         private var shuffleModeEnabled: Boolean = false
 
         /**
@@ -998,7 +1103,13 @@ class FlutterMediaSessionService : MediaSessionService() {
                     commandsBuilder.add(Player.COMMAND_SEEK_FORWARD)
                 }
             }
-            
+            // With the media library on, browsers (Android Auto) ask to play an item by setting it.
+            if (FlutterMediaSessionPlugin.instance?.mediaLibraryEnabled == true) {
+                commandsBuilder.add(Player.COMMAND_SET_MEDIA_ITEM)
+                commandsBuilder.add(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+                commandsBuilder.add(Player.COMMAND_PREPARE)
+            }
+
             return State.Builder()
                 .setAvailableCommands(commandsBuilder.build())
                 .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
@@ -1079,6 +1190,19 @@ class FlutterMediaSessionService : MediaSessionService() {
 
         override fun handleSetShuffleModeEnabled(shuffleModeEnabled: Boolean): ListenableFuture<*> {
             FlutterMediaSessionPlugin.instance?.sendAction("shuffle")
+            return Futures.immediateVoidFuture()
+        }
+
+        /**
+         * A browser set the item to play (the session callback already passed the request to Dart as
+         * `playFromMediaId` / `playFromSearch`). The Dart side drives playback and pushes the
+         * metadata, so the stand-in player keeps nothing.
+         */
+        override fun handleSetMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long): ListenableFuture<*> {
+            return Futures.immediateVoidFuture()
+        }
+
+        override fun handleAddMediaItems(index: Int, mediaItems: MutableList<MediaItem>): ListenableFuture<*> {
             return Futures.immediateVoidFuture()
         }
     }

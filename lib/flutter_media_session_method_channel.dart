@@ -7,6 +7,7 @@ import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
 import 'src/models/action_slot_layout.dart';
+import 'src/models/media_library_item.dart';
 import 'flutter_media_session_platform_interface.dart';
 
 /// An implementation of [FlutterMediaSessionPlatform] that uses method channels.
@@ -114,6 +115,36 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   @override
   Future<void> setBackgroundKeepAlive(bool enabled) async {
     await methodChannel.invokeMethod('setBackgroundKeepAlive', enabled);
+  }
+
+  MediaLibraryChildrenProvider? _libraryChildren;
+
+  @override
+  Future<void> setMediaLibrary(
+      MediaLibraryChildrenProvider? getChildren) async {
+    // Media browsers (Android Auto) exist on Android only.
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    _libraryChildren = getChildren;
+    methodChannel
+        .setMethodCallHandler(getChildren == null ? null : _onNativeCall);
+    await methodChannel.invokeMethod(
+        'setMediaLibraryEnabled', getChildren != null);
+  }
+
+  /// Calls from the platform side: a media browser asking for a library node's children.
+  Future<dynamic> _onNativeCall(MethodCall call) async {
+    switch (call.method) {
+      case 'getMediaLibraryChildren':
+        final provider = _libraryChildren;
+        if (provider == null) return const <dynamic>[];
+        final args = call.arguments;
+        final parentId = (args is Map ? args['parentId'] as String? : null) ??
+            MediaLibraryItem.rootId;
+        final items = await provider(parentId);
+        return items.map((i) => i.toJson()).toList();
+      default:
+        throw MissingPluginException('${call.method} is not handled');
+    }
   }
 
   @override

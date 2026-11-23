@@ -88,6 +88,24 @@ class MediaAction {
   /// Action to toggle repeat mode.
   static const repeat = MediaAction('repeat');
 
+  /// A media browser (such as Android Auto) asked to play an item of the media library.
+  ///
+  /// The item's id is in [customExtras] under `mediaId` (see [mediaId]). Only sent once the app
+  /// has opted into a library with `FlutterMediaSession.setMediaLibrary`. Android only.
+  static const playFromMediaId = MediaAction('playFromMediaId');
+
+  /// A voice request such as `play X on <app>` (Google Assistant, Android Auto).
+  ///
+  /// The spoken query is in [customExtras] under `query` (see [query]); what it means is up to the
+  /// app. Android only.
+  static const playFromSearch = MediaAction('playFromSearch');
+
+  /// The media library item to play, for [playFromMediaId] actions.
+  String? get mediaId => customExtras?['mediaId'] as String?;
+
+  /// The spoken search query, for [playFromSearch] actions.
+  String? get query => customExtras?['query'] as String?;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

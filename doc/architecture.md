@@ -83,7 +83,7 @@ App Playback Stop / Teardown
 
 ### Android: AndroidX Media3 Architecture
 
-- **Core Framework**: Built on AndroidX Media3 `MediaSessionService` and `MediaSession`.
+- **Core Framework**: Built on AndroidX Media3 `MediaLibraryService` and `MediaLibrarySession` (a `MediaSessionService` with browsing). Browse requests are refused unless the app opts into a media library with `setMediaLibrary`; then the library's nodes are fetched from Dart over the method channel (`getMediaLibraryChildren`), and picking an item or a voice search (`onSetMediaItems` / `onAddMediaItems`) is forwarded as `playFromMediaId` / `playFromSearch`.
 - **Foreground Service Lifecycle**:
   - `FlutterMediaSessionService` runs as an Android foreground service with types `mediaPlayback|connectedDevice` (complying with Android 14+ background execution policies).
   - Handles `POST_NOTIFICATIONS` runtime permission on Android 13+ (API 33+) via automatic permission request during `activate()`.

@@ -6,6 +6,7 @@ import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
 import 'src/models/action_slot_layout.dart';
+import 'src/models/media_library_item.dart';
 import 'flutter_media_session_method_channel.dart';
 
 /// The platform-specific interface for [FlutterMediaSession].
@@ -132,6 +133,12 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   }
 
   /// A stream of media actions emitted by the current platform.
+  /// Opts into a browsable media library (Android Auto and other Media3 browsers), whose items
+  /// [getChildren] provides; null opts out. Has no effect on platforms without media browsers.
+  Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) {
+    return Future.value();
+  }
+
   Stream<MediaAction> get onMediaAction {
     throw UnimplementedError('onMediaAction has not been implemented.');
   }

@@ -135,6 +135,9 @@ session.setActionHandler(
   onFastForward: () => player.seek(player.position + const Duration(seconds: 10)),
   onShuffle: () => player.toggleShuffle(),
   onRepeat: () => player.toggleRepeat(),
+  // Android, with a media library (see "Media Library & Android Auto"):
+  onPlayFromMediaId: (mediaId) => playlist.playItem(mediaId),
+  onPlayFromSearch: (query) => playlist.playMatching(query),
 );
 
 // Clear callbacks when no longer needed:
@@ -361,3 +364,66 @@ if (Platform.isWindows) {
 ```
 
 For complete packaging options (MSIX vs. portable vs. Inno Setup / WiX installers), see the dedicated [Windows Setup Guide](windows_setup.md).
+
+### Media Library & Android Auto (Android)
+
+Media browsers such as Android Auto show a library the user can browse and pick from, and accept voice requests ("play X on My App"). The library is opt-in: until `setMediaLibrary` is called, browse requests are refused and the service behaves as before.
+
+```dart
+import 'package:flutter_media_session/flutter_media_session.dart';
+
+final session = FlutterMediaSession();
+
+await session.setMediaLibrary(getChildren: (parentId) async {
+  if (parentId == MediaLibraryItem.rootId) {
+    return const [
+      MediaLibraryItem(id: 'recent', title: 'Recently played', isBrowsable: true, isPlayable: false),
+    ];
+  }
+  if (parentId == 'recent') {
+    return [
+      for (final track in await history.recent())
+        MediaLibraryItem(id: track.id, title: track.title, subtitle: track.artist, artworkUri: track.coverUri),
+    ];
+  }
+  return const [];
+});
+
+session.setActionHandler(
+  onPlay: () => player.play(),
+  onPause: () => player.pause(),
+  // An item picked in the library:
+  onPlayFromMediaId: (mediaId) => playlist.playItem(mediaId),
+  // A voice request; the query is the spoken words, interpreted by the app:
+  onPlayFromSearch: (query) => playlist.playMatching(query),
+);
+
+// Turn it off again:
+await session.clearMediaLibrary();
+```
+
+- The browser asks for the children of `MediaLibraryItem.rootId` first, then of any item with `isBrowsable: true`. Items with `isPlayable: true` can be picked.
+- Picking an item sends `MediaAction.playFromMediaId` (its id in `action.mediaId`); a voice request sends `MediaAction.playFromSearch` (the words in `action.query`). Start playback and update metadata and state as usual.
+- Paging requested by the browser is applied to the list `getChildren` returns.
+
+To be listed in Android Auto, the app also declares itself a media app in its **own** `AndroidManifest.xml`:
+
+```xml
+<application>
+    <meta-data
+        android:name="com.google.android.gms.car.application"
+        android:resource="@xml/automotive_app_desc" />
+</application>
+```
+
+with `android/app/src/main/res/xml/automotive_app_desc.xml`:
+
+```xml
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>
+```
+
+Android Auto lists apps installed from Google Play. To test a debug or sideloaded build, enable **Unknown sources** in Android Auto's developer settings (tap the version number in Android Auto's settings ten times to reveal them).
+
+On other platforms `setMediaLibrary` has no effect.

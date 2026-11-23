@@ -7,6 +7,10 @@ class MockFlutterMediaSessionPlatform
     with MockPlatformInterfaceMixin
     implements FlutterMediaSessionPlatform {
   @override
+  Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) =>
+      Future.value();
+
+  @override
   Future<void> activate() => Future.value();
 
   @override

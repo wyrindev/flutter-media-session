@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'src/models/media_action.dart';
 import 'src/models/action_slot_layout.dart';
+import 'src/models/media_library_item.dart';
 import 'src/adapters/media_session_adapter.dart';
 import 'flutter_media_session_platform_interface.dart';
 
@@ -12,6 +13,7 @@ export 'src/models/media_metadata.dart';
 export 'src/models/playback_state.dart';
 export 'src/models/media_action.dart';
 export 'src/models/action_slot_layout.dart';
+export 'src/models/media_library_item.dart';
 export 'src/adapters/media_session_adapter.dart';
 export 'flutter_media_session_platform_interface.dart';
 
@@ -66,6 +68,8 @@ class FlutterMediaSession {
     VoidCallback? onFastForward,
     VoidCallback? onShuffle,
     VoidCallback? onRepeat,
+    void Function(String mediaId)? onPlayFromMediaId,
+    void Function(String query)? onPlayFromSearch,
   }) {
     _actionHandlerSubscription?.cancel();
     _actionHandlerSubscription =
@@ -102,6 +106,13 @@ class FlutterMediaSession {
           break;
         case 'repeat':
           onRepeat?.call();
+          break;
+        case 'playFromMediaId':
+          final mediaId = action.mediaId;
+          if (mediaId != null) onPlayFromMediaId?.call(mediaId);
+          break;
+        case 'playFromSearch':
+          onPlayFromSearch?.call(action.query ?? '');
           break;
       }
     });
@@ -198,6 +209,26 @@ class FlutterMediaSession {
   /// such as a Chromecast or DLNA socket on the local network.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
+  }
+
+  /// Opts into a browsable media library, shown by media browsers such as Android Auto.
+  ///
+  /// [getChildren] is asked for the children of a library node: first [MediaLibraryItem.rootId]
+  /// (the top level), then any item that is browsable. Picking a playable item arrives as a
+  /// [MediaAction.playFromMediaId] action (`onPlayFromMediaId` in [setActionHandler]); a voice
+  /// request (`play X on <app>`) as [MediaAction.playFromSearch] (`onPlayFromSearch`).
+  ///
+  /// To be listed in Android Auto, the app must also declare itself a media app in its own
+  /// manifest (see the Android Auto section of the usage guide). Until this is called, browse
+  /// requests are refused, as before. Android only; no effect elsewhere.
+  Future<void> setMediaLibrary(
+      {required MediaLibraryChildrenProvider getChildren}) {
+    return FlutterMediaSessionPlatform.instance.setMediaLibrary(getChildren);
+  }
+
+  /// Turns the media library off again (see [setMediaLibrary]).
+  Future<void> clearMediaLibrary() {
+    return FlutterMediaSessionPlatform.instance.setMediaLibrary(null);
   }
 
   /// Sets the customizable action slot layout for system media controls.
