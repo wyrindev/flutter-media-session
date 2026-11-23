@@ -48,6 +48,13 @@ class FlutterMediaSessionService : MediaLibraryService() {
         private val INTERRUPTION = mapOf("reason" to "interruption")
 
         /**
+         * An extra set (to `true`) on the intent that opens the app from its media notification or
+         * the system's media controls, so the app can tell that from being opened from the launcher
+         * (for example to show what is playing).
+         */
+        const val EXTRA_OPENED_FROM_SESSION = "dev.wyrin.flutter_media_session.OPENED_FROM_SESSION"
+
+        /**
          * Singleton instance for the service, set during onCreate.
          */
         var instance: FlutterMediaSessionService? = null
@@ -377,8 +384,9 @@ class FlutterMediaSessionService : MediaLibraryService() {
         instance = this
         player = ForwardingPlayer()
         
-        // Use the launch intent of the app for the session activity
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
+        // Use the launch intent of the app for the session activity, marked so the app can tell
+        // it was opened from the media controls.
+        val intent = packageManager.getLaunchIntentForPackage(packageName)?.putExtra(EXTRA_OPENED_FROM_SESSION, true)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
         // Parse any initial actions passed before service creation

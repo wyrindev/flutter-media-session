@@ -387,6 +387,18 @@ if (Platform.isWindows) {
 
 For complete packaging options (MSIX vs. portable vs. Inno Setup / WiX installers), see the dedicated [Windows Setup Guide](windows_setup.md).
 
+### Opening the App from the Media Controls (Android)
+
+Tapping the media notification (or the system's media controls) opens the app with its launch intent, marked with the extra `FlutterMediaSessionService.EXTRA_OPENED_FROM_SESSION` set to `true`. An app that wants to show what is playing when opened this way checks for it in its `MainActivity`, both when it is created and in `onNewIntent` (when it was already running), and passes it on to Dart however it likes:
+
+```kotlin
+import dev.wyrin.flutter_media_session.FlutterMediaSessionService
+
+val fromControls = intent.getBooleanExtra(FlutterMediaSessionService.EXTRA_OPENED_FROM_SESSION, false)
+```
+
+Opened from the launcher, the extra is absent.
+
 ### Media Library & Android Auto (Android)
 
 Media browsers such as Android Auto show a library the user can browse and pick from, and accept voice requests ("play X on My App"). The library is opt-in: until `setMediaLibrary` is called, browse requests are refused and the service behaves as before.
