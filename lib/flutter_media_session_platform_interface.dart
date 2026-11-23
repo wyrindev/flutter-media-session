@@ -133,6 +133,12 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   }
 
   /// A stream of media actions emitted by the current platform.
+  /// Whether the app was started in the background by a media browser (Android Auto) through the
+  /// shared engine, rather than by the user opening it. False where that can't happen.
+  Future<bool> wasStartedInBackground() {
+    return Future.value(false);
+  }
+
   /// Pause instead of being ducked when another app speaks briefly (a navigation prompt), for
   /// spoken-word content. Has no effect where the platform doesn't duck.
   Future<void> setPauseWhenDucked(bool enabled) {

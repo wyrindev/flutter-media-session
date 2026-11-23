@@ -448,4 +448,38 @@ with `android/app/src/main/res/xml/automotive_app_desc.xml`:
 
 Android Auto lists apps installed from Google Play. To test a debug or sideloaded build, enable **Unknown sources** in Android Auto's developer settings (tap the version number in Android Auto's settings ten times to reveal them).
 
+#### When the app is closed (cold start)
+
+Android Auto browses media apps that aren't running. Without more setup, a closed app's library is empty until the app is opened on the phone. To have the plugin start the app's Dart code in the background when it's needed, opt into a Flutter engine shared by the app's screen and the media service.
+
+Declare it in the app's `AndroidManifest.xml`, inside `<application>`:
+
+```xml
+<meta-data
+    android:name="dev.wyrin.flutter_media_session.background_engine"
+    android:value="true" />
+```
+
+and make `MainActivity` use the shared engine:
+
+```kotlin
+import dev.wyrin.flutter_media_session.FlutterMediaSessionActivity
+
+class MainActivity : FlutterMediaSessionActivity()
+```
+
+The app then starts in the background (running its normal `main()`, without a screen) when the library is opened in the car or something is asked to play, not merely when Android Auto connects. The screen attaches to the same engine when the app is opened, and the engine keeps running when the screen closes. Swiping the app away from recent apps stops playback and ends it, as before.
+
+Started this way, the app should set up its library and action handlers but not activate its session or start playing until it is asked to: an active session makes it the app Android Auto resumes, taking over from whatever was playing. `wasStartedInBackground()` tells it which case it is in:
+
+```dart
+await session.setMediaLibrary(getChildren: libraryChildren);
+if (!await session.wasStartedInBackground()) {
+  await session.activate();
+}
+// Otherwise activate in onPlayFromMediaId / onPlayFromSearch / onPlay.
+```
+
+Until the app has given the session metadata or a playback state, the session reports nothing loaded, so an automatic resume from Android Auto doesn't start playback on its own.
+
 On other platforms `setMediaLibrary` has no effect.

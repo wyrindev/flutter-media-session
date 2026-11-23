@@ -156,7 +156,24 @@ class _PlayerHomeState extends State<PlayerHome> {
     _listenMediaSessionActions();
     _listenAudioPlayerEvents();
     _applyPlayerAudioContext();
-    _activate();
+    _start();
+  }
+
+  /// The media library and handlers are set up in any case. Started in the background by Android
+  /// Auto (the app was closed), the session is only activated once something is asked to play: an
+  /// active session would make this the app Android Auto resumes, taking over from what was playing.
+  Future<void> _start() async {
+    await _plugin.setMediaLibrary(getChildren: _libraryChildren);
+    if (await _plugin.wasStartedInBackground()) {
+      debugPrint('Started in the background: waiting to be asked to play');
+      return;
+    }
+    await _activate();
+  }
+
+  /// Activates the session first if the app was started in the background.
+  Future<void> _ensureActive() async {
+    if (!_active) await _activate();
   }
 
   Future<void> _loadAppVersion() async {
@@ -309,8 +326,9 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   /// A media browser picked a library item.
-  void _playFromMediaId(String mediaId) {
+  Future<void> _playFromMediaId(String mediaId) async {
     _showMessage('Media library: play $mediaId');
+    await _ensureActive();
     final index = int.tryParse(mediaId.replaceFirst('track-', ''));
     if (index != null && index >= 0 && index < _playlist.length) {
       _playIndex(index);
@@ -318,8 +336,9 @@ class _PlayerHomeState extends State<PlayerHome> {
   }
 
   /// A voice request ("play song 3 on ..."): the first title containing the query, else the first track.
-  void _playFromSearch(String query) {
+  Future<void> _playFromSearch(String query) async {
     _showMessage('Voice request: "$query"');
+    await _ensureActive();
     final q = query.toLowerCase().trim();
     final index = q.isEmpty
         ? 0
@@ -331,8 +350,6 @@ class _PlayerHomeState extends State<PlayerHome> {
     _listenMediaSessionActions();
     await _plugin.activate();
     await _plugin.setSkipIntervals(forwardSeconds: 10, backwardSeconds: 10);
-    // Android Auto and other media browsers: a small browsable library.
-    await _plugin.setMediaLibrary(getChildren: _libraryChildren);
     if (!mounted) return;
     setState(() {
       _active = true;
@@ -1128,7 +1145,7 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
         FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
       switch (action.name) {
         case 'play':
-          state._play();
+          state._ensureActive().then((_) => state._play());
           break;
         case 'pause':
           if (action.isInterruption) {

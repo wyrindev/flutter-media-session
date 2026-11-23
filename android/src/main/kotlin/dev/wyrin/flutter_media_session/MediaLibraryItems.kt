@@ -1,8 +1,26 @@
 package dev.wyrin.flutter_media_session
 
+import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+
+/**
+ * Whether the app offers a media library, saved so the service knows after a cold start (Android
+ * Auto can start the service without the app's Flutter side running). Written whenever the app turns
+ * its library on or off.
+ */
+internal object MediaLibraryPrefs {
+    private const val FILE = "flutter_media_session"
+    private const val KEY = "media_library_enabled"
+
+    fun saved(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean(KEY, false)
+
+    fun save(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY, enabled).apply()
+    }
+}
 
 /**
  * A browsable media library entry as sent from Dart (`MediaLibraryItem.toJson()`).

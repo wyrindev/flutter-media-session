@@ -14,6 +14,9 @@ class FakeFlutterMediaSessionPlatform
       StreamController<MediaAction>.broadcast();
 
   @override
+  Future<bool> wasStartedInBackground() => Future.value(false);
+
+  @override
   Future<void> setPauseWhenDucked(bool enabled) => Future.value();
 
   @override

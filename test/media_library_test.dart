@@ -12,6 +12,19 @@ class _ActionPlatform extends FlutterMediaSessionPlatform
     with MockPlatformInterfaceMixin {
   final actions = StreamController<MediaAction>.broadcast();
   MediaLibraryChildrenProvider? library;
+  var activated = false;
+  var permissionFails = false;
+
+  @override
+  Future<bool> requestNotificationPermission() async {
+    if (permissionFails) {
+      throw PlatformException(code: 'NO_ACTIVITY', message: 'no screen');
+    }
+    return true;
+  }
+
+  @override
+  Future<void> activate() async => activated = true;
 
   @override
   Stream<MediaAction> get onMediaAction => actions.stream;
@@ -158,6 +171,19 @@ void main() {
       expect(await askChildren('root'), isNull);
     });
 
+    test('wasStartedInBackground asks the platform on Android, false elsewhere',
+        () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return call.method == 'wasStartedInBackground' ? true : null;
+      });
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      expect(await platform.wasStartedInBackground(), isTrue);
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(await platform.wasStartedInBackground(), isFalse);
+      expect(calls.map((c) => c.method), ['wasStartedInBackground']);
+    });
+
     test('elsewhere it does nothing (no media browsers)', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       await platform.setMediaLibrary((_) async => const []);
@@ -223,6 +249,16 @@ void main() {
       expect(fake.library, same(provider));
       await FlutterMediaSession().clearMediaLibrary();
       expect(fake.library, isNull);
+    });
+
+    test(
+        'activate goes ahead when there is no screen to ask for notification permission from (started in the background)',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      fake.permissionFails = true;
+      await FlutterMediaSession().activate();
+      expect(fake.activated, isTrue);
     });
 
     test('setActionHandler routes playFromMediaId and playFromSearch',

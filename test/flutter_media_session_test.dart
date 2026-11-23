@@ -7,6 +7,9 @@ class MockFlutterMediaSessionPlatform
     with MockPlatformInterfaceMixin
     implements FlutterMediaSessionPlatform {
   @override
+  Future<bool> wasStartedInBackground() => Future.value(false);
+
+  @override
   Future<void> setPauseWhenDucked(bool enabled) => Future.value();
 
   @override

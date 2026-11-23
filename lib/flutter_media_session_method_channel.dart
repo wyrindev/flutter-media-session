@@ -118,6 +118,13 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
   }
 
   @override
+  Future<bool> wasStartedInBackground() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return false;
+    return await methodChannel.invokeMethod<bool>('wasStartedInBackground') ??
+        false;
+  }
+
+  @override
   Future<void> setPauseWhenDucked(bool enabled) async {
     if (defaultTargetPlatform != TargetPlatform.android) return;
     await methodChannel.invokeMethod('setPauseWhenDucked', enabled);

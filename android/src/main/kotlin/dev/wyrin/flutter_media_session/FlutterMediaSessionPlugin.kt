@@ -191,6 +191,9 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             "setSkipIntervals" -> {
                 result.success(null)
             }
+            "wasStartedInBackground" -> {
+                result.success(FlutterMediaSessionEngine.startedInBackground)
+            }
             "setPauseWhenDucked" -> {
                 pauseWhenDucked = call.arguments as? Boolean ?: false
                 FlutterMediaSessionService.instance?.onPauseWhenDuckedChanged()
@@ -198,6 +201,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             }
             "setMediaLibraryEnabled" -> {
                 mediaLibraryEnabled = call.arguments as? Boolean ?: false
+                if (::context.isInitialized) MediaLibraryPrefs.save(context, mediaLibraryEnabled)
                 FlutterMediaSessionService.instance?.onMediaLibraryEnabledChanged()
                 result.success(null)
             }

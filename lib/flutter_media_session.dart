@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'src/models/media_action.dart';
 import 'src/models/action_slot_layout.dart';
 import 'src/models/media_library_item.dart';
@@ -132,8 +133,13 @@ class FlutterMediaSession {
   Future<void> activate() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Unify lifecycle by automatically requesting permissions when activating on Android
-      await FlutterMediaSessionPlatform.instance
-          .requestNotificationPermission();
+      try {
+        await FlutterMediaSessionPlatform.instance
+            .requestNotificationPermission();
+      } on PlatformException {
+        // No screen to ask from: the app was started in the background (a media browser such as
+        // Android Auto, see FlutterMediaSessionEngine). Activate anyway; it is asked next time.
+      }
     }
     return FlutterMediaSessionPlatform.instance.activate();
   }
@@ -209,6 +215,18 @@ class FlutterMediaSession {
   /// such as a Chromecast or DLNA socket on the local network.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
+  }
+
+  /// Whether a media browser (Android Auto) started the app in the background while it was closed,
+  /// through the shared engine (see the Android Auto section of the usage guide), rather than the
+  /// user opening it.
+  ///
+  /// An app started this way should set up its media library and action handlers, but not
+  /// [activate] the session or start playing until it is asked to (an item picked, a voice request):
+  /// an active session makes it the app Android Auto resumes, taking over from whatever was playing.
+  /// Android only; `false` elsewhere.
+  Future<bool> wasStartedInBackground() {
+    return FlutterMediaSessionPlatform.instance.wasStartedInBackground();
   }
 
   /// For spoken-word content (podcasts, audiobooks, text to speech): when another app speaks
