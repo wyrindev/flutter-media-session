@@ -191,6 +191,11 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             "setSkipIntervals" -> {
                 result.success(null)
             }
+            "setPauseWhenDucked" -> {
+                pauseWhenDucked = call.arguments as? Boolean ?: false
+                FlutterMediaSessionService.instance?.onPauseWhenDuckedChanged()
+                result.success(null)
+            }
             "setMediaLibraryEnabled" -> {
                 mediaLibraryEnabled = call.arguments as? Boolean ?: false
                 FlutterMediaSessionService.instance?.onMediaLibraryEnabledChanged()
@@ -333,6 +338,13 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
         eventChannel.setStreamHandler(null)
         instance = null
     }
+
+    /**
+     * Whether a brief interruption that only asks for ducking (a navigation prompt) pauses playback
+     * instead, for spoken-word content. Off by default (the system lowers the volume).
+     */
+    var pauseWhenDucked = false
+        internal set
 
     /**
      * Whether the app has opted into the browsable media library (Android Auto and other

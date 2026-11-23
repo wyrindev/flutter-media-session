@@ -51,4 +51,20 @@ internal class FlutterMediaSessionPluginTest {
         Mockito.verify(off).success(null)
         kotlin.test.assertFalse(plugin.mediaLibraryEnabled)
     }
+
+    @Test
+    fun onMethodCall_setPauseWhenDucked_togglesPausingInsteadOfDucking() {
+        val plugin = FlutterMediaSessionPlugin()
+        kotlin.test.assertFalse(plugin.pauseWhenDucked, "off by default: the system ducks")
+
+        val on: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("setPauseWhenDucked", true), on)
+        Mockito.verify(on).success(null)
+        kotlin.test.assertTrue(plugin.pauseWhenDucked)
+
+        val off: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("setPauseWhenDucked", false), off)
+        Mockito.verify(off).success(null)
+        kotlin.test.assertFalse(plugin.pauseWhenDucked)
+    }
 }

@@ -133,6 +133,12 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   }
 
   /// A stream of media actions emitted by the current platform.
+  /// Pause instead of being ducked when another app speaks briefly (a navigation prompt), for
+  /// spoken-word content. Has no effect where the platform doesn't duck.
+  Future<void> setPauseWhenDucked(bool enabled) {
+    return Future.value();
+  }
+
   /// Opts into a browsable media library (Android Auto and other Media3 browsers), whose items
   /// [getChildren] provides; null opts out. Has no effect on platforms without media browsers.
   Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) {

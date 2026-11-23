@@ -2,7 +2,7 @@
 
 ### Features
 
-  * **Android**: Added an opt-in browsable media library for Android Auto and other Media3 media browsers. `FlutterMediaSession.setMediaLibrary(getChildren: ...)` provides the library's nodes from Dart (`MediaLibraryItem`); picking an item arrives as `MediaAction.playFromMediaId` and a voice request ("play X on My App") as `MediaAction.playFromSearch`, with `onPlayFromMediaId` and `onPlayFromSearch` in `setActionHandler`. `FlutterMediaSessionService` is now a `MediaLibraryService`; without `setMediaLibrary` it refuses browse requests and behaves as before. See the usage guide for the Android Auto manifest declaration.
+  * **Android**: Added Android Auto support. Apps can opt into a browsable media library with `FlutterMediaSession.setMediaLibrary(getChildren: ...)`, whose nodes come from Dart as `MediaLibraryItem`s; picking an item arrives as `MediaAction.playFromMediaId` and a voice request ("play X on My App") as `MediaAction.playFromSearch`, with `onPlayFromMediaId` and `onPlayFromSearch` in `setActionHandler`. For spoken content, `setPauseWhenDucked(true)` pauses during navigation prompts instead of ducking, and pauses and resumes caused by interruptions carry `MediaAction.isInterruption` so apps can step back on resume. `FlutterMediaSessionService` is now a `MediaLibraryService`; without `setMediaLibrary` it refuses browse requests and behaves as before. See the usage guide for the Android Auto manifest declaration.
 
 ---
 

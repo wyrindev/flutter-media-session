@@ -106,6 +106,11 @@ class MediaAction {
   /// The spoken search query, for [playFromSearch] actions.
   String? get query => customExtras?['query'] as String?;
 
+  /// Whether this `pause` or `play` was caused by an audio interruption (a call, a navigation
+  /// prompt) rather than by the user, when the platform reports it (Android with
+  /// `setAutoHandleInterruptions`).
+  bool get isInterruption => customExtras?['reason'] == 'interruption';
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

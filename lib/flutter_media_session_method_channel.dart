@@ -117,6 +117,12 @@ class MethodChannelFlutterMediaSession extends FlutterMediaSessionPlatform {
     await methodChannel.invokeMethod('setBackgroundKeepAlive', enabled);
   }
 
+  @override
+  Future<void> setPauseWhenDucked(bool enabled) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    await methodChannel.invokeMethod('setPauseWhenDucked', enabled);
+  }
+
   MediaLibraryChildrenProvider? _libraryChildren;
 
   @override

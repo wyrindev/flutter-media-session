@@ -14,6 +14,9 @@ class FakeFlutterMediaSessionPlatform
       StreamController<MediaAction>.broadcast();
 
   @override
+  Future<void> setPauseWhenDucked(bool enabled) => Future.value();
+
+  @override
   Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) =>
       Future.value();
 

@@ -92,7 +92,8 @@ App Playback Stop / Teardown
   - Maps `ActionSlotLayout` directly to notification buttons and compact view indices (`setShowActionsInCompactView`).
   - Supports custom actions with custom icon resources (`customIconResource`) located in `res/drawable*`.
 - **Audio Focus**:
-  - When `setAutoHandleInterruptions(true)` is set, the service requests `AUDIOFOCUS_GAIN` via `AudioManagerCompat` upon playback and listens for `AUDIOFOCUS_LOSS` / `AUDIOFOCUS_LOSS_TRANSIENT`, dispatching `pause` or `play` actions across the event channel.
+  - When `setAutoHandleInterruptions(true)` is set, the service requests `AUDIOFOCUS_GAIN` via `AudioManagerCompat` upon playback and listens for `AUDIOFOCUS_LOSS` / `AUDIOFOCUS_LOSS_TRANSIENT`, dispatching `pause` or `play` actions across the event channel, marked with `reason: interruption`.
+  - With `setPauseWhenDucked(true)` the request uses `CONTENT_TYPE_SPEECH` and `willPauseWhenDucked`, so `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK` (a navigation prompt) pauses instead of being ducked; focus is kept, and `AUDIOFOCUS_GAIN` resumes.
 - **Keep-Alive**:
   - When `setBackgroundKeepAlive(true)` is enabled, acquires a `PARTIAL_WAKE_LOCK` and a `WIFI_MODE_FULL_HIGH_PERF` Wi-Fi lock to preserve network connections during screen-off streaming (e.g. casting).
 

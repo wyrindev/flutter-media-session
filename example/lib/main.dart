@@ -69,6 +69,7 @@ class _PlayerHomeState extends State<PlayerHome> {
   PlaybackStatus _status = PlaybackStatus.idle;
   bool _isBuffering = false;
   bool _handlesInterruptions = false;
+  bool _pauseWhenDucked = false;
   bool _backgroundKeepAlive = false;
   bool _hasError = false;
   bool _isSwitchingTrack = false;
@@ -252,10 +253,65 @@ class _PlayerHomeState extends State<PlayerHome> {
     }));
   }
 
+  /// The demo media library: a "Demo library" folder holding the playlist.
+  Future<List<MediaLibraryItem>> _libraryChildren(String parentId) async {
+    debugPrint('Media library: children of $parentId');
+    if (parentId == MediaLibraryItem.rootId) {
+      return const [
+        MediaLibraryItem(
+            id: 'demo',
+            title: 'Demo library',
+            isBrowsable: true,
+            isPlayable: false),
+      ];
+    }
+    if (parentId == 'demo') {
+      return [
+        for (var i = 0; i < _playlist.length; i++)
+          MediaLibraryItem(
+            id: 'track-$i',
+            title: _playlist[i].title,
+            subtitle: _playlist[i].artist,
+            artworkUri: _playlist[i].artwork,
+          ),
+      ];
+    }
+    return const [];
+  }
+
+  void _showMessage(String message) {
+    debugPrint(message);
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  /// A media browser picked a library item.
+  void _playFromMediaId(String mediaId) {
+    _showMessage('Media library: play $mediaId');
+    final index = int.tryParse(mediaId.replaceFirst('track-', ''));
+    if (index != null && index >= 0 && index < _playlist.length) {
+      _playIndex(index);
+    }
+  }
+
+  /// A voice request ("play song 3 on ..."): the first title containing the query, else the first track.
+  void _playFromSearch(String query) {
+    _showMessage('Voice request: "$query"');
+    final q = query.toLowerCase().trim();
+    final index = q.isEmpty
+        ? 0
+        : _playlist.indexWhere((t) => t.title.toLowerCase().contains(q));
+    _playIndex(index < 0 ? 0 : index);
+  }
+
   Future<void> _activate() async {
     _listenMediaSessionActions();
     await _plugin.activate();
     await _plugin.setSkipIntervals(forwardSeconds: 10, backwardSeconds: 10);
+    // Android Auto and other media browsers: a small browsable library.
+    await _plugin.setMediaLibrary(getChildren: _libraryChildren);
     if (!mounted) return;
     setState(() {
       _active = true;
@@ -727,6 +783,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                                 setState(() => _handlesInterruptions = val);
                                 _plugin.setAutoHandleInterruptions(val);
                               },
+                              pauseWhenDucked: _pauseWhenDucked,
+                              onPauseWhenDuckedChanged: (val) {
+                                setState(() => _pauseWhenDucked = val);
+                                _plugin.setPauseWhenDucked(val);
+                              },
                               backgroundKeepAlive: _backgroundKeepAlive,
                               onBackgroundKeepAliveChanged: (val) {
                                 setState(() => _backgroundKeepAlive = val);
@@ -794,6 +855,11 @@ class _PlayerHomeState extends State<PlayerHome> {
                       onHandleInterruptionsChanged: (val) {
                         setState(() => _handlesInterruptions = val);
                         _plugin.setAutoHandleInterruptions(val);
+                      },
+                      pauseWhenDucked: _pauseWhenDucked,
+                      onPauseWhenDuckedChanged: (val) {
+                        setState(() => _pauseWhenDucked = val);
+                        _plugin.setPauseWhenDucked(val);
                       },
                       backgroundKeepAlive: _backgroundKeepAlive,
                       onBackgroundKeepAliveChanged: (val) {
@@ -1040,7 +1106,16 @@ class _ExamplePlayerAdapter implements MediaSessionAdapter {
           state._play();
           break;
         case 'pause':
+          if (action.isInterruption) {
+            state._showMessage('Paused by an interruption');
+          }
           state._pause();
+          break;
+        case 'playFromMediaId':
+          if (action.mediaId != null) state._playFromMediaId(action.mediaId!);
+          break;
+        case 'playFromSearch':
+          state._playFromSearch(action.query ?? '');
           break;
         case 'stop':
           state._stop();

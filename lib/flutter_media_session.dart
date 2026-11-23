@@ -211,6 +211,18 @@ class FlutterMediaSession {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
   }
 
+  /// For spoken-word content (podcasts, audiobooks, text to speech): when another app speaks
+  /// briefly and would only lower this app's volume (a navigation prompt), pause instead, and
+  /// resume when it's done. Lowered speech under another voice can't be followed. Defaults to
+  /// `false` (the system lowers the volume, which suits music).
+  ///
+  /// Needs [setAutoHandleInterruptions] enabled. The pause and the resume arrive as `pause` and
+  /// `play` actions with [MediaAction.isInterruption] set, so an app can step back a little when
+  /// it resumes. Android only; no effect elsewhere.
+  Future<void> setPauseWhenDucked(bool enabled) {
+    return FlutterMediaSessionPlatform.instance.setPauseWhenDucked(enabled);
+  }
+
   /// Opts into a browsable media library, shown by media browsers such as Android Auto.
   ///
   /// [getChildren] is asked for the children of a library node: first [MediaLibraryItem.rootId]

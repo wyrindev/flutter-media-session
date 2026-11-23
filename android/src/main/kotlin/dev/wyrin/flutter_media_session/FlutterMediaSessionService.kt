@@ -44,6 +44,9 @@ class FlutterMediaSessionService : MediaLibraryService() {
     private lateinit var player: ForwardingPlayer
 
     companion object {
+        /** Marks a pause or play caused by an audio interruption (a call, a navigation prompt), not by the user. */
+        private val INTERRUPTION = mapOf("reason" to "interruption")
+
         /**
          * Singleton instance for the service, set during onCreate.
          */
@@ -271,22 +274,27 @@ class FlutterMediaSessionService : MediaLibraryService() {
             AudioManager.AUDIOFOCUS_LOSS -> {
                 hasAudioFocus = false
                 resumeOnFocusGain = false
-                FlutterMediaSessionPlugin.instance?.sendAction("pause")
+                FlutterMediaSessionPlugin.instance?.sendAction("pause", INTERRUPTION)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 resumeOnFocusGain = hasAudioFocus
                 hasAudioFocus = false
-                FlutterMediaSessionPlugin.instance?.sendAction("pause")
+                FlutterMediaSessionPlugin.instance?.sendAction("pause", INTERRUPTION)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // No-op: the system ducks playback volume automatically because
-                // willPauseWhenDucked is false on the focus request.
+                // By default the system ducks playback volume (willPauseWhenDucked is false on the
+                // focus request). Spoken-word apps opt into pausing instead: lowered speech under a
+                // navigation prompt is unintelligible. Focus is kept, so GAIN comes back after.
+                if (FlutterMediaSessionPlugin.instance?.pauseWhenDucked == true) {
+                    resumeOnFocusGain = hasAudioFocus
+                    FlutterMediaSessionPlugin.instance?.sendAction("pause", INTERRUPTION)
+                }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 hasAudioFocus = true
                 if (resumeOnFocusGain) {
                     resumeOnFocusGain = false
-                    FlutterMediaSessionPlugin.instance?.sendAction("play")
+                    FlutterMediaSessionPlugin.instance?.sendAction("play", INTERRUPTION)
                 }
             }
         }
@@ -295,15 +303,16 @@ class FlutterMediaSessionService : MediaLibraryService() {
     private fun requestAudioFocus() {
         if (hasAudioFocus) return
         val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val spoken = FlutterMediaSessionPlugin.instance?.pauseWhenDucked == true
             val request = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setContentType(if (spoken) android.media.AudioAttributes.CONTENT_TYPE_SPEECH else android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
                 .setOnAudioFocusChangeListener(audioFocusListener)
-                .setWillPauseWhenDucked(false)
+                .setWillPauseWhenDucked(spoken)
                 .build()
                 .also { audioFocusRequest = it }
             audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -341,6 +350,19 @@ class FlutterMediaSessionService : MediaLibraryService() {
      * plugins (audioplayers, just_audio) can take it back without
      * fighting us.
      */
+    /**
+     * The app switched pausing instead of ducking on or off: the focus request is built again (its
+     * attributes change), and re-requested if focus is held.
+     */
+    fun onPauseWhenDuckedChanged() {
+        audioFocusRequest = null
+        if (hasAudioFocus) {
+            abandonAudioFocus()
+            requestAudioFocus()
+        }
+        if (::player.isInitialized) player.refreshCommands()
+    }
+
     fun onHandlesInterruptionsChanged(enabled: Boolean) {
         if (!enabled) {
             abandonAudioFocus()
@@ -1120,7 +1142,7 @@ class FlutterMediaSessionService : MediaLibraryService() {
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(C.USAGE_MEDIA)
-                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .setContentType(if (FlutterMediaSessionPlugin.instance?.pauseWhenDucked == true) C.AUDIO_CONTENT_TYPE_SPEECH else C.AUDIO_CONTENT_TYPE_MUSIC)
                         .build()
                 )
                 .setPlaylist(listOf(

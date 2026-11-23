@@ -331,6 +331,27 @@ await session.setAutoHandleInterruptions(true);
 - **When to enable**: When using custom pipelines or engines that do not handle OS focus (e.g., bare `fvp` or raw video decoders).
 - **Other platforms**: No-op on iOS, macOS, Windows, and Web.
 
+#### Spoken content: pause for navigation prompts (`setPauseWhenDucked`, Android)
+
+By default a brief interruption that only asks to lower other audio (a navigation prompt, especially in Android Auto) ducks your volume. That suits music, but lowered speech under another voice can't be followed. Podcast, audiobook and text-to-speech apps can pause instead:
+
+```dart
+import 'package:flutter_media_session/flutter_media_session.dart';
+
+await session.setAutoHandleInterruptions(true);
+await session.setPauseWhenDucked(true);
+
+FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
+  if (action == MediaAction.play && action.isInterruption) {
+    // Back after a call or a prompt: step back a little so nothing is missed.
+    player.seek(player.position - const Duration(seconds: 3));
+  }
+});
+```
+
+- The focus request is made with `CONTENT_TYPE_SPEECH` and `willPauseWhenDucked`, so the system tells the app instead of ducking it. The pause and the resume arrive as `pause` and `play` actions.
+- Pauses and resumes caused by an interruption (a call, a prompt) carry `MediaAction.isInterruption`, so an app can tell them from the user pressing pause, and step back on resume.
+
 ### Background Keep-Alive (`setBackgroundKeepAlive`)
 
 For audio streamed or cast off-device (e.g. Google Cast / DLNA), the local audio hardware is idle, leaving the app vulnerable to OS sleep or Doze termination:
