@@ -280,12 +280,12 @@ void main() {
       FlutterMediaSessionPlatform.instance = original;
     });
 
-    test('setMediaLibrary and clearMediaLibrary pass the provider through',
+    test('setMediaLibrary passes the provider through, and null turns it off',
         () async {
       Future<List<MediaLibraryItem>> provider(String _) async => const [];
       await FlutterMediaSession().setMediaLibrary(getChildren: provider);
       expect(fake.library, same(provider));
-      await FlutterMediaSession().clearMediaLibrary();
+      await FlutterMediaSession().setMediaLibrary();
       expect(fake.library, isNull);
     });
 

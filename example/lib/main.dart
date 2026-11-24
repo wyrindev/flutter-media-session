@@ -859,13 +859,16 @@ class _PlayerHomeState extends State<PlayerHome> {
                               handlesInterruptions: _handlesInterruptions,
                               onHandleInterruptionsChanged: (val) {
                                 setState(() => _handlesInterruptions = val);
-                                _plugin.setAutoHandleInterruptions(val);
+                                _plugin.setAutoHandleInterruptions(val,
+                                    pauseWhenDucked: _pauseWhenDucked);
                                 _applyPlayerAudioContext();
                               },
                               pauseWhenDucked: _pauseWhenDucked,
                               onPauseWhenDuckedChanged: (val) {
                                 setState(() => _pauseWhenDucked = val);
-                                _plugin.setPauseWhenDucked(val);
+                                _plugin.setAutoHandleInterruptions(
+                                    _handlesInterruptions,
+                                    pauseWhenDucked: val);
                                 _applyPlayerAudioContext();
                               },
                               backgroundKeepAlive: _backgroundKeepAlive,
@@ -934,13 +937,16 @@ class _PlayerHomeState extends State<PlayerHome> {
                       handlesInterruptions: _handlesInterruptions,
                       onHandleInterruptionsChanged: (val) {
                         setState(() => _handlesInterruptions = val);
-                        _plugin.setAutoHandleInterruptions(val);
+                        _plugin.setAutoHandleInterruptions(val,
+                            pauseWhenDucked: _pauseWhenDucked);
                         _applyPlayerAudioContext();
                       },
                       pauseWhenDucked: _pauseWhenDucked,
                       onPauseWhenDuckedChanged: (val) {
                         setState(() => _pauseWhenDucked = val);
-                        _plugin.setPauseWhenDucked(val);
+                        _plugin.setAutoHandleInterruptions(
+                            _handlesInterruptions,
+                            pauseWhenDucked: val);
                         _applyPlayerAudioContext();
                       },
                       backgroundKeepAlive: _backgroundKeepAlive,

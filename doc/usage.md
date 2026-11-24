@@ -331,15 +331,14 @@ await session.setAutoHandleInterruptions(true);
 - **When to enable**: When using custom pipelines or engines that do not handle OS focus (e.g., bare `fvp` or raw video decoders).
 - **Other platforms**: No-op on iOS, macOS, Windows, and Web.
 
-#### Spoken content: pause for navigation prompts (`setPauseWhenDucked`, Android)
+#### Spoken content: pause for navigation prompts (`pauseWhenDucked`, Android)
 
 By default a brief interruption that only asks to lower other audio (a navigation prompt, especially in Android Auto) ducks your volume. That suits music, but lowered speech under another voice can't be followed. Podcast, audiobook and text-to-speech apps can pause instead:
 
 ```dart
 import 'package:flutter_media_session/flutter_media_session.dart';
 
-await session.setAutoHandleInterruptions(true);
-await session.setPauseWhenDucked(true);
+await session.setAutoHandleInterruptions(true, pauseWhenDucked: true);
 
 FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
   if (action == MediaAction.play && action.isInterruption) {
@@ -350,6 +349,7 @@ FlutterMediaSessionPlatform.instance.onMediaAction.listen((action) {
 ```
 
 - The focus request is made with `CONTENT_TYPE_SPEECH` and `willPauseWhenDucked`, so the system tells the app instead of ducking it. The pause and the resume arrive as `pause` and `play` actions.
+- Each `setAutoHandleInterruptions` call sets both, so pass `pauseWhenDucked` every time; without it, ducking is back.
 - The plugin must be the only one in the app requesting audio focus. If the player requests its own (the default for `audioplayers` and `just_audio`), the system ducks the player's request and this has no effect; turn the player's focus handling off as above.
 - Pauses and resumes caused by an interruption (a call, a prompt) carry `MediaAction.isInterruption`, so an app can tell them from the user pressing pause, and step back on resume.
 
@@ -433,7 +433,7 @@ session.setActionHandler(
 );
 
 // Turn it off again:
-await session.clearMediaLibrary();
+await session.setMediaLibrary();
 ```
 
 - The browser asks for the children of `MediaLibraryItem.rootId` first, then of any item with `isBrowsable: true`. Items with `isPlayable: true` can be picked.

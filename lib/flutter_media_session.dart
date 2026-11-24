@@ -206,9 +206,22 @@ class FlutterMediaSession {
   /// Leave this off if your audio player already manages focus
   /// (such as `audioplayers` or `just_audio`). Turn it on for players
   /// that do not manage focus themselves (such as `fvp` or `video_player`).
-  Future<void> setAutoHandleInterruptions(bool enabled) {
-    return FlutterMediaSessionPlatform.instance
-        .setAutoHandleInterruptions(enabled);
+  ///
+  /// [pauseWhenDucked] is for spoken-word content (podcasts, audiobooks, text to speech): when
+  /// another app speaks briefly and would only lower this app's volume (a navigation prompt),
+  /// pause instead, and resume when it's done. Lowered speech under another voice can't be
+  /// followed. Defaults to `false` (the system lowers the volume, which suits music). The pause
+  /// and the resume arrive as `pause` and `play` actions with [MediaAction.isInterruption] set, so
+  /// an app can step back a little when it resumes. Each call sets both, so pass it every time.
+  /// Android only; no effect elsewhere.
+  Future<void> setAutoHandleInterruptions(
+    bool enabled, {
+    bool pauseWhenDucked = false,
+  }) async {
+    final platform = FlutterMediaSessionPlatform.instance;
+    // First, so focus is requested with the right attributes when enabling while playing.
+    await platform.setPauseWhenDucked(enabled && pauseWhenDucked);
+    await platform.setAutoHandleInterruptions(enabled);
   }
 
   /// Opts the session into a background keep-alive. Defaults to `false`.
@@ -251,18 +264,6 @@ class FlutterMediaSession {
     return FlutterMediaSessionPlatform.instance.wasStartedInBackground();
   }
 
-  /// For spoken-word content (podcasts, audiobooks, text to speech): when another app speaks
-  /// briefly and would only lower this app's volume (a navigation prompt), pause instead, and
-  /// resume when it's done. Lowered speech under another voice can't be followed. Defaults to
-  /// `false` (the system lowers the volume, which suits music).
-  ///
-  /// Needs [setAutoHandleInterruptions] enabled. The pause and the resume arrive as `pause` and
-  /// `play` actions with [MediaAction.isInterruption] set, so an app can step back a little when
-  /// it resumes. Android only; no effect elsewhere.
-  Future<void> setPauseWhenDucked(bool enabled) {
-    return FlutterMediaSessionPlatform.instance.setPauseWhenDucked(enabled);
-  }
-
   /// Opts into a browsable media library, shown by media browsers such as Android Auto.
   ///
   /// [getChildren] is asked for the children of a library node: first [MediaLibraryItem.rootId]
@@ -273,15 +274,10 @@ class FlutterMediaSession {
   ///
   /// To be listed in Android Auto, the app must also declare itself a media app in its own
   /// manifest (see the Android Auto section of the usage guide). Until this is called, browse
-  /// requests are refused, as before. Android only; no effect elsewhere.
-  Future<void> setMediaLibrary(
-      {required MediaLibraryChildrenProvider getChildren}) {
+  /// requests are refused, as before; a null [getChildren] turns the library off again. Android
+  /// only; no effect elsewhere.
+  Future<void> setMediaLibrary({MediaLibraryChildrenProvider? getChildren}) {
     return FlutterMediaSessionPlatform.instance.setMediaLibrary(getChildren);
-  }
-
-  /// Turns the media library off again (see [setMediaLibrary]).
-  Future<void> clearMediaLibrary() {
-    return FlutterMediaSessionPlatform.instance.setMediaLibrary(null);
   }
 
   /// Sets the customizable action slot layout for system media controls.

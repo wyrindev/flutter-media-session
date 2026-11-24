@@ -37,6 +37,26 @@ void main() {
     ]);
   });
 
+  test('setAutoHandleInterruptions sets pausing when ducked with it, first',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final original = FlutterMediaSessionPlatform.instance;
+    FlutterMediaSessionPlatform.instance = platform;
+    addTearDown(() => FlutterMediaSessionPlatform.instance = original);
+    final session = FlutterMediaSession();
+    await session.setAutoHandleInterruptions(true, pauseWhenDucked: true);
+    await session.setAutoHandleInterruptions(true);
+    await session.setAutoHandleInterruptions(false, pauseWhenDucked: true);
+    expect(calls.map((c) => (c.method, c.arguments)), [
+      ('setPauseWhenDucked', true),
+      ('setAutoHandleInterruptions', true),
+      ('setPauseWhenDucked', false),
+      ('setAutoHandleInterruptions', true),
+      ('setPauseWhenDucked', false),
+      ('setAutoHandleInterruptions', false),
+    ]);
+  });
+
   test('setPauseWhenDucked does nothing elsewhere', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     await platform.setPauseWhenDucked(true);
