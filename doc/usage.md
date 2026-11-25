@@ -480,6 +480,24 @@ import dev.wyrin.flutter_media_session.FlutterMediaSessionActivity
 class MainActivity : FlutterMediaSessionActivity()
 ```
 
+If your app uses `FlutterFragmentActivity` (e.g. for plugins that require Android fragments, such as `local_auth`), implement the engine hooks on it directly instead:
+
+```kotlin
+import android.content.Context
+import dev.wyrin.flutter_media_session.FlutterMediaSessionEngine
+import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.engine.FlutterEngine
+
+class MainActivity : FlutterFragmentActivity() {
+    override fun provideFlutterEngine(context: Context): FlutterEngine {
+        FlutterMediaSessionEngine.startedInBackground = false
+        return FlutterMediaSessionEngine.provide(context)
+    }
+
+    override fun shouldDestroyEngineWithHost(): Boolean = false
+}
+```
+
 The app then starts in the background (running its normal `main()`, without a screen) when the library is opened in the car or something is asked to play, not merely when Android Auto connects. The screen attaches to the same engine when the app is opened, and the engine keeps running when the screen closes. Swiping the app away from recent apps sends `stop`, as closing the screen used to end playback.
 
 Started this way, the app should set up its library and action handlers but not activate its session or start playing until it is asked to: an active session makes it the app Android Auto resumes, taking over from whatever was playing. `wasStartedInBackground()` tells it which case it is in:
