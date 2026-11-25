@@ -31,7 +31,6 @@ object FlutterMediaSessionEngine {
      */
     @Volatile
     var startedInBackground = false
-        internal set
 
     /** Whether the app opted into the shared engine (the manifest meta-data). */
     fun isEnabled(context: Context): Boolean = try {

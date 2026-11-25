@@ -480,22 +480,12 @@ import dev.wyrin.flutter_media_session.FlutterMediaSessionActivity
 class MainActivity : FlutterMediaSessionActivity()
 ```
 
-If your app uses `FlutterFragmentActivity` (e.g. for plugins that require Android fragments, such as `local_auth`), implement the engine hooks on it directly instead:
+If your app uses `FlutterFragmentActivity` (e.g. for plugins that require Android fragments, such as `local_auth`), extend `FlutterMediaSessionFragmentActivity` instead:
 
 ```kotlin
-import android.content.Context
-import dev.wyrin.flutter_media_session.FlutterMediaSessionEngine
-import io.flutter.embedding.android.FlutterFragmentActivity
-import io.flutter.embedding.engine.FlutterEngine
+import dev.wyrin.flutter_media_session.FlutterMediaSessionFragmentActivity
 
-class MainActivity : FlutterFragmentActivity() {
-    override fun provideFlutterEngine(context: Context): FlutterEngine {
-        FlutterMediaSessionEngine.startedInBackground = false
-        return FlutterMediaSessionEngine.provide(context)
-    }
-
-    override fun shouldDestroyEngineWithHost(): Boolean = false
-}
+class MainActivity : FlutterMediaSessionFragmentActivity()
 ```
 
 The app then starts in the background (running its normal `main()`, without a screen) when the library is opened in the car or something is asked to play, not merely when Android Auto connects. The screen attaches to the same engine when the app is opened, and the engine keeps running when the screen closes. Swiping the app away from recent apps sends `stop`, as closing the screen used to end playback.
