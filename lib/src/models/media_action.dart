@@ -88,6 +88,41 @@ class MediaAction {
   /// Action to toggle repeat mode.
   static const repeat = MediaAction('repeat');
 
+  /// A media browser (such as Android Auto) asked to play an item of the media library.
+  ///
+  /// The item's id is in [customExtras] under `mediaId` (see [mediaId]). Only sent once the app
+  /// has opted into a library with `FlutterMediaSession.setMediaLibrary`. Android only.
+  static const playFromMediaId = MediaAction('playFromMediaId');
+
+  /// A voice request such as `play X on <app>` (Google Assistant, Android Auto).
+  ///
+  /// The spoken query is in [customExtras] under `query` (see [query]); what it means is up to the
+  /// app. Android only.
+  static const playFromSearch = MediaAction('playFromSearch');
+
+  /// The media library item to play, for [playFromMediaId] actions.
+  String? get mediaId => customExtras?['mediaId'] as String?;
+
+  /// Whether this [playFromMediaId] resumes the item saved with
+  /// `FlutterMediaSession.setResumptionItem` (Android Auto reconnecting, the system's resume card),
+  /// rather than the user picking it.
+  bool get isResumption => customExtras?['resumed'] == true;
+
+  /// Where to start, for a [playFromMediaId] that resumes a saved item ([isResumption]); null to
+  /// start from the beginning.
+  Duration? get startPosition {
+    final ms = customExtras?['positionMs'];
+    return ms is int ? Duration(milliseconds: ms) : null;
+  }
+
+  /// The spoken search query, for [playFromSearch] actions.
+  String? get query => customExtras?['query'] as String?;
+
+  /// Whether this `pause` or `play` was caused by an audio interruption (a call, a navigation
+  /// prompt) rather than by the user, when the platform reports it (Android with
+  /// `setAutoHandleInterruptions`).
+  bool get isInterruption => customExtras?['reason'] == 'interruption';
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

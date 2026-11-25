@@ -32,6 +32,8 @@ class SettingsPanel extends StatelessWidget {
   final MediaAction repeatAction;
   final bool handlesInterruptions;
   final void Function(bool) onHandleInterruptionsChanged;
+  final bool pauseWhenDucked;
+  final void Function(bool) onPauseWhenDuckedChanged;
   final bool backgroundKeepAlive;
   final void Function(bool) onBackgroundKeepAliveChanged;
   final AudioSourceType audioSource;
@@ -50,6 +52,8 @@ class SettingsPanel extends StatelessWidget {
     required this.repeatAction,
     required this.handlesInterruptions,
     required this.onHandleInterruptionsChanged,
+    required this.pauseWhenDucked,
+    required this.onPauseWhenDuckedChanged,
     required this.backgroundKeepAlive,
     required this.onBackgroundKeepAliveChanged,
     required this.audioSource,
@@ -151,6 +155,15 @@ class SettingsPanel extends StatelessWidget {
                             "Automatically pause during phone calls or when other apps play audio"),
                         value: handlesInterruptions,
                         onChanged: onHandleInterruptionsChanged,
+                      ),
+                      SwitchListTile(
+                        title: const Text("Pause for Navigation Prompts"),
+                        subtitle: const Text(
+                            "For spoken content: pause instead of lowering the volume. Needs Handle Audio Focus."),
+                        value: handlesInterruptions && pauseWhenDucked,
+                        onChanged: handlesInterruptions
+                            ? onPauseWhenDuckedChanged
+                            : null,
                       ),
                     ],
                     if (!kIsWeb && !Platform.isIOS) ...[

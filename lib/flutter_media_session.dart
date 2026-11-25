@@ -3,8 +3,10 @@ library;
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'src/models/media_action.dart';
 import 'src/models/action_slot_layout.dart';
+import 'src/models/media_library_item.dart';
 import 'src/adapters/media_session_adapter.dart';
 import 'flutter_media_session_platform_interface.dart';
 
@@ -12,6 +14,7 @@ export 'src/models/media_metadata.dart';
 export 'src/models/playback_state.dart';
 export 'src/models/media_action.dart';
 export 'src/models/action_slot_layout.dart';
+export 'src/models/media_library_item.dart';
 export 'src/adapters/media_session_adapter.dart';
 export 'flutter_media_session_platform_interface.dart';
 
@@ -66,6 +69,8 @@ class FlutterMediaSession {
     VoidCallback? onFastForward,
     VoidCallback? onShuffle,
     VoidCallback? onRepeat,
+    void Function(String mediaId, Duration? resumeFrom)? onPlayFromMediaId,
+    void Function(String query)? onPlayFromSearch,
   }) {
     _actionHandlerSubscription?.cancel();
     _actionHandlerSubscription =
@@ -103,6 +108,19 @@ class FlutterMediaSession {
         case 'repeat':
           onRepeat?.call();
           break;
+        case 'playFromMediaId':
+          final mediaId = action.mediaId;
+          if (mediaId != null) {
+            onPlayFromMediaId?.call(
+                mediaId,
+                action.isResumption
+                    ? action.startPosition ?? Duration.zero
+                    : null);
+          }
+          break;
+        case 'playFromSearch':
+          onPlayFromSearch?.call(action.query ?? '');
+          break;
       }
     });
   }
@@ -121,8 +139,13 @@ class FlutterMediaSession {
   Future<void> activate() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Unify lifecycle by automatically requesting permissions when activating on Android
-      await FlutterMediaSessionPlatform.instance
-          .requestNotificationPermission();
+      try {
+        await FlutterMediaSessionPlatform.instance
+            .requestNotificationPermission();
+      } on PlatformException {
+        // No screen to ask from: the app was started in the background (a media browser such as
+        // Android Auto, see FlutterMediaSessionEngine). Activate anyway; it is asked next time.
+      }
     }
     return FlutterMediaSessionPlatform.instance.activate();
   }
@@ -183,9 +206,22 @@ class FlutterMediaSession {
   /// Leave this off if your audio player already manages focus
   /// (such as `audioplayers` or `just_audio`). Turn it on for players
   /// that do not manage focus themselves (such as `fvp` or `video_player`).
-  Future<void> setAutoHandleInterruptions(bool enabled) {
-    return FlutterMediaSessionPlatform.instance
-        .setAutoHandleInterruptions(enabled);
+  ///
+  /// [pauseWhenDucked] is for spoken-word content (podcasts, audiobooks, text to speech): when
+  /// another app speaks briefly and would only lower this app's volume (a navigation prompt),
+  /// pause instead, and resume when it's done. Lowered speech under another voice can't be
+  /// followed. Defaults to `false` (the system lowers the volume, which suits music). The pause
+  /// and the resume arrive as `pause` and `play` actions with [MediaAction.isInterruption] set, so
+  /// an app can step back a little when it resumes. Each call sets both, so pass it every time.
+  /// Android only; no effect elsewhere.
+  Future<void> setAutoHandleInterruptions(
+    bool enabled, {
+    bool pauseWhenDucked = false,
+  }) async {
+    final platform = FlutterMediaSessionPlatform.instance;
+    // First, so focus is requested with the right attributes when enabling while playing.
+    await platform.setPauseWhenDucked(enabled && pauseWhenDucked);
+    await platform.setAutoHandleInterruptions(enabled);
   }
 
   /// Opts the session into a background keep-alive. Defaults to `false`.
@@ -198,6 +234,50 @@ class FlutterMediaSession {
   /// such as a Chromecast or DLNA socket on the local network.
   Future<void> setBackgroundKeepAlive(bool enabled) {
     return FlutterMediaSessionPlatform.instance.setBackgroundKeepAlive(enabled);
+  }
+
+  /// Saves what Android Auto, Bluetooth or the system's resume card should resume when they ask to
+  /// play while nothing is loaded (Android Auto does on connect), kept while the app is closed. The
+  /// resume arrives as [MediaAction.playFromMediaId] with [MediaAction.isResumption] and
+  /// [MediaAction.startPosition]. With nothing saved (or after `null`), such a request is declined
+  /// and nothing starts on its own.
+  ///
+  /// Update it when the item changes and when playback pauses or stops, with the position to
+  /// continue from. Android only; does nothing elsewhere.
+  Future<void> setResumptionItem(
+    MediaLibraryItem? item, {
+    Duration position = Duration.zero,
+  }) {
+    return FlutterMediaSessionPlatform.instance
+        .setResumptionItem(item, position);
+  }
+
+  /// Whether a media browser (Android Auto) started the app in the background while it was closed,
+  /// through the shared engine (see the Android Auto section of the usage guide), rather than the
+  /// user opening it.
+  ///
+  /// An app started this way should set up its media library and action handlers, but not
+  /// [activate] the session or start playing until it is asked to (an item picked, a voice request):
+  /// an active session makes it the app Android Auto resumes, taking over from whatever was playing.
+  /// Android only; `false` elsewhere.
+  Future<bool> wasStartedInBackground() {
+    return FlutterMediaSessionPlatform.instance.wasStartedInBackground();
+  }
+
+  /// Opts into a browsable media library, shown by media browsers such as Android Auto.
+  ///
+  /// [getChildren] is asked for the children of a library node: first [MediaLibraryItem.rootId]
+  /// (the top level), then any item that is browsable. Picking a playable item arrives as a
+  /// [MediaAction.playFromMediaId] action (`onPlayFromMediaId` in [setActionHandler], whose
+  /// `resumeFrom` is null for a pick and the saved position for a resume, see [setResumptionItem]); a voice
+  /// request (`play X on <app>`) as [MediaAction.playFromSearch] (`onPlayFromSearch`).
+  ///
+  /// To be listed in Android Auto, the app must also declare itself a media app in its own
+  /// manifest (see the Android Auto section of the usage guide). Until this is called, browse
+  /// requests are refused, as before; a null [getChildren] turns the library off again. Android
+  /// only; no effect elsewhere.
+  Future<void> setMediaLibrary({MediaLibraryChildrenProvider? getChildren}) {
+    return FlutterMediaSessionPlatform.instance.setMediaLibrary(getChildren);
   }
 
   /// Sets the customizable action slot layout for system media controls.

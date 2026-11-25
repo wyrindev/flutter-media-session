@@ -191,6 +191,29 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
             "setSkipIntervals" -> {
                 result.success(null)
             }
+            "wasStartedInBackground" -> {
+                result.success(FlutterMediaSessionEngine.startedInBackground)
+            }
+            "setResumptionItem" -> {
+                val args = call.arguments as? Map<*, *>
+                MediaLibraryPrefs.saveResumption(
+                    context,
+                    args?.get("item") as? Map<*, *>,
+                    (args?.get("positionMs") as? Number)?.toLong() ?: 0L,
+                )
+                result.success(null)
+            }
+            "setPauseWhenDucked" -> {
+                pauseWhenDucked = call.arguments as? Boolean ?: false
+                FlutterMediaSessionService.instance?.onPauseWhenDuckedChanged()
+                result.success(null)
+            }
+            "setMediaLibraryEnabled" -> {
+                mediaLibraryEnabled = call.arguments as? Boolean ?: false
+                if (::context.isInitialized) MediaLibraryPrefs.save(context, mediaLibraryEnabled)
+                FlutterMediaSessionService.instance?.onMediaLibraryEnabledChanged()
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -327,6 +350,44 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
         channel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
         instance = null
+    }
+
+    /**
+     * Whether a brief interruption that only asks for ducking (a navigation prompt) pauses playback
+     * instead, for spoken-word content. Off by default (the system lowers the volume).
+     */
+    var pauseWhenDucked = false
+        internal set
+
+    /**
+     * Whether the app has opted into the browsable media library (Android Auto and other
+     * Media3 browsers) with `setMediaLibrary` on the Dart side. Off by default: the service then
+     * refuses browse requests, as before.
+     */
+    var mediaLibraryEnabled = false
+        internal set
+
+    /**
+     * Asks the Dart side for the children of a media library node. [onResult] receives the
+     * parsed items, or null when the Dart side failed or has no library; it is called on the
+     * main thread.
+     */
+    internal fun requestLibraryChildren(parentId: String, onResult: (List<LibraryItemData>?) -> Unit) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            val methodChannel = channel
+            if (!::channel.isInitialized) {
+                onResult(null)
+                return@post
+            }
+            methodChannel.invokeMethod("getMediaLibraryChildren", mapOf("parentId" to parentId), object : Result {
+                override fun success(result: Any?) = onResult(LibraryItemData.listFrom(result))
+                override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                    android.util.Log.w("FlutterMediaSession", "getMediaLibraryChildren($parentId) failed: $errorCode $errorMessage")
+                    onResult(null)
+                }
+                override fun notImplemented() = onResult(null)
+            })
+        }
     }
 
     /**

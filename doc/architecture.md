@@ -83,7 +83,9 @@ App Playback Stop / Teardown
 
 ### Android: AndroidX Media3 Architecture
 
-- **Core Framework**: Built on AndroidX Media3 `MediaSessionService` and `MediaSession`.
+- **Core Framework**: Built on AndroidX Media3 `MediaLibraryService` and `MediaLibrarySession` (a `MediaSessionService` with browsing). Browse requests are refused unless the app opts into a media library with `setMediaLibrary`; then the library's nodes are fetched from Dart over the method channel (`getMediaLibraryChildren`), and picking an item or a voice search (media items set on the stand-in player, `handleSetMediaItems` / `handleAddMediaItems`) is forwarded as `playFromMediaId` / `playFromSearch`.
+- **Play requests and resumption**: every media item set on the stand-in player becomes one action for Dart: a voice search (`playFromSearch`), a pick (`playFromMediaId`), or a resumed item (`playFromMediaId` with `resumed` and `positionMs`). Resumption comes from Media3's `onPlaybackResumption`, answered from the item the app saved with `setResumptionItem` (kept in SharedPreferences) and marked in the item's request extras; without one it is declined. Until the app gives the session content, the player reports nothing loaded, so an automatic `play` goes to resumption instead of starting playback.
+- **Cold start (opt-in)**: with the `background_engine` meta-data, `FlutterMediaSessionEngine` keeps one Flutter engine in `FlutterEngineCache`, shared by the app's screen (`FlutterMediaSessionActivity`) and the service. The service starts it when a library node below the root is requested or a play request arrives while the app is closed; requests made meanwhile wait (library requests up to 15 seconds) and run once the app turns its library on. Swiping the app away sends `stop`.
 - **Foreground Service Lifecycle**:
   - `FlutterMediaSessionService` runs as an Android foreground service with types `mediaPlayback|connectedDevice` (complying with Android 14+ background execution policies).
   - Handles `POST_NOTIFICATIONS` runtime permission on Android 13+ (API 33+) via automatic permission request during `activate()`.
@@ -92,7 +94,8 @@ App Playback Stop / Teardown
   - Maps `ActionSlotLayout` directly to notification buttons and compact view indices (`setShowActionsInCompactView`).
   - Supports custom actions with custom icon resources (`customIconResource`) located in `res/drawable*`.
 - **Audio Focus**:
-  - When `setAutoHandleInterruptions(true)` is set, the service requests `AUDIOFOCUS_GAIN` via `AudioManagerCompat` upon playback and listens for `AUDIOFOCUS_LOSS` / `AUDIOFOCUS_LOSS_TRANSIENT`, dispatching `pause` or `play` actions across the event channel.
+  - When `setAutoHandleInterruptions(true)` is set, the service requests `AUDIOFOCUS_GAIN` via `AudioManagerCompat` upon playback and listens for `AUDIOFOCUS_LOSS` / `AUDIOFOCUS_LOSS_TRANSIENT`, dispatching `pause` or `play` actions across the event channel, marked with `reason: interruption`.
+  - With `setAutoHandleInterruptions(true, pauseWhenDucked: true)` the request uses `CONTENT_TYPE_SPEECH` and `willPauseWhenDucked`, so `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK` (a navigation prompt) pauses instead of being ducked; focus is kept, and `AUDIOFOCUS_GAIN` resumes.
 - **Keep-Alive**:
   - When `setBackgroundKeepAlive(true)` is enabled, acquires a `PARTIAL_WAKE_LOCK` and a `WIFI_MODE_FULL_HIGH_PERF` Wi-Fi lock to preserve network connections during screen-off streaming (e.g. casting).
 

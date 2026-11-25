@@ -27,6 +27,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Android Auto: this is a media app (the library comes from setMediaLibrary). -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <!-- Lets Android Auto start the app while it is closed: the media service starts its Flutter
+             side in the background, shared with MainActivity (FlutterMediaSessionActivity). -->
+        <meta-data
+            android:name="dev.wyrin.flutter_media_session.background_engine"
+            android:value="true" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

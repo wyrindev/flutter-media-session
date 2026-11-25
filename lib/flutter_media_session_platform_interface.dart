@@ -6,6 +6,7 @@ import 'src/models/media_metadata.dart';
 import 'src/models/playback_state.dart';
 import 'src/models/media_action.dart';
 import 'src/models/action_slot_layout.dart';
+import 'src/models/media_library_item.dart';
 import 'flutter_media_session_method_channel.dart';
 
 /// The platform-specific interface for [FlutterMediaSession].
@@ -132,6 +133,29 @@ abstract class FlutterMediaSessionPlatform extends PlatformInterface {
   }
 
   /// A stream of media actions emitted by the current platform.
+  /// Saves the library item to resume (or clears it with null), kept while the app is closed.
+  Future<void> setResumptionItem(MediaLibraryItem? item, Duration position) {
+    return Future.value();
+  }
+
+  /// Whether the app was started in the background by a media browser (Android Auto) through the
+  /// shared engine, rather than by the user opening it. False where that can't happen.
+  Future<bool> wasStartedInBackground() {
+    return Future.value(false);
+  }
+
+  /// Pause instead of being ducked when another app speaks briefly (a navigation prompt), for
+  /// spoken-word content. Has no effect where the platform doesn't duck.
+  Future<void> setPauseWhenDucked(bool enabled) {
+    return Future.value();
+  }
+
+  /// Opts into a browsable media library (Android Auto and other Media3 browsers), whose items
+  /// [getChildren] provides; null opts out. Has no effect on platforms without media browsers.
+  Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) {
+    return Future.value();
+  }
+
   Stream<MediaAction> get onMediaAction {
     throw UnimplementedError('onMediaAction has not been implemented.');
   }

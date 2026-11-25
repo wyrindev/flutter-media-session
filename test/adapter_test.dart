@@ -14,6 +14,20 @@ class FakeFlutterMediaSessionPlatform
       StreamController<MediaAction>.broadcast();
 
   @override
+  Future<void> setResumptionItem(MediaLibraryItem? item, Duration position) =>
+      Future.value();
+
+  @override
+  Future<bool> wasStartedInBackground() => Future.value(false);
+
+  @override
+  Future<void> setPauseWhenDucked(bool enabled) => Future.value();
+
+  @override
+  Future<void> setMediaLibrary(MediaLibraryChildrenProvider? getChildren) =>
+      Future.value();
+
+  @override
   Future<void> activate() => Future.value();
 
   @override
