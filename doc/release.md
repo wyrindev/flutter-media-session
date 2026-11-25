@@ -24,6 +24,7 @@
    ```
 4. **Bump version and update changelog**:
    - Update version in `pubspec.yaml` and `example/pubspec.yaml` ([Semantic Versioning](https://semver.org/)).
+   - For stable/official releases, additionally update the dependency version in `README.md` (pre-releases should keep the latest stable version).
    - Add a `CHANGELOG.md` entry for the new version.
 
 ---
