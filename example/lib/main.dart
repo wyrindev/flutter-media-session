@@ -61,7 +61,18 @@ class PlayerHome extends StatefulWidget {
 
 class _PlayerHomeState extends State<PlayerHome> {
   final _plugin = FlutterMediaSession();
-  final List<AudioPlayer> _players = [AudioPlayer(), AudioPlayer()];
+  static AudioPlayer _createPlayer() {
+    final player = AudioPlayer();
+    // Default FramePositionUpdater relies on UI frame callbacks, which freeze when backgrounded
+    // or cold-started headlessly by Android Auto. TimerPositionUpdater keeps position live.
+    player.positionUpdater = TimerPositionUpdater(
+      getPosition: player.getCurrentPosition,
+      interval: const Duration(milliseconds: 200),
+    );
+    return player;
+  }
+
+  final List<AudioPlayer> _players = [_createPlayer(), _createPlayer()];
   int _currentPlayerIndex = 0;
   AudioPlayer get _audioPlayer => _players[_currentPlayerIndex];
 
@@ -396,8 +407,13 @@ class _PlayerHomeState extends State<PlayerHome> {
     ]);
 
     _positionSyncTimer?.cancel();
-    _positionSyncTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (_status == PlaybackStatus.playing && !_isBuffering) {
+    _positionSyncTimer =
+        Timer.periodic(const Duration(seconds: 10), (timer) async {
+      if (_status == PlaybackStatus.playing && !_isBuffering && !_isDragging) {
+        final pos = await _audioPlayer.getCurrentPosition();
+        if (pos != null && mounted) {
+          _position = pos;
+        }
         _updatePlayback();
       }
     });
@@ -558,6 +574,10 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _pause() async {
     try {
       await _audioPlayer.pause();
+      final pos = await _audioPlayer.getCurrentPosition();
+      if (pos != null && mounted && _pendingStart == null) {
+        _position = pos;
+      }
     } catch (_) {}
     _saveResumption();
   }
@@ -565,14 +585,15 @@ class _PlayerHomeState extends State<PlayerHome> {
   Future<void> _stop() async {
     _seekDebounce?.cancel();
     await _pause();
+    await _audioPlayer.stop();
     if (mounted) {
       setState(() {
         _position = Duration.zero;
-        _status = PlaybackStatus.paused;
+        _status = PlaybackStatus.idle;
+        _isBuffering = false;
+        _loadedUrl = null;
       });
     }
-    await _audioPlayer.seek(Duration.zero);
-    _updatePlayback();
   }
 
   Future<void> _next() async {
@@ -678,7 +699,7 @@ class _PlayerHomeState extends State<PlayerHome> {
     setState(() {
       _isSwitchingTrack = true;
       _currentIndex = newIndex;
-      _position = Duration.zero;
+      _position = start ?? Duration.zero;
       _currentDuration = Duration.zero;
       _isBuffering = true;
       _hasError = false;

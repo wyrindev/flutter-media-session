@@ -500,7 +500,7 @@ if (!await session.wasStartedInBackground()) {
 // Otherwise activate in onPlayFromMediaId / onPlayFromSearch / onPlay.
 ```
 
-Until the app has given the session metadata or a playback state, the session reports nothing loaded, so an automatic resume from Android Auto doesn't start playback on its own.
+Apps without a media library or a saved resumption item keep the v3.2.1 activation behavior. On Android, `activate()` initially exposes a paused session with a placeholder item. With either feature enabled, the session has an empty playlist until the app sends metadata or playback state, so automatic playback requests can go through the resumption callback. Enabling the library or saving a resumption item after activation also updates the initial session state if the app has yet to send metadata or playback state.
 
 #### Resuming playback
 
@@ -514,6 +514,8 @@ await session.setResumptionItem(
 ```
 
 Save it when the item changes and when playback pauses or stops. The resume arrives as `playFromMediaId`: in `setActionHandler`, `onPlayFromMediaId` gets the saved position as `resumeFrom` (null for a pick); on the `MediaAction`, `isResumption` and `startPosition`. With nothing saved, or after `setResumptionItem(null)`, the request is declined and nothing starts.
+
+Read the current position from your player when saving a resume point. Position updates driven by UI frames can stall when the app is in the background or starts without a screen. For `audioplayers`, the example uses `TimerPositionUpdater` for position events and `getCurrentPosition()` to sample the player directly.
 
 ```dart
 session.setActionHandler(

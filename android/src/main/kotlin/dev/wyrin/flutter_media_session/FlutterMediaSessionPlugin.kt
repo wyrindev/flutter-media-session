@@ -201,6 +201,7 @@ class FlutterMediaSessionPlugin: FlutterPlugin, MethodCallHandler, ActivityAware
                     args?.get("item") as? Map<*, *>,
                     (args?.get("positionMs") as? Number)?.toLong() ?: 0L,
                 )
+                FlutterMediaSessionService.instance?.onResumptionItemChanged()
                 result.success(null)
             }
             "setPauseWhenDucked" -> {

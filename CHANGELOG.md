@@ -11,8 +11,12 @@
 
 ### Improvements
 
-  * **Android**: `FlutterMediaSessionService` is now a `MediaLibraryService`. Without `setMediaLibrary`, it rejects browse requests and behaves as before.
-  * **Android**: The session reports no loaded item until metadata or a playback state is sent. No notification is shown before then, and `play` requests from headsets, Bluetooth, Android Auto, or the resume card are routed to playback resumption.
+  * **Android**: `FlutterMediaSessionService` is now a `MediaLibraryService`. Browsing requires an enabled media library.
+  * **Android**: With the media library enabled or a resumption item saved, the session starts with an empty playlist. Until the app sends metadata or playback state, system controllers can request playback resumption.
+
+### Bug Fixes
+
+  * **Android**: Preserved the v3.2.1 initial session state for apps without a media library or a saved resumption item. Calling `activate()` still exposes a paused session and a placeholder item before the first metadata or playback state update. Existing apps can keep their current activation flow.
 
 ---
 

@@ -30,6 +30,9 @@ internal object MediaLibraryPrefs {
     private const val RESUME_ITEM = "resumption_item"
     private const val RESUME_POSITION = "resumption_position_ms"
 
+    fun hasResumptionItem(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).contains(RESUME_ITEM)
+
     /** Saves what to resume (or clears it with null), kept while the app is closed. */
     fun saveResumption(context: Context, item: Map<*, *>?, positionMs: Long) {
         val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()

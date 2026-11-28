@@ -476,6 +476,10 @@ class FlutterMediaSessionService : MediaLibraryService() {
         }
     }
 
+    fun onResumptionItemChanged() {
+        if (::player.isInitialized) player.refreshCommands()
+    }
+
     /** Library requests waiting for the app's Flutter side to start and turn its library on. */
     private val waitingForLibrary = mutableListOf<() -> Unit>()
 
@@ -490,8 +494,9 @@ class FlutterMediaSessionService : MediaLibraryService() {
 
     /** Sends a play request to the app, or keeps it until the app's Flutter side is ready (cold start). */
     private fun sendPlayRequest(request: Pair<String, Map<String, Any>>) {
-        if (FlutterMediaSessionPlugin.instance?.mediaLibraryEnabled == true) {
-            FlutterMediaSessionPlugin.instance?.sendAction(request.first, request.second)
+        val plugin = FlutterMediaSessionPlugin.instance
+        if (plugin != null && (plugin.mediaLibraryEnabled || request.second["resumed"] == true)) {
+            plugin.sendAction(request.first, request.second)
         } else if (FlutterMediaSessionEngine.startForService(applicationContext)) {
             pendingPlayRequests.add(request)
         }
@@ -508,6 +513,16 @@ class FlutterMediaSessionService : MediaLibraryService() {
         // no longer ends playback by itself. Ask the app to stop, as swiping did before; the service
         // stops once nothing is bound to it, and the process ends as usual.
         if (FlutterMediaSessionEngine.isRunning()) {
+            // A bound browser (Android Auto) keeps the service alive past stopSelf(); clear the
+            // loaded state so reconnecting routes to playback resumption rather than plain play.
+            player.clearLoaded()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            abandonAudioFocus()
             FlutterMediaSessionPlugin.instance?.sendAction("stop")
             stopSelf()
             super.onTaskRemoved(rootIntent)
@@ -1091,14 +1106,18 @@ class FlutterMediaSessionService : MediaLibraryService() {
         private var currentMetadata: MediaMetadata = MediaMetadata.EMPTY
         private var playbackStatus: String = "paused"
 
-        /**
-         * The app has given the session something (metadata or a playback state). Until then the
-         * player reports nothing loaded, so an automatic resume from a system controller (Android Auto
-         * on connect, Bluetooth, the system's resume card) goes to the session's playback resumption,
-         * which declines, instead of being passed on as `play`: a service a media browser bound while
-         * the app was closed must not start playing on its own and take over from another app.
-         */
+        /** Whether the app has provided metadata or playback state. */
         private var loaded = false
+        private var clearedOnTaskRemoval = false
+
+        /** Clears the loaded state (e.g. when the app task is swiped away) so future play requests use resumption. */
+        fun clearLoaded() {
+            loaded = false
+            clearedOnTaskRemoval = true
+            playbackStatus = "idle"
+            lastPositionMs = 0
+            invalidateState()
+        }
 
 
         /** Outer-class accessor — `playbackStatus` is private to this inner
@@ -1118,6 +1137,7 @@ class FlutterMediaSessionService : MediaLibraryService() {
          */
         fun updateMetadata(title: String?, artist: String?, album: String?, artworkUri: String?, durationMs: Long) {
             loaded = true
+            clearedOnTaskRemoval = false
             currentMetadata = MediaMetadata.Builder()
                 .setTitle(title)
                 .setDisplayTitle(title)
@@ -1139,7 +1159,7 @@ class FlutterMediaSessionService : MediaLibraryService() {
             invalidateState()
         }
 
-        /** The commands depend on settings outside the player (the media library): tell controllers again. */
+        /** Refreshes the state and commands after a library, resumption, or audio focus setting changes. */
         fun refreshCommands() {
             invalidateState()
         }
@@ -1154,6 +1174,7 @@ class FlutterMediaSessionService : MediaLibraryService() {
             val isPlaying = status == "playing"
             
             loaded = true
+            clearedOnTaskRemoval = false
             this.playbackStatus = status
             this.lastPositionMs = positionMs
             this.lastPositionUpdateTimeMs = android.os.SystemClock.elapsedRealtime()
@@ -1192,7 +1213,12 @@ class FlutterMediaSessionService : MediaLibraryService() {
         }
 
         override fun getState(): State {
-            val playerState = if (!loaded) Player.STATE_IDLE else when (playbackStatus) {
+            val libraryEnabled = FlutterMediaSessionPlugin.instance?.mediaLibraryEnabled == true ||
+                MediaLibraryPrefs.saved(this@FlutterMediaSessionService)
+            val hasResumptionItem = MediaLibraryPrefs.hasResumptionItem(this@FlutterMediaSessionService)
+            // Keep the legacy placeholder for apps that use only transport controls.
+            val hasMediaItem = loaded || (!clearedOnTaskRemoval && !libraryEnabled && !hasResumptionItem)
+            val playerState = if (!hasMediaItem) Player.STATE_IDLE else when (playbackStatus) {
                 "playing", "paused" -> Player.STATE_READY
                 "buffering" -> Player.STATE_BUFFERING
                 "ended" -> Player.STATE_ENDED
@@ -1238,8 +1264,7 @@ class FlutterMediaSessionService : MediaLibraryService() {
             }
             // With the media library on, browsers (Android Auto) ask to play an item by setting it,
             // and a resumed item is set the same way (also while the app is still starting).
-            if (FlutterMediaSessionPlugin.instance?.mediaLibraryEnabled == true ||
-                MediaLibraryPrefs.saved(this@FlutterMediaSessionService)) {
+            if (libraryEnabled || hasResumptionItem) {
                 commandsBuilder.add(Player.COMMAND_SET_MEDIA_ITEM)
                 commandsBuilder.add(Player.COMMAND_CHANGE_MEDIA_ITEMS)
                 commandsBuilder.add(Player.COMMAND_PREPARE)
@@ -1258,7 +1283,7 @@ class FlutterMediaSessionService : MediaLibraryService() {
                         .setContentType(if (FlutterMediaSessionPlugin.instance?.pauseWhenDucked == true) C.AUDIO_CONTENT_TYPE_SPEECH else C.AUDIO_CONTENT_TYPE_MUSIC)
                         .build()
                 )
-                .setPlaylist(if (!loaded) emptyList() else listOf(
+                .setPlaylist(if (!hasMediaItem) emptyList() else listOf(
                     MediaItemData.Builder("channel_0")
                         .setMediaItem(MediaItem.Builder().setMediaId("channel_0").setMediaMetadata(currentMetadata).build())
                         .setMediaMetadata(currentMetadata)
