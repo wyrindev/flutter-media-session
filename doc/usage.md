@@ -279,26 +279,35 @@ await session.setActionLayout(
 
 > **Android Resource Requirement**: Custom actions require drawable resource names matching files in `android/app/src/main/res/drawable*` (e.g. `ic_repeat_all.xml` or `.png`).
 
-### Opting Out of Android Permissions
+### Android Permission Minimization
 
-The plugin's `AndroidManifest.xml` declares `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `WAKE_LOCK`, and `ACCESS_WIFI_STATE` to support off-device casting via `setBackgroundKeepAlive`.
+Reduce the permissions declared in your app's merged Android manifest when it does not use casting, connected-device playback, or background keep-alive.
 
-If your app only plays local audio, strip these permissions via Manifest Merger in `android/app/src/main/AndroidManifest.xml`:
+#### Check feature usage
+
+- Check your player, casting plugins, and other dependencies for connected-device foreground services. If the media session never handles casting or connected-device playback, override its service type to `mediaPlayback`.
+- Search for `setBackgroundKeepAlive(true)`. If this feature is unused, leave it disabled. If disabling it in an existing integration, call `setBackgroundKeepAlive(false)` and remove the code that enables it.
+- Inspect the app's **Merged Manifest** in Android Studio. Keep each permission that another service or dependency still needs.
+
+#### Update the manifest
+
+When all three permissions are unused, add these overrides in `android/app/src/main/AndroidManifest.xml`. Keep only the removal entries that apply to your app.
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Strip unused casting/keep-alive permissions -->
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.WAKE_LOCK"
         tools:node="remove" />
     <uses-permission
         android:name="android.permission.ACCESS_WIFI_STATE"
         tools:node="remove" />
 
     <application>
-        <!-- Update service type to match the retained permissions (Android 14+ compliance) -->
         <service
             android:name="dev.wyrin.flutter_media_session.FlutterMediaSessionService"
             android:foregroundServiceType="mediaPlayback"
@@ -307,7 +316,7 @@ If your app only plays local audio, strip these permissions via Manifest Merger 
 </manifest>
 ```
 
-> **Android 14+ Notice**: If you remove `FOREGROUND_SERVICE_CONNECTED_DEVICE`, you must also override the `<service>` declaration with `tools:replace="android:foregroundServiceType"` set to `"mediaPlayback"` as shown above. Otherwise, Android 14+ will throw a `SecurityException` at runtime when starting the foreground service.
+On Android 14 and later, a service declaring the `connectedDevice` type needs the corresponding foreground-service permission. Apply the service override whenever you remove `FOREGROUND_SERVICE_CONNECTED_DEVICE`. Rebuild the app and verify the effective service type and the retained permissions in the merged manifest.
 
 ### Skip Intervals (iOS & macOS)
 
@@ -500,7 +509,7 @@ if (!await session.wasStartedInBackground()) {
 // Otherwise activate in onPlayFromMediaId / onPlayFromSearch / onPlay.
 ```
 
-Apps without a media library or a saved resumption item keep the v3.2.1 activation behavior. On Android, `activate()` initially exposes a paused session with a placeholder item. With either feature enabled, the session has an empty playlist until the app sends metadata or playback state, so automatic playback requests can go through the resumption callback. Enabling the library or saving a resumption item after activation also updates the initial session state if the app has yet to send metadata or playback state.
+On Android, when the app has neither a media library nor a saved resumption item, `activate()` initially exposes a paused session with a placeholder item. With either feature enabled, the session has an empty playlist until the app sends metadata or playback state, so automatic playback requests can go through the resumption callback. Enabling the library or saving a resumption item after activation also updates the initial session state if the app has yet to send metadata or playback state.
 
 #### Resuming playback
 

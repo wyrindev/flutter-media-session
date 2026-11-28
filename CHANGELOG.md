@@ -16,7 +16,7 @@
 
 ### Bug Fixes
 
-  * **Android**: Preserved the v3.2.1 initial session state for apps without a media library or a saved resumption item. Calling `activate()` still exposes a paused session and a placeholder item before the first metadata or playback state update. Existing apps can keep their current activation flow.
+  * **Android**: Restored the paused initial session state for apps without a media library or a saved resumption item. Calling `activate()` still exposes a paused session and a placeholder item before the first metadata or playback state update. Existing apps can keep their current activation flow.
 
 ---
 
